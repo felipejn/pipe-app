@@ -31,56 +31,70 @@ O módulo Euromilhões é o primeiro módulo. A arquitectura suporta adição de
 ### Módulo Euromilhões (`app/euromilhoes/`)
 - Modelo `Jogo` (SQLite) — substitui o `jogos.json` dos scripts anteriores
 - `api.py` — consome a API pública com retry exponencial (3 tentativas, backoff 5s/10s/20s)
-- Rotas: listar jogos, registar jogo, apagar jogo, gerar combinação aleatória (endpoint JSON)
+- Rotas implementadas:
+  - `GET /` — listar jogos registados
+  - `POST /registar` — registar novo jogo
+  - `POST /apagar/<id>` — apagar jogo
+  - `GET /gerar` — endpoint JSON para combinação aleatória
+  - `GET /resultados` — página de resultados (carrega imediatamente)
+  - `GET /resultados/dados` — endpoint JSON assíncrono com acertos da API
+  - `GET /frequencias` — análise histórica de frequências
 - Cálculo local do próximo sorteio (terça ou sexta)
+
+### Funcionalidades implementadas
+- **Registo de jogo** com selector de data: próximo sorteio (default) ou data manual
+  - Validação JS: só aceita terças-feiras e sextas-feiras
+  - Botão de registo bloqueado até data + 5 números + 2 estrelas seleccionados
+- **Gerador aleatório** integrado no formulário de registo
+- **Página de resultados** com carregamento em duas fases:
+  - Fase 1 (imediata): jogos locais visíveis com skeleton loader animado
+  - Fase 2 (assíncrona): fetch ao endpoint `/resultados/dados` preenche acertos, bolas do sorteio, badges e total ganho
+  - Filtro por período: último sorteio / 30 dias / 90 dias / todos
+  - Destaque visual em bolas com acerto (outline verde)
+  - Tratamento de erro de API sem bloquear a página
+- **Página de frequências** com análise histórica completa:
+  - Top 5 números mais e menos frequentes
+  - Top 3 estrelas mais e menos frequentes
+  - Tabela completa 1–50 e 1–12 com barras proporcionais
+  - Aviso explícito de que a frequência não prevê sorteios futuros
 
 ### Design System (`app/static/css/pipe.css`)
 - Tema escuro com acentos em âmbar/dourado
-- Componentes: navbar, cartões, formulários, botões, alertas, bolas de números/estrelas
+- Componentes base: navbar, cartões, formulários, botões, alertas, bolas de números/estrelas
+- Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado
 - Layout responsivo (grid de 2 colunas colapsa para 1 em mobile)
-- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/register.html`, `euromilhoes/index.html`
+- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/register.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`
+
+### Testes realizados localmente
+- Login e registo de utilizador ✅
+- Dashboard ✅
+- Registo de jogo (data próximo sorteio e data manual) ✅
+- Gerador aleatório ✅
+- Apagar jogo ✅
+- Página de resultados com skeleton loader ✅
+- Página de frequências ✅
 
 ---
 
 ## Ponto onde estamos
 
-O scaffold está completo e no GitHub. A aplicação **ainda não foi testada a correr** — o próximo passo é arrancar localmente e verificar que tudo funciona.
+O módulo Euromilhões está funcionalmente completo com todas as funcionalidades dos scripts originais migradas para a interface web. A aplicação corre localmente e está actualizada no GitHub.
 
 ---
 
 ## Próximos passos sugeridos (por ordem)
 
-### 1. Primeiro arranque local (prioritário)
-```bash
-pip install -r requirements.txt
-python scripts/criar_admin.py
-python run.py
-```
-Verificar: login, registo, dashboard, módulo Euromilhões, registar jogo, apagar jogo, gerar combinação.
-
-### 2. Integrar lógica dos scripts originais
-Os scripts `euromilhoes.py`, `euromilhoes_frequencia.py` e `euromilhoes_gerador.py` já existem e funcionam.
-Migrar a lógica de verificação de resultados e análise de frequências para as rotas Flask.
-
-### 3. Página de resultados
-Ver resultados dos jogos registados com filtro por período (último sorteio / 30 dias / 90 dias / todos).
-Mostrar acertos e prémios ganhos — lógica já existe em `api.py` (`verificar_acertos`).
-
-### 4. Página de frequências
-Análise histórica de números e estrelas com visualização (barras, top 5 mais/menos frequentes).
-Pode ser uma página dentro do módulo Euromilhões.
-
-### 5. Autenticação 2FA (TOTP)
+### 1. Autenticação 2FA (TOTP)
 Adicionar 2FA via app de autenticação (Google Authenticator / Authy).
 Biblioteca sugerida: `pyotp` + `qrcode`.
 Já previsto na arquitectura — não requer mudanças estruturais.
 
-### 6. Notificações Telegram
+### 2. Notificações Telegram
 Bot Telegram para notificações automáticas de resultados.
 `api.telegram.org` está na lista de domínios permitidos no PythonAnywhere free.
 Scheduled task no PA (1x por dia) — verificar às terças e sextas.
 
-### 7. Deploy no PythonAnywhere
+### 3. Deploy no PythonAnywhere
 Quando o projecto estiver estável localmente:
 ```bash
 # No PA:
@@ -91,6 +105,9 @@ cp .env.example .env   # preencher SECRET_KEY
 python scripts/criar_admin.py
 ```
 Configurar o ficheiro `wsgi.py` com o username do PA.
+
+### 4. Novos módulos PIPE
+A arquitectura com Flask Blueprints permite adicionar módulos independentes com a mesma identidade visual.
 
 ---
 
