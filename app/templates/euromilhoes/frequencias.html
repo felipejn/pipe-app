@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block titulo %}Frequências{% endblock %}
+
+{% block conteudo %}
+<div class="modulo-cabecalho">
+    <h1>📊 Frequências Históricas</h1>
+    {% if total_sorteios %}
+    <p class="modulo-desc">Baseado em <strong>{{ total_sorteios }}</strong> sorteios históricos</p>
+    {% endif %}
+</div>
+
+<div class="aviso-frequencias">
+    ⚠️ A frequência histórica não prevê sorteios futuros. Cada sorteio é independente.
+</div>
+
+{% if erro_api %}
+<div class="alerta alerta-erro">⚠️ {{ erro_api }}</div>
+{% endif %}
+
+{% if freq_numeros %}
+
+<!-- Destaques: top e menos frequentes -->
+<div class="freq-destaques">
+    <div class="cartao">
+        <h3>🔥 Números mais frequentes</h3>
+        <div class="bolas-destaque">
+            {% for n in top5_nums %}
+            <div class="bola-freq">
+                <span class="bola-resultado bola-num-r">{{ n.valor }}</span>
+                <span class="freq-pct">{{ n.pct }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="cartao">
+        <h3>❄️ Números menos frequentes</h3>
+        <div class="bolas-destaque">
+            {% for n in bot5_nums %}
+            <div class="bola-freq">
+                <span class="bola-resultado bola-num-r">{{ n.valor }}</span>
+                <span class="freq-pct">{{ n.pct }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="cartao">
+        <h3>⭐ Estrelas mais frequentes</h3>
+        <div class="bolas-destaque">
+            {% for e in top3_ests %}
+            <div class="bola-freq">
+                <span class="bola-resultado bola-est-r">{{ e.valor }}</span>
+                <span class="freq-pct">{{ e.pct }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="cartao">
+        <h3>🧊 Estrelas menos frequentes</h3>
+        <div class="bolas-destaque">
+            {% for e in bot3_ests %}
+            <div class="bola-freq">
+                <span class="bola-resultado bola-est-r">{{ e.valor }}</span>
+                <span class="freq-pct">{{ e.pct }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Tabela completa: Números -->
+<div class="cartao">
+    <h2>Números (1–50)</h2>
+    <div class="freq-tabela">
+        {% for n in freq_numeros %}
+        <div class="freq-linha">
+            <span class="freq-numero bola-resultado bola-num-r">{{ n.valor }}</span>
+            <div class="freq-barra-cont">
+                <div class="freq-barra" style="width: {{ n.proporcao }}%"></div>
+            </div>
+            <span class="freq-contagem">{{ n.count }}×</span>
+            <span class="freq-pct-label">{{ n.pct }}%</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Tabela completa: Estrelas -->
+<div class="cartao">
+    <h2>Estrelas (1–12)</h2>
+    <div class="freq-tabela">
+        {% for e in freq_estrelas %}
+        <div class="freq-linha">
+            <span class="freq-numero bola-resultado bola-est-r">{{ e.valor }}</span>
+            <div class="freq-barra-cont">
+                <div class="freq-barra freq-barra-est" style="width: {{ e.proporcao }}%"></div>
+            </div>
+            <span class="freq-contagem">{{ e.count }}×</span>
+            <span class="freq-pct-label">{{ e.pct }}%</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endif %}
+
+<!-- Navegação -->
+<div class="navegacao-modulo">
+    <a href="{{ url_for('euromilhoes.resultados') }}" class="btn btn-secundario">← Resultados</a>
+    <a href="{{ url_for('euromilhoes.index') }}" class="btn btn-secundario">Os meus jogos →</a>
+</div>
+
+{% endblock %}

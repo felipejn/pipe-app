@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block titulo %}Resultados{% endblock %}
+
+{% block conteudo %}
+<div class="modulo-cabecalho">
+    <h1>📋 Resultados</h1>
+    <p class="modulo-desc">Acertos dos teus jogos registados</p>
+</div>
+
+<!-- Filtro de período -->
+<div class="filtro-periodo">
+    <span class="filtro-label">Período:</span>
+    <div class="filtro-botoes">
+        <a href="{{ url_for('euromilhoes.resultados', periodo='ultimo') }}"
+           class="btn-filtro {% if periodo == 'ultimo' %}activo{% endif %}">
+            Último sorteio
+        </a>
+        <a href="{{ url_for('euromilhoes.resultados', periodo='30') }}"
+           class="btn-filtro {% if periodo == '30' %}activo{% endif %}">
+            30 dias
+        </a>
+        <a href="{{ url_for('euromilhoes.resultados', periodo='90') }}"
+           class="btn-filtro {% if periodo == '90' %}activo{% endif %}">
+            90 dias
+        </a>
+        <a href="{{ url_for('euromilhoes.resultados', periodo='todos') }}"
+           class="btn-filtro {% if periodo == 'todos' %}activo{% endif %}">
+            Todos
+        </a>
+    </div>
+</div>
+
+{% if erro_api %}
+<div class="alerta alerta-erro">⚠️ {{ erro_api }}</div>
+{% endif %}
+
+{% if resultados %}
+
+<!-- Sumário do período -->
+<div class="cartao resumo-periodo">
+    <div class="resumo-stats">
+        <div class="resumo-stat">
+            <span class="resumo-valor">{{ resultados | length }}</span>
+            <span class="resumo-label">jogos</span>
+        </div>
+        <div class="resumo-stat">
+            <span class="resumo-valor">{{ resultados | selectattr('tem_resultado') | list | length }}</span>
+            <span class="resumo-label">com resultado</span>
+        </div>
+        <div class="resumo-stat destaque">
+            <span class="resumo-valor">
+                {% if total_ganho > 0 %}
+                    {{ "%.2f"|format(total_ganho) }} €
+                {% else %}
+                    0,00 €
+                {% endif %}
+            </span>
+            <span class="resumo-label">total ganho</span>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de resultados -->
+<div class="lista-resultados">
+    {% for r in resultados %}
+    <div class="cartao resultado-item {% if r.premio > 0 %}resultado-ganhou{% endif %}">
+        <div class="resultado-cabecalho">
+            <span class="resultado-data">{{ r.jogo.data_sorteio.strftime('%d/%m/%Y') }}</span>
+            {% if r.tem_resultado %}
+                {% if r.premio > 0 %}
+                <span class="resultado-badge badge-ganhou">🏆 Ganhou {{ "%.2f"|format(r.premio) }} €</span>
+                {% else %}
+                <span class="resultado-badge badge-sem-premio">Sem prémio</span>
+                {% endif %}
+            {% else %}
+                <span class="resultado-badge badge-pendente">⏳ Aguarda sorteio</span>
+            {% endif %}
+        </div>
+
+        <div class="resultado-numeros">
+            <div class="resultado-linha">
+                <span class="resultado-linha-label">Jogado</span>
+                <div class="bolas-linha">
+                    {% for n in r.jogo.get_numeros() %}
+                    {% if r.tem_resultado and n|string in r.sorteio.numbers %}
+                    <span class="bola-resultado bola-num-r bola-acerto">{{ n }}</span>
+                    {% else %}
+                    <span class="bola-resultado bola-num-r">{{ n }}</span>
+                    {% endif %}
+                    {% endfor %}
+                    {% for e in r.jogo.get_estrelas() %}
+                    {% if r.tem_resultado and e|string in r.sorteio.stars %}
+                    <span class="bola-resultado bola-est-r bola-acerto">{{ e }}</span>
+                    {% else %}
+                    <span class="bola-resultado bola-est-r">{{ e }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if r.tem_resultado %}
+            <div class="resultado-linha">
+                <span class="resultado-linha-label">Sorteio</span>
+                <div class="bolas-linha">
+                    {% for n in r.sorteio.numbers %}
+                    <span class="bola-resultado bola-num-r">{{ n }}</span>
+                    {% endfor %}
+                    {% for e in r.sorteio.stars %}
+                    <span class="bola-resultado bola-est-r">{{ e }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="resultado-acertos">
+                <span class="acerto-chip">{{ r.n_acertos }} núm.</span>
+                <span class="acerto-chip acerto-est">{{ r.e_acertos }} est.</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="cartao texto-centrado">
+    <p class="texto-vazio">Nenhum jogo registado para este período.</p>
+    <a href="{{ url_for('euromilhoes.index') }}" class="btn btn-primario">Registar jogo</a>
+</div>
+{% endif %}
+
+<!-- Navegação -->
+<div class="navegacao-modulo">
+    <a href="{{ url_for('euromilhoes.index') }}" class="btn btn-secundario">← Os meus jogos</a>
+    <a href="{{ url_for('euromilhoes.frequencias') }}" class="btn btn-secundario">Frequências →</a>
+</div>
+
+{% endblock %}

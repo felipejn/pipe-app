@@ -9,6 +9,12 @@
     {% endif %}
 </div>
 
+<!-- Navegação do módulo -->
+<div class="modulo-nav">
+    <a href="{{ url_for('euromilhoes.resultados') }}" class="btn btn-secundario">📋 Resultados</a>
+    <a href="{{ url_for('euromilhoes.frequencias') }}" class="btn btn-secundario">📊 Frequências</a>
+</div>
+
 <div class="euro-layout">
     <!-- Painel: Registar jogo -->
     <section class="cartao">
@@ -16,9 +22,27 @@
         <form method="POST" action="{{ url_for('euromilhoes.registar_jogo') }}" id="form-jogo">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-            <input type="hidden" name="data_sorteio"
-                   value="{{ proximo_sorteio.strftime('%Y-%m-%d') if proximo_sorteio else '' }}"
-                   id="data-sorteio-input">
+            <input type="hidden" name="data_sorteio" id="data-sorteio-input"
+                   value="{{ proximo_sorteio.strftime('%Y-%m-%d') if proximo_sorteio else '' }}">
+
+            <div class="campo">
+                <label>Data do sorteio</label>
+                <div class="data-toggle">
+                    <button type="button" class="btn-data-opcao activo" id="btn-proximo">
+                        📅 Próximo ({{ proximo_sorteio.strftime('%d/%m/%Y') if proximo_sorteio else '—' }})
+                    </button>
+                    <button type="button" class="btn-data-opcao" id="btn-outra">
+                        🗓️ Outra data
+                    </button>
+                </div>
+                <div id="painel-outra-data" style="display:none; margin-top: 0.6rem;">
+                    <input type="date" id="input-data-manual" class="input"
+                           placeholder="AAAA-MM-DD">
+                    <span id="erro-data" class="erro-campo" style="display:none;">
+                        Apenas terças-feiras e sextas-feiras são dias de sorteio.
+                    </span>
+                </div>
+            </div>
 
             <div class="campo">
                 <label>Números (escolhe 5)</label>
@@ -97,7 +121,8 @@ let numerosSelec = new Set();
 let estrelasSelec = new Set();
 
 function actualizarBotao() {
-    const ok = numerosSelec.size === MAX_NUMS && estrelasSelec.size === MAX_ESTS;
+    const temData = document.getElementById('data-sorteio-input').value !== '';
+    const ok = numerosSelec.size === MAX_NUMS && estrelasSelec.size === MAX_ESTS && temData;
     document.getElementById('btn-registar').disabled = !ok;
 }
 
@@ -146,6 +171,61 @@ document.querySelectorAll('.bola-est').forEach(btn => {
     });
 });
 
+// --- Selector de data ---
+const inputDataManual = document.getElementById('input-data-manual');
+const painelOutraData = document.getElementById('painel-outra-data');
+const erroData = document.getElementById('erro-data');
+const dataInput = document.getElementById('data-sorteio-input');
+const btnProximo = document.getElementById('btn-proximo');
+const btnOutra = document.getElementById('btn-outra');
+
+function isDiaDeSorteio(dataStr) {
+    // weekday: 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sab
+    // Usar UTC para evitar desvios de fuso horário
+    const d = new Date(dataStr + 'T12:00:00');
+    const dia = d.getDay();
+    return dia === 2 || dia === 5; // Terça=2, Sexta=5
+}
+
+btnProximo.addEventListener('click', () => {
+    btnProximo.classList.add('activo');
+    btnOutra.classList.remove('activo');
+    painelOutraData.style.display = 'none';
+    erroData.style.display = 'none';
+    dataInput.value = '{{ proximo_sorteio.strftime("%Y-%m-%d") if proximo_sorteio else "" }}';
+    actualizarBotao();
+});
+
+btnOutra.addEventListener('click', () => {
+    btnOutra.classList.add('activo');
+    btnProximo.classList.remove('activo');
+    painelOutraData.style.display = 'block';
+    dataInput.value = '';
+    actualizarBotao();
+    inputDataManual.focus();
+});
+
+inputDataManual.addEventListener('change', () => {
+    const val = inputDataManual.value;
+    if (!val) {
+        dataInput.value = '';
+        erroData.style.display = 'none';
+        actualizarBotao();
+        return;
+    }
+    if (isDiaDeSorteio(val)) {
+        dataInput.value = val;
+        erroData.style.display = 'none';
+        inputDataManual.style.borderColor = '';
+    } else {
+        dataInput.value = '';
+        erroData.style.display = 'block';
+        inputDataManual.style.borderColor = 'var(--cor-erro)';
+    }
+    actualizarBotao();
+});
+
+// --- Gerar combinação aleatória ---
 document.getElementById('btn-gerar').addEventListener('click', async () => {
     const resp = await fetch('{{ url_for("euromilhoes.gerar_combinacao") }}');
     const dados = await resp.json();
