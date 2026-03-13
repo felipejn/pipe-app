@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}Dashboard{% endblock %}
+
+{% block conteudo %}
+<div class="dashboard">
+    <div class="dashboard-cabecalho">
+        <h1>Olá, {{ current_user.username }} 👋</h1>
+        <p class="subtitulo">Bem-vindo ao PIPE</p>
+    </div>
+
+    <div class="modulos-grid">
+        <a href="{{ url_for('euromilhoes.index') }}" class="cartao-modulo">
+            <div class="modulo-icone">🎯</div>
+            <div class="modulo-info">
+                <h2>Euromilhões</h2>
+                <p>Regista jogos, verifica resultados e analisa frequências</p>
+            </div>
+            <span class="modulo-seta">→</span>
+        </a>
+        {# Adicionar novos módulos aqui #}
+    </div>
+</div>
+{% endblock %}

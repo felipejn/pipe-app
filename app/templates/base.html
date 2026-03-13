@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block titulo %}PIPE{% endblock %} — PIPE</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pipe.css') }}">
+    {% block estilos_extra %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<nav class="navbar">
+    <div class="navbar-marca">
+        <a href="{{ url_for('dashboard') }}" class="marca-link">
+            <span class="marca-pipe">PIPE</span>
+        </a>
+    </div>
+    <div class="navbar-modulos">
+        <a href="{{ url_for('euromilhoes.index') }}"
+           class="modulo-link {% if request.blueprint == 'euromilhoes' %}activo{% endif %}">
+            🎯 Euromilhões
+        </a>
+        {# Futuros módulos aqui #}
+    </div>
+    <div class="navbar-utilizador">
+        <span class="utilizador-nome">{{ current_user.username }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>
+    </div>
+</nav>
+{% endif %}
+
+<main class="conteudo-principal">
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% if mensagens %}
+        <div class="alertas">
+            {% for categoria, mensagem in mensagens %}
+            <div class="alerta alerta-{{ categoria }}">{{ mensagem }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block conteudo %}{% endblock %}
+</main>
+
+<footer class="rodape">
+    <span>PIPE — Plataforma Inteligente Pessoal e Expansível</span>
+</footer>
+
+<script src="{{ url_for('static', filename='js/pipe.js') }}"></script>
+{% block scripts_extra %}{% endblock %}
+</body>
+</html>

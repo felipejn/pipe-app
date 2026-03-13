@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block titulo %}Criar conta{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-auth">
+    <div class="cartao-auth">
+        <div class="auth-cabecalho">
+            <h1 class="marca-pipe-grande">PIPE</h1>
+            <p>Criar nova conta</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.registo') }}">
+            {{ form.hidden_tag() }}
+            <div class="campo">
+                {{ form.username.label }}
+                {{ form.username(class="input") }}
+                {% for erro in form.username.errors %}
+                <span class="erro-campo">{{ erro }}</span>
+                {% endfor %}
+            </div>
+            <div class="campo">
+                {{ form.email.label }}
+                {{ form.email(class="input") }}
+                {% for erro in form.email.errors %}
+                <span class="erro-campo">{{ erro }}</span>
+                {% endfor %}
+            </div>
+            <div class="campo">
+                {{ form.password.label }}
+                {{ form.password(class="input") }}
+                {% for erro in form.password.errors %}
+                <span class="erro-campo">{{ erro }}</span>
+                {% endfor %}
+            </div>
+            <div class="campo">
+                {{ form.password2.label }}
+                {{ form.password2(class="input") }}
+                {% for erro in form.password2.errors %}
+                <span class="erro-campo">{{ erro }}</span>
+                {% endfor %}
+            </div>
+            <div class="campo">
+                {{ form.submeter(class="btn btn-primario btn-bloco") }}
+            </div>
+        </form>
+
+        <p class="auth-link">
+            Já tens conta?
+            <a href="{{ url_for('auth.login') }}">Entrar</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

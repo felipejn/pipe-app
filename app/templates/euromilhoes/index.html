@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block titulo %}Euromilhões{% endblock %}
+
+{% block conteudo %}
+<div class="modulo-cabecalho">
+    <h1>🎯 Euromilhões</h1>
+    {% if proximo_sorteio %}
+    <p class="proximo-sorteio">Próximo sorteio: <strong>{{ proximo_sorteio.strftime('%A, %d de %B de %Y') }}</strong></p>
+    {% endif %}
+</div>
+
+<div class="euro-layout">
+    <!-- Painel: Registar jogo -->
+    <section class="cartao">
+        <h2>Registar jogo</h2>
+        <form method="POST" action="{{ url_for('euromilhoes.registar_jogo') }}" id="form-jogo">
+            {{ csrf_token() | safe }}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <input type="hidden" name="data_sorteio"
+                   value="{{ proximo_sorteio.strftime('%Y-%m-%d') if proximo_sorteio else '' }}"
+                   id="data-sorteio-input">
+
+            <div class="campo">
+                <label>Números (escolhe 5)</label>
+                <div class="grelha-numeros" id="grelha-numeros">
+                    {% for n in range(1, 51) %}
+                    <button type="button" class="bola-num" data-valor="{{ n }}" data-tipo="numero">
+                        {{ n }}
+                    </button>
+                    {% endfor %}
+                </div>
+                <!-- inputs hidden preenchidos via JS -->
+                <div id="inputs-numeros"></div>
+            </div>
+
+            <div class="campo">
+                <label>Estrelas (escolhe 2)</label>
+                <div class="grelha-estrelas" id="grelha-estrelas">
+                    {% for e in range(1, 13) %}
+                    <button type="button" class="bola-est" data-valor="{{ e }}" data-tipo="estrela">
+                        {{ e }}
+                    </button>
+                    {% endfor %}
+                </div>
+                <div id="inputs-estrelas"></div>
+            </div>
+
+            <div class="campo-linha">
+                <button type="button" class="btn btn-secundario" id="btn-gerar">
+                    🎲 Gerar aleatório
+                </button>
+                <button type="submit" class="btn btn-primario" id="btn-registar" disabled>
+                    Registar jogo
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Painel: Jogos registados -->
+    <section class="cartao">
+        <h2>Os meus jogos</h2>
+        {% if jogos %}
+        <div class="lista-jogos">
+            {% for jogo in jogos %}
+            <div class="item-jogo">
+                <div class="jogo-data">{{ jogo.data_sorteio.strftime('%d/%m/%Y') }}</div>
+                <div class="jogo-numeros">
+                    {% for n in jogo.get_numeros() %}
+                    <span class="bola-resultado bola-num-r">{{ n }}</span>
+                    {% endfor %}
+                    {% for e in jogo.get_estrelas() %}
+                    <span class="bola-resultado bola-est-r">{{ e }}</span>
+                    {% endfor %}
+                </div>
+                <form method="POST"
+                      action="{{ url_for('euromilhoes.apagar_jogo', jogo_id=jogo.id) }}"
+                      style="display:inline"
+                      onsubmit="return confirm('Apagar este jogo?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-apagar" title="Apagar">✕</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="texto-vazio">Ainda não tens jogos registados.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+const MAX_NUMS = 5;
+const MAX_ESTS = 2;
+let numerosSelec = new Set();
+let estrelasSelec = new Set();
+
+function actualizarBotao() {
+    const ok = numerosSelec.size === MAX_NUMS && estrelasSelec.size === MAX_ESTS;
+    document.getElementById('btn-registar').disabled = !ok;
+}
+
+function actualizarInputs() {
+    document.getElementById('inputs-numeros').innerHTML =
+        [...numerosSelec].map(n => `<input type="hidden" name="numeros" value="${n}">`).join('');
+    document.getElementById('inputs-estrelas').innerHTML =
+        [...estrelasSelec].map(e => `<input type="hidden" name="estrelas" value="${e}">`).join('');
+}
+
+function limparSeleccao() {
+    numerosSelec.clear();
+    estrelasSelec.clear();
+    document.querySelectorAll('.bola-num, .bola-est').forEach(b => b.classList.remove('seleccionado'));
+    actualizarInputs();
+    actualizarBotao();
+}
+
+document.querySelectorAll('.bola-num').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const v = parseInt(btn.dataset.valor);
+        if (numerosSelec.has(v)) {
+            numerosSelec.delete(v);
+            btn.classList.remove('seleccionado');
+        } else if (numerosSelec.size < MAX_NUMS) {
+            numerosSelec.add(v);
+            btn.classList.add('seleccionado');
+        }
+        actualizarInputs();
+        actualizarBotao();
+    });
+});
+
+document.querySelectorAll('.bola-est').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const v = parseInt(btn.dataset.valor);
+        if (estrelasSelec.has(v)) {
+            estrelasSelec.delete(v);
+            btn.classList.remove('seleccionado');
+        } else if (estrelasSelec.size < MAX_ESTS) {
+            estrelasSelec.add(v);
+            btn.classList.add('seleccionado');
+        }
+        actualizarInputs();
+        actualizarBotao();
+    });
+});
+
+document.getElementById('btn-gerar').addEventListener('click', async () => {
+    const resp = await fetch('{{ url_for("euromilhoes.gerar_combinacao") }}');
+    const dados = await resp.json();
+    limparSeleccao();
+    dados.numeros.forEach(n => {
+        numerosSelec.add(n);
+        document.querySelector(`.bola-num[data-valor="${n}"]`)?.classList.add('seleccionado');
+    });
+    dados.estrelas.forEach(e => {
+        estrelasSelec.add(e);
+        document.querySelector(`.bola-est[data-valor="${e}"]`)?.classList.add('seleccionado');
+    });
+    actualizarInputs();
+    actualizarBotao();
+});
+</script>
+{% endblock %}
