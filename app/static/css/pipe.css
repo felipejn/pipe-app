@@ -739,3 +739,104 @@ a:hover { text-decoration: underline; }
     color: #000;
     font-weight: 600;
 }
+
+/* ---- Skeleton loader ---- */
+@keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+.skeleton {
+    background: linear-gradient(90deg,
+        var(--cor-superficie-2) 25%,
+        var(--cor-borda) 50%,
+        var(--cor-superficie-2) 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s infinite linear;
+    border-radius: var(--raio-sm);
+    display: inline-block;
+}
+
+.skeleton-inline {
+    width: 60px;
+    height: 1.4em;
+    vertical-align: middle;
+}
+
+.skeleton-chip {
+    width: 56px;
+    height: 24px;
+    border-radius: 20px;
+}
+
+.skeleton-bola {
+    background: linear-gradient(90deg,
+        var(--cor-superficie-2) 25%,
+        var(--cor-borda) 50%,
+        var(--cor-superficie-2) 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s infinite linear;
+    opacity: 0.5;
+}
+
+.skeleton-bola-est {
+    opacity: 0.35;
+}
+
+/* ---- Spinner ---- */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--cor-borda);
+    border-top-color: var(--cor-primaria);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+}
+
+.spinner-mini {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: var(--cor-texto-suave);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.3rem;
+}
+
+/* ---- Estado da API ---- */
+.estado-api {
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--raio-sm);
+    margin-bottom: 1rem;
+}
+
+.estado-carregando {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    color: var(--cor-texto-suave);
+}
+
+/* ---- Badge a carregar ---- */
+.badge-carregando {
+    background: var(--cor-superficie-2);
+    color: var(--cor-texto-suave);
+    border: 1px solid var(--cor-borda);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+}

@@ -75,83 +75,95 @@ def gerar_combinacao():
 @euromilhoes.route('/resultados')
 @login_required
 def resultados():
-    """Página de resultados — verifica acertos dos jogos registados."""
+    """Página de resultados — carrega imediatamente com jogos locais.
+    Os acertos são preenchidos via fetch ao endpoint /resultados/dados."""
     periodo = request.args.get('periodo', 'ultimo')
-
-    # Determinar intervalo de datas
     hoje = date.today()
+
     if periodo == '30':
         data_inicio = hoje - timedelta(days=30)
     elif periodo == '90':
         data_inicio = hoje - timedelta(days=90)
     elif periodo == 'todos':
-        data_inicio = date(2004, 1, 1)  # Euromilhões começou em 2004
+        data_inicio = date(2004, 1, 1)
     else:
-        # Último sorteio: calcular a data do sorteio mais recente passado
         data_inicio = hoje - timedelta(days=7)
         periodo = 'ultimo'
 
-    # Obter jogos do utilizador no período
     jogos = Jogo.query.filter_by(user_id=current_user.id)\
                       .filter(Jogo.data_sorteio >= data_inicio)\
                       .filter(Jogo.data_sorteio <= hoje)\
                       .order_by(Jogo.data_sorteio.desc()).all()
 
-    # Obter sorteios históricos da API
-    sorteios_api = []
-    erro_api = None
+    return render_template('euromilhoes/resultados.html',
+                           jogos=jogos,
+                           periodo=periodo)
+
+
+@euromilhoes.route('/resultados/dados')
+@login_required
+def resultados_dados():
+    """Endpoint JSON — faz chamada à API e devolve acertos calculados."""
+    periodo = request.args.get('periodo', 'ultimo')
+    hoje = date.today()
+
+    if periodo == '30':
+        data_inicio = hoje - timedelta(days=30)
+    elif periodo == '90':
+        data_inicio = hoje - timedelta(days=90)
+    elif periodo == 'todos':
+        data_inicio = date(2004, 1, 1)
+    else:
+        data_inicio = hoje - timedelta(days=7)
+
+    jogos = Jogo.query.filter_by(user_id=current_user.id)\
+                      .filter(Jogo.data_sorteio >= data_inicio)\
+                      .filter(Jogo.data_sorteio <= hoje)\
+                      .order_by(Jogo.data_sorteio.desc()).all()
+
     try:
         todos = euro_api.obter_todos_sorteios()
-        if todos:
-            # Filtrar sorteios no período
-            sorteios_api = [
-                s for s in todos
-                if data_inicio <= datetime.strptime(s['date'], '%Y-%m-%d').date() <= hoje
-            ]
-    except Exception as ex:
-        erro_api = 'Não foi possível contactar a API. Tenta novamente mais tarde.'
+    except Exception:
+        return jsonify({'erro': 'Não foi possível contactar a API. Tenta novamente mais tarde.'})
 
-    # Cruzar jogos com sorteios
-    resultados_jogos = []
+    sorteios_por_data = {}
+    if todos:
+        for s in todos:
+            sorteios_por_data[s['date']] = s
+
+    resultados_json = []
     total_ganho = 0
 
     for jogo in jogos:
-        # Encontrar o sorteio correspondente à data do jogo
-        sorteio_match = next(
-            (s for s in sorteios_api
-             if datetime.strptime(s['date'], '%Y-%m-%d').date() == jogo.data_sorteio),
-            None
-        )
+        data_str = jogo.data_sorteio.strftime('%Y-%m-%d')
+        sorteio = sorteios_por_data.get(data_str)
 
-        if sorteio_match:
+        if sorteio:
             n_ac, e_ac, premio = euro_api.verificar_acertos(
-                jogo.get_numeros(), jogo.get_estrelas(), sorteio_match
+                jogo.get_numeros(), jogo.get_estrelas(), sorteio
             )
             total_ganho += premio
-            resultados_jogos.append({
-                'jogo': jogo,
-                'sorteio': sorteio_match,
+            resultados_json.append({
+                'jogo_id': jogo.id,
                 'n_acertos': n_ac,
                 'e_acertos': e_ac,
                 'premio': premio,
+                'numeros_sorteio': sorteio.get('numbers', []),
+                'estrelas_sorteio': sorteio.get('stars', []),
                 'tem_resultado': True,
             })
         else:
-            # Sorteio ainda não aconteceu ou não está na API
-            resultados_jogos.append({
-                'jogo': jogo,
-                'sorteio': None,
+            resultados_json.append({
+                'jogo_id': jogo.id,
                 'n_acertos': 0,
                 'e_acertos': 0,
                 'premio': 0,
+                'numeros_sorteio': [],
+                'estrelas_sorteio': [],
                 'tem_resultado': False,
             })
 
-    return render_template('euromilhoes/resultados.html',
-                           resultados=resultados_jogos,
-                           total_ganho=total_ganho,
-                           periodo=periodo,
-                           erro_api=erro_api)
+    return jsonify({'resultados': resultados_json, 'total_ganho': total_ganho})
 
 
 @euromilhoes.route('/frequencias')
@@ -176,7 +188,6 @@ def frequencias():
                 for e in s.get('stars', []):
                     cont_ests[int(e)] += 1
 
-            # Números 1-50 com percentagem e proporção para barra visual
             max_num = max(cont_nums.values()) if cont_nums else 1
             for n in range(1, 51):
                 count = cont_nums.get(n, 0)
@@ -187,7 +198,6 @@ def frequencias():
                     'proporcao': round(count / max_num * 100, 1) if max_num else 0,
                 })
 
-            # Estrelas 1-12
             max_est = max(cont_ests.values()) if cont_ests else 1
             for e in range(1, 13):
                 count = cont_ests.get(e, 0)
@@ -201,7 +211,6 @@ def frequencias():
     except Exception:
         erro_api = 'Não foi possível contactar a API. Tenta novamente mais tarde.'
 
-    # Top 5 mais e menos frequentes
     top5_nums = sorted(freq_numeros, key=lambda x: x['count'], reverse=True)[:5]
     bot5_nums = sorted(freq_numeros, key=lambda x: x['count'])[:5]
     top3_ests = sorted(freq_estrelas, key=lambda x: x['count'], reverse=True)[:3]

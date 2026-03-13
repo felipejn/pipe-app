@@ -30,92 +30,79 @@
     </div>
 </div>
 
-{% if erro_api %}
-<div class="alerta alerta-erro">⚠️ {{ erro_api }}</div>
-{% endif %}
+{% if jogos %}
 
-{% if resultados %}
-
-<!-- Sumário do período -->
-<div class="cartao resumo-periodo">
+<!-- Sumário — preenchido via JS quando os dados chegam -->
+<div class="cartao resumo-periodo" id="resumo">
     <div class="resumo-stats">
         <div class="resumo-stat">
-            <span class="resumo-valor">{{ resultados | length }}</span>
+            <span class="resumo-valor">{{ jogos | length }}</span>
             <span class="resumo-label">jogos</span>
         </div>
         <div class="resumo-stat">
-            <span class="resumo-valor">{{ resultados | selectattr('tem_resultado') | list | length }}</span>
+            <span class="resumo-valor" id="resumo-com-resultado">
+                <span class="skeleton skeleton-inline"></span>
+            </span>
             <span class="resumo-label">com resultado</span>
         </div>
         <div class="resumo-stat destaque">
-            <span class="resumo-valor">
-                {% if total_ganho > 0 %}
-                    {{ "%.2f"|format(total_ganho) }} €
-                {% else %}
-                    0,00 €
-                {% endif %}
+            <span class="resumo-valor" id="resumo-total">
+                <span class="skeleton skeleton-inline"></span>
             </span>
             <span class="resumo-label">total ganho</span>
         </div>
     </div>
 </div>
 
-<!-- Lista de resultados -->
-<div class="lista-resultados">
-    {% for r in resultados %}
-    <div class="cartao resultado-item {% if r.premio > 0 %}resultado-ganhou{% endif %}">
+<!-- Indicador de carregamento -->
+<div id="estado-api" class="estado-api estado-carregando">
+    <span class="spinner"></span> A consultar resultados na API…
+</div>
+
+<!-- Lista de jogos — estrutura imediata, acertos preenchidos via JS -->
+<div class="lista-resultados" id="lista-resultados">
+    {% for jogo in jogos %}
+    <div class="cartao resultado-item" id="jogo-{{ jogo.id }}" data-jogo-id="{{ jogo.id }}"
+         data-numeros="{{ jogo.get_numeros() | join(',') }}"
+         data-estrelas="{{ jogo.get_estrelas() | join(',') }}">
+
         <div class="resultado-cabecalho">
-            <span class="resultado-data">{{ r.jogo.data_sorteio.strftime('%d/%m/%Y') }}</span>
-            {% if r.tem_resultado %}
-                {% if r.premio > 0 %}
-                <span class="resultado-badge badge-ganhou">🏆 Ganhou {{ "%.2f"|format(r.premio) }} €</span>
-                {% else %}
-                <span class="resultado-badge badge-sem-premio">Sem prémio</span>
-                {% endif %}
-            {% else %}
-                <span class="resultado-badge badge-pendente">⏳ Aguarda sorteio</span>
-            {% endif %}
+            <span class="resultado-data">{{ jogo.data_sorteio.strftime('%d/%m/%Y') }}</span>
+            <span class="resultado-badge badge-carregando" id="badge-{{ jogo.id }}">
+                <span class="spinner-mini"></span> A verificar…
+            </span>
         </div>
 
         <div class="resultado-numeros">
+            <!-- Linha: jogado -->
             <div class="resultado-linha">
                 <span class="resultado-linha-label">Jogado</span>
-                <div class="bolas-linha">
-                    {% for n in r.jogo.get_numeros() %}
-                    {% if r.tem_resultado and n|string in r.sorteio.numbers %}
-                    <span class="bola-resultado bola-num-r bola-acerto">{{ n }}</span>
-                    {% else %}
+                <div class="bolas-linha" id="bolas-jogado-{{ jogo.id }}">
+                    {% for n in jogo.get_numeros() %}
                     <span class="bola-resultado bola-num-r">{{ n }}</span>
-                    {% endif %}
                     {% endfor %}
-                    {% for e in r.jogo.get_estrelas() %}
-                    {% if r.tem_resultado and e|string in r.sorteio.stars %}
-                    <span class="bola-resultado bola-est-r bola-acerto">{{ e }}</span>
-                    {% else %}
+                    {% for e in jogo.get_estrelas() %}
                     <span class="bola-resultado bola-est-r">{{ e }}</span>
-                    {% endif %}
                     {% endfor %}
                 </div>
             </div>
-
-            {% if r.tem_resultado %}
-            <div class="resultado-linha">
+            <!-- Linha: sorteio — skeleton enquanto carrega -->
+            <div class="resultado-linha" id="linha-sorteio-{{ jogo.id }}">
                 <span class="resultado-linha-label">Sorteio</span>
                 <div class="bolas-linha">
-                    {% for n in r.sorteio.numbers %}
-                    <span class="bola-resultado bola-num-r">{{ n }}</span>
+                    {% for _ in range(5) %}
+                    <span class="bola-resultado skeleton-bola"></span>
                     {% endfor %}
-                    {% for e in r.sorteio.stars %}
-                    <span class="bola-resultado bola-est-r">{{ e }}</span>
+                    {% for _ in range(2) %}
+                    <span class="bola-resultado skeleton-bola skeleton-bola-est"></span>
                     {% endfor %}
                 </div>
             </div>
-
-            <div class="resultado-acertos">
-                <span class="acerto-chip">{{ r.n_acertos }} núm.</span>
-                <span class="acerto-chip acerto-est">{{ r.e_acertos }} est.</span>
+            <!-- Acertos — skeleton enquanto carrega -->
+            <div class="resultado-acertos" id="acertos-{{ jogo.id }}">
+                <span class="skeleton skeleton-chip"></span>
+                <span class="skeleton skeleton-chip"></span>
             </div>
-            {% endif %}
         </div>
     </div>
     {% endfor %}
@@ -134,4 +121,141 @@
     <a href="{{ url_for('euromilhoes.frequencias') }}" class="btn btn-secundario">Frequências →</a>
 </div>
 
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+const PERIODO = '{{ periodo }}';
+const URL_DADOS = '{{ url_for("euromilhoes.resultados_dados") }}?periodo=' + PERIODO;
+
+async function carregarResultados() {
+    const estadoEl = document.getElementById('estado-api');
+    if (!estadoEl) return; // sem jogos na página
+
+    try {
+        const resp = await fetch(URL_DADOS);
+        const dados = await resp.json();
+
+        estadoEl.remove();
+
+        if (dados.erro) {
+            mostrarErroApi(dados.erro);
+            limparSkeletons();
+            return;
+        }
+
+        // Preencher resumo
+        const comResultado = dados.resultados.filter(r => r.tem_resultado).length;
+        document.getElementById('resumo-com-resultado').textContent = comResultado;
+        const totalEl = document.getElementById('resumo-total');
+        totalEl.textContent = dados.total_ganho > 0
+            ? dados.total_ganho.toFixed(2) + ' €'
+            : '0,00 €';
+
+        // Preencher cada jogo
+        dados.resultados.forEach(r => {
+            preencherJogo(r);
+        });
+
+    } catch (e) {
+        estadoEl.remove();
+        mostrarErroApi('Erro de ligação. Verifica a tua conexão e tenta novamente.');
+        limparSkeletons();
+    }
+}
+
+function preencherJogo(r) {
+    const card = document.getElementById('jogo-' + r.jogo_id);
+    if (!card) return;
+
+    const numJogados = card.dataset.numeros.split(',').map(Number);
+    const estJogadas = card.dataset.estrelas.split(',').map(Number);
+
+    // Badge
+    const badge = document.getElementById('badge-' + r.jogo_id);
+    if (r.tem_resultado) {
+        if (r.premio > 0) {
+            badge.className = 'resultado-badge badge-ganhou';
+            badge.innerHTML = '🏆 Ganhou ' + r.premio.toFixed(2) + ' €';
+            card.classList.add('resultado-ganhou');
+        } else {
+            badge.className = 'resultado-badge badge-sem-premio';
+            badge.textContent = 'Sem prémio';
+        }
+    } else {
+        badge.className = 'resultado-badge badge-pendente';
+        badge.textContent = '⏳ Aguarda sorteio';
+    }
+
+    // Remarcar bolas jogadas com acertos
+    const bolasJogado = document.getElementById('bolas-jogado-' + r.jogo_id);
+    if (bolasJogado && r.tem_resultado) {
+        const numsStr = r.numeros_sorteio.map(String);
+        const estsStr = r.estrelas_sorteio.map(String);
+        bolasJogado.querySelectorAll('.bola-num-r').forEach(b => {
+            if (numsStr.includes(b.textContent.trim())) b.classList.add('bola-acerto');
+        });
+        bolasJogado.querySelectorAll('.bola-est-r').forEach(b => {
+            if (estsStr.includes(b.textContent.trim())) b.classList.add('bola-acerto');
+        });
+    }
+
+    // Linha do sorteio
+    const linhaSorteio = document.getElementById('linha-sorteio-' + r.jogo_id);
+    if (linhaSorteio) {
+        if (r.tem_resultado) {
+            const bolasHTML = r.numeros_sorteio.map(n =>
+                `<span class="bola-resultado bola-num-r">${n}</span>`
+            ).join('') + r.estrelas_sorteio.map(e =>
+                `<span class="bola-resultado bola-est-r">${e}</span>`
+            ).join('');
+            linhaSorteio.querySelector('.bolas-linha').innerHTML = bolasHTML;
+        } else {
+            linhaSorteio.style.display = 'none';
+        }
+    }
+
+    // Chips de acertos
+    const acertosEl = document.getElementById('acertos-' + r.jogo_id);
+    if (acertosEl) {
+        if (r.tem_resultado) {
+            acertosEl.innerHTML =
+                `<span class="acerto-chip">${r.n_acertos} núm.</span>` +
+                `<span class="acerto-chip acerto-est">${r.e_acertos} est.</span>`;
+        } else {
+            acertosEl.innerHTML = '';
+        }
+    }
+}
+
+function mostrarErroApi(msg) {
+    const lista = document.getElementById('lista-resultados');
+    const erroEl = document.createElement('div');
+    erroEl.className = 'alerta alerta-erro';
+    erroEl.textContent = '⚠️ ' + msg;
+    lista.insertAdjacentElement('beforebegin', erroEl);
+}
+
+function limparSkeletons() {
+    // Se a API falhou, substituir skeletons por '—'
+    document.querySelectorAll('.skeleton-bola').forEach(el => {
+        el.style.background = 'var(--cor-superficie-2)';
+    });
+    document.querySelectorAll('.skeleton').forEach(el => {
+        el.textContent = '—';
+        el.className = '';
+        el.style.color = 'var(--cor-texto-suave)';
+    });
+    document.querySelectorAll('.badge-carregando').forEach(el => {
+        el.className = 'resultado-badge badge-pendente';
+        el.textContent = '— sem dados';
+    });
+    const resumoCom = document.getElementById('resumo-com-resultado');
+    const resumoTotal = document.getElementById('resumo-total');
+    if (resumoCom) resumoCom.textContent = '—';
+    if (resumoTotal) resumoTotal.textContent = '—';
+}
+
+carregarResultados();
+</script>
 {% endblock %}
