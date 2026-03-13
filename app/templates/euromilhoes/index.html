@@ -14,7 +14,6 @@
     <section class="cartao">
         <h2>Registar jogo</h2>
         <form method="POST" action="{{ url_for('euromilhoes.registar_jogo') }}" id="form-jogo">
-            {{ csrf_token() | safe }}
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <input type="hidden" name="data_sorteio"
