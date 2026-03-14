@@ -20,43 +20,25 @@ O módulo Euromilhões é o primeiro módulo. A arquitectura suporta adição de
 pipe-app/
 ├── app/
 │   ├── __init__.py          # create_app, app factory
-│   ├── models.py
 │   ├── static/
 │   │   └── css/pipe.css     # design system (tema escuro, âmbar/dourado)
 │   ├── templates/
 │   │   ├── base.html
 │   │   ├── dashboard.html
 │   │   ├── auth/
-│   │   └── euromilhoes/
+│   │   ├── euromilhoes/
+│   │   └── settings/
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout
-│   │   └── forms.py         # LoginForm, RegistoForm
-│   └── euromilhoes/         # Blueprint Euromilhões
-│       ├── __init__.py
-│       ├── routes.py
-│       ├── models.py        # modelo Jogo (SQLite)
-│       └── api.py           # consumo API pública + retry exponencial
-├── scripts/
-│   └── criar_admin.py
-├── instance/
-│   └── pipe.db              # SQLite (excluído do git)
-├── .env                     # variáveis locais (excluído do git)
-├── .env.example
-├── requirements.txt
-└── run.py
-```
-- App factory (`create_app`) com suporte a configurações Development/Production
-- Flask-SQLAlchemy com SQLite (`instance/pipe.db`)
-- Flask-Login para gestão de sessões
-- Flask-WTF para formulários com protecção CSRF
-- Dois Blueprints registados: `auth` e `euromilhoes`
-
-### Estrutura alvo (com notificações)
-```
-pipe-app/
-├── app/
-│   ├── notifications/       # NOVO — serviço central de notificações
+│   │   ├── forms.py         # LoginForm, RegistoForm
+│   │   └── models.py        # modelo User
+│   ├── euromilhoes/         # Blueprint Euromilhões
+│   │   ├── __init__.py
+│   │   ├── routes.py
+│   │   ├── models.py        # modelo Jogo (SQLite)
+│   │   └── api.py           # consumo API pública + retry exponencial
+│   ├── notifications/       # serviço central de notificações
 │   │   ├── __init__.py      # expõe notification_service
 │   │   ├── service.py       # NotificationService
 │   │   ├── models.py        # UserNotificationPreferences (BD)
@@ -64,10 +46,18 @@ pipe-app/
 │   │       ├── base.py      # classe abstracta BaseChannel
 │   │       ├── telegram.py  # TelegramChannel
 │   │       └── email.py     # EmailChannel (SendGrid)
-│   ├── auth/
-│   ├── euromilhoes/
-│   └── [módulos futuros]/
-└── ...
+│   └── settings/            # Blueprint de definições
+│       ├── __init__.py
+│       └── routes.py        # /definicoes/
+├── scripts/
+│   ├── criar_admin.py
+│   └── verificar_resultados.py  # scheduled task PA
+├── instance/
+│   └── pipe.db              # SQLite (excluído do git)
+├── .env                     # variáveis locais (excluído do git)
+├── .env.example
+├── requirements.txt
+└── run.py
 ```
 
 ### Módulo Auth (`app/auth/`)
@@ -106,12 +96,20 @@ pipe-app/
   - Tabela completa 1–50 e 1–12 com barras proporcionais
   - Aviso explícito de que a frequência não prevê sorteios futuros
 
+### Sistema de notificações (`app/notifications/`)
+- Serviço central `NotificationService` — cada módulo chama apenas `notification_service.send()`
+- `TelegramChannel` — Bot API Telegram, testado e a funcionar ✅
+- `EmailChannel` — SendGrid API v3, testado e a funcionar ✅
+- `UserNotificationPreferences` — preferências por utilizador na BD (canal activo, chat_id, tipos)
+- Página de definições em `/definicoes` com toggles por canal e botões de teste
+- `scripts/verificar_resultados.py` — scheduled task para o PA (corre às 23:00 às terças e sextas)
+
 ### Design System (`app/static/css/pipe.css`)
 - Tema escuro com acentos em âmbar/dourado
 - Componentes base: navbar, cartões, formulários, botões, alertas, bolas de números/estrelas
-- Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado
+- Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado, toggle switch, página de definições
 - Layout responsivo (grid de 2 colunas colapsa para 1 em mobile)
-- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/register.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`
+- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/register.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`
 
 ### Testes realizados localmente
 - Login e registo de utilizador ✅
@@ -121,6 +119,9 @@ pipe-app/
 - Apagar jogo ✅
 - Página de resultados com skeleton loader ✅
 - Página de frequências ✅
+- Notificação Telegram (teste manual) ✅
+- Notificação Email SendGrid (teste manual) ✅
+- Script `verificar_resultados.py` (teste manual com dia comentado) ✅
 
 ---
 
@@ -146,47 +147,60 @@ notification_service.send(
 ### Canais
 | Canal | Estado | Notas |
 |---|---|---|
-| `TelegramChannel` | Planeado (prioritário) | `api.telegram.org` permitido no PA free |
-| `EmailChannel` | Planeado | SendGrid — 100 emails/dia grátis, domínio permitido no PA |
+| `TelegramChannel` | Implementado ✅ | Bot criado, token configurado no `.env` |
+| `EmailChannel` | Implementado ✅ | SendGrid, remetente verificado, API key no `.env` |
 | `WebPushChannel` | Futuro | Notificações browser |
 
-**Nota:** Gmail SMTP bloqueado no PythonAnywhere free. WhatsApp descartado (sem solução gratuita sustentável).
+---
+
+## Arquitectura de 2FA (decisão de design)
+
+O 2FA é obrigatório para todos os utilizadores.
+O utilizador pode ter múltiplos métodos activos em simultâneo e escolhe qual usar no momento do login.
+
+### Métodos planeados
+| Método | Biblioteca | Descrição |
+|---|---|---|
+| TOTP | `pyotp` + `qrcode` | Google Authenticator / Authy — código gerado localmente |
+| Telegram | canal existente | Bot envia código de 6 dígitos |
+| Email | canal existente | SendGrid envia código de 6 dígitos |
+
+### Fluxo de login com 2FA
+1. Utilizador introduz username + password
+2. Se credenciais válidas → redireciona para página de verificação 2FA
+3. Utilizador escolhe o método e introduz o código
+4. Código válido → acesso concedido
 
 ---
 
 ## Ponto onde estamos
 
-O módulo Euromilhões está funcionalmente completo com todas as funcionalidades dos scripts originais migradas para a interface web. A aplicação corre localmente e está actualizada no GitHub. A arquitectura de notificações está definida mas não implementada.
+O módulo Euromilhões está completo e testado. O sistema de notificações está implementado e testado (Telegram + Email). A scheduled task está pronta para configurar no PA. A arquitectura do 2FA está definida, implementação a iniciar.
 
 ---
 
 ## Próximos passos (por ordem)
 
-### 1. Implementar NotificationService + TelegramChannel
-Criar `app/notifications/` conforme arquitectura definida acima.
-Começar por `service.py` e `channels/telegram.py`.
-Scheduled task no PA (1x por dia) — verificar resultados às terças e sextas.
+### 1. Autenticação 2FA
+- Obrigatório para todos os utilizadores
+- Métodos: TOTP (`pyotp` + `qrcode`), Telegram, Email
+- Utilizador pode ter múltiplos métodos activos — escolhe qual usar no login
+- Adicionar ao modelo `User`: `totp_secret`, `dois_fa_activo`
+- Novas rotas em `app/auth/`: `/auth/2fa/verificar`, `/auth/2fa/configurar`
+- Interface na página de definições (`/definicoes`)
 
-### 2. Implementar EmailChannel (SendGrid)
-`channels/email.py` com SendGrid como canal de email.
-
-### 3. Autenticação 2FA (TOTP)
-Adicionar 2FA via app de autenticação (Google Authenticator / Authy).
-Biblioteca sugerida: `pyotp` + `qrcode`.
-Já previsto na arquitectura — não requer mudanças estruturais.
-
-### 4. Deploy no PythonAnywhere
+### 2. Deploy no PythonAnywhere
 ```bash
-# No PA:
 git clone https://github.com/felipejn/pipe-app.git
 cd pipe-app
 pip install -r requirements.txt --user
-cp .env.example .env   # preencher SECRET_KEY
+cp .env.example .env   # preencher todas as variáveis
 python scripts/criar_admin.py
 ```
-Configurar o ficheiro `wsgi.py` com o username do PA.
+- Configurar `wsgi.py` com o username do PA
+- Configurar scheduled task: `python ~/pipe-app/scripts/verificar_resultados.py` às 23:00
 
-### 5. Novos módulos PIPE
+### 3. Novos módulos PIPE
 A arquitectura com Flask Blueprints permite adicionar módulos independentes com a mesma identidade visual.
 
 ---
@@ -200,12 +214,26 @@ Flask-SQLAlchemy==3.1.1
 Werkzeug==3.0.3
 WTForms==3.1.2
 python-dotenv==1.0.1
+requests==2.32.3
+```
+
+## Variáveis de ambiente (`.env`)
+```
+FLASK_ENV=development
+SECRET_KEY=...
+
+# Telegram
+TELEGRAM_BOT_TOKEN=...
+
+# SendGrid
+SENDGRID_API_KEY=...
+SENDGRID_FROM_EMAIL=...
 ```
 
 ## Contexto técnico
 - Python com ortografia Portuguesa Europeia em todos os comentários e mensagens
-- Hosting alvo: PythonAnywhere (plano free)
+- Hosting alvo: PythonAnywhere (plano free) — espaço em disco não é problema (~37MB para .venv)
 - Custo total: zero
 - Base de dados: SQLite
-- Autenticação actual: username/password — 2FA previsto para fase seguinte
-- Notificações: Telegram (prioritário) + SendGrid (email) — arquitectura modular definida
+- Autenticação actual: username/password — 2FA obrigatório a implementar
+- Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes
