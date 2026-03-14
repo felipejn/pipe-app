@@ -15,12 +15,60 @@ O módulo Euromilhões é o primeiro módulo. A arquitectura suporta adição de
 - `.gitignore` configurado (exclui `.env`, `instance/`, `__pycache__`, `*.db`)
 - `.env.example` incluído no repositório como referência
 
-### Estrutura do projecto (Flask)
+### Estrutura do projecto (Flask) — estado actual
+```
+pipe-app/
+├── app/
+│   ├── __init__.py          # create_app, app factory
+│   ├── models.py
+│   ├── static/
+│   │   └── css/pipe.css     # design system (tema escuro, âmbar/dourado)
+│   ├── templates/
+│   │   ├── base.html
+│   │   ├── dashboard.html
+│   │   ├── auth/
+│   │   └── euromilhoes/
+│   ├── auth/                # Blueprint auth
+│   │   ├── __init__.py
+│   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout
+│   │   └── forms.py         # LoginForm, RegistoForm
+│   └── euromilhoes/         # Blueprint Euromilhões
+│       ├── __init__.py
+│       ├── routes.py
+│       ├── models.py        # modelo Jogo (SQLite)
+│       └── api.py           # consumo API pública + retry exponencial
+├── scripts/
+│   └── criar_admin.py
+├── instance/
+│   └── pipe.db              # SQLite (excluído do git)
+├── .env                     # variáveis locais (excluído do git)
+├── .env.example
+├── requirements.txt
+└── run.py
+```
 - App factory (`create_app`) com suporte a configurações Development/Production
 - Flask-SQLAlchemy com SQLite (`instance/pipe.db`)
 - Flask-Login para gestão de sessões
 - Flask-WTF para formulários com protecção CSRF
 - Dois Blueprints registados: `auth` e `euromilhoes`
+
+### Estrutura alvo (com notificações)
+```
+pipe-app/
+├── app/
+│   ├── notifications/       # NOVO — serviço central de notificações
+│   │   ├── __init__.py      # expõe notification_service
+│   │   ├── service.py       # NotificationService
+│   │   ├── models.py        # UserNotificationPreferences (BD)
+│   │   └── channels/
+│   │       ├── base.py      # classe abstracta BaseChannel
+│   │       ├── telegram.py  # TelegramChannel
+│   │       └── email.py     # EmailChannel (SendGrid)
+│   ├── auth/
+│   ├── euromilhoes/
+│   └── [módulos futuros]/
+└── ...
+```
 
 ### Módulo Auth (`app/auth/`)
 - Modelo `User` com password em hash (Werkzeug)
@@ -76,26 +124,58 @@ O módulo Euromilhões é o primeiro módulo. A arquitectura suporta adição de
 
 ---
 
-## Ponto onde estamos
+## Arquitectura de notificações (decisão de design)
 
-O módulo Euromilhões está funcionalmente completo com todas as funcionalidades dos scripts originais migradas para a interface web. A aplicação corre localmente e está actualizada no GitHub.
+O PIPE tem um serviço central de notificações transversal a todos os módulos.
+Cada módulo chama apenas `notification_service.send()` sem conhecer os canais de entrega.
+O serviço consulta as preferências do utilizador e despacha para os canais activos.
+
+### Uso em qualquer módulo
+```python
+from app.notifications import notification_service
+
+notification_service.send(
+    user=current_user,
+    type="resultado_euromilhoes",
+    subject="Resultados de hoje",
+    body="Verificámos os teus jogos...",
+    data={"acertos": 3}
+)
+```
+
+### Canais
+| Canal | Estado | Notas |
+|---|---|---|
+| `TelegramChannel` | Planeado (prioritário) | `api.telegram.org` permitido no PA free |
+| `EmailChannel` | Planeado | SendGrid — 100 emails/dia grátis, domínio permitido no PA |
+| `WebPushChannel` | Futuro | Notificações browser |
+
+**Nota:** Gmail SMTP bloqueado no PythonAnywhere free. WhatsApp descartado (sem solução gratuita sustentável).
 
 ---
 
-## Próximos passos sugeridos (por ordem)
+## Ponto onde estamos
 
-### 1. Autenticação 2FA (TOTP)
+O módulo Euromilhões está funcionalmente completo com todas as funcionalidades dos scripts originais migradas para a interface web. A aplicação corre localmente e está actualizada no GitHub. A arquitectura de notificações está definida mas não implementada.
+
+---
+
+## Próximos passos (por ordem)
+
+### 1. Implementar NotificationService + TelegramChannel
+Criar `app/notifications/` conforme arquitectura definida acima.
+Começar por `service.py` e `channels/telegram.py`.
+Scheduled task no PA (1x por dia) — verificar resultados às terças e sextas.
+
+### 2. Implementar EmailChannel (SendGrid)
+`channels/email.py` com SendGrid como canal de email.
+
+### 3. Autenticação 2FA (TOTP)
 Adicionar 2FA via app de autenticação (Google Authenticator / Authy).
 Biblioteca sugerida: `pyotp` + `qrcode`.
 Já previsto na arquitectura — não requer mudanças estruturais.
 
-### 2. Notificações Telegram
-Bot Telegram para notificações automáticas de resultados.
-`api.telegram.org` está na lista de domínios permitidos no PythonAnywhere free.
-Scheduled task no PA (1x por dia) — verificar às terças e sextas.
-
-### 3. Deploy no PythonAnywhere
-Quando o projecto estiver estável localmente:
+### 4. Deploy no PythonAnywhere
 ```bash
 # No PA:
 git clone https://github.com/felipejn/pipe-app.git
@@ -106,7 +186,7 @@ python scripts/criar_admin.py
 ```
 Configurar o ficheiro `wsgi.py` com o username do PA.
 
-### 4. Novos módulos PIPE
+### 5. Novos módulos PIPE
 A arquitectura com Flask Blueprints permite adicionar módulos independentes com a mesma identidade visual.
 
 ---
@@ -128,4 +208,4 @@ python-dotenv==1.0.1
 - Custo total: zero
 - Base de dados: SQLite
 - Autenticação actual: username/password — 2FA previsto para fase seguinte
-- Notificações: Telegram (Gmail SMTP bloqueado no PA free; SendGrid como alternativa email)
+- Notificações: Telegram (prioritário) + SendGrid (email) — arquitectura modular definida
