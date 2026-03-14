@@ -840,3 +840,158 @@ a:hover { text-decoration: underline; }
     display: inline-flex;
     align-items: center;
 }
+
+/* ---- Página de Definições ---- */
+.pagina-definicoes {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.pagina-cabecalho {
+    margin-bottom: 2rem;
+}
+
+.pagina-cabecalho h1 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--cor-texto);
+}
+
+.definicoes-secao {
+    margin-bottom: 1.2rem;
+    padding: 1.4rem 1.6rem;
+}
+
+.secao-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.secao-titulo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.secao-icone {
+    font-size: 1.4rem;
+    width: 2.2rem;
+    text-align: center;
+}
+
+.secao-titulo h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--cor-texto);
+    margin-bottom: 0.1rem;
+}
+
+.secao-descricao {
+    font-size: 0.85rem;
+    color: var(--cor-texto-suave);
+}
+
+.secao-corpo {
+    margin-top: 1.2rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--cor-borda);
+}
+
+.campo-ajuda {
+    font-size: 0.82rem;
+    color: var(--cor-texto-suave);
+    margin-top: 0.5rem;
+    line-height: 1.5;
+}
+
+.input {
+    width: 100%;
+    background: var(--cor-fundo);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    padding: 0.6rem 0.9rem;
+    color: var(--cor-texto);
+    font-size: 0.95rem;
+    font-family: var(--fonte);
+    transition: border-color 0.2s;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--cor-primaria);
+}
+
+.opcao-check {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--cor-texto);
+}
+
+.opcao-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--cor-primaria);
+    cursor: pointer;
+}
+
+/* Toggle switch */
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--cor-borda);
+    border-radius: 24px;
+    transition: background 0.2s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background: var(--cor-texto-suave);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.toggle input:checked + .toggle-slider {
+    background: var(--cor-primaria);
+}
+
+.toggle input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+    background: #fff;
+}
+
+.definicoes-acoes {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.definicoes-teste {
+    margin-top: 2rem;
+    border-top: 1px solid var(--cor-borda);
+}

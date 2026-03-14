@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block titulo %}Definições{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-definicoes">
+
+    <div class="pagina-cabecalho">
+        <h1>Definições</h1>
+        <p class="subtitulo">Configura as tuas notificações</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('settings.guardar_notificacoes') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {# ── Telegram ─────────────────────────────────────────── #}
+        <div class="cartao definicoes-secao">
+            <div class="secao-cabecalho">
+                <div class="secao-titulo">
+                    <span class="secao-icone">✈️</span>
+                    <div>
+                        <h2>Telegram</h2>
+                        <p class="secao-descricao">Recebe notificações directamente no Telegram</p>
+                    </div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" name="telegram_activo"
+                           {% if prefs.telegram_activo %}checked{% endif %}
+                           id="telegram_activo">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="secao-corpo">
+                <div class="campo">
+                    <label for="telegram_chat_id">Chat ID</label>
+                    <div class="campo-linha">
+                        <input type="text"
+                               id="telegram_chat_id"
+                               name="telegram_chat_id"
+                               class="input"
+                               placeholder="ex: 123456789"
+                               value="{{ prefs.telegram_chat_id or '' }}">
+                    </div>
+                    <p class="campo-ajuda">
+                        Para obteres o teu Chat ID, envia qualquer mensagem ao
+                        <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>
+                        no Telegram. Depois envia uma mensagem ao
+                        <a href="https://t.me/{{ config.get('TELEGRAM_BOT_USERNAME', 'bot') }}" target="_blank">nosso bot</a>
+                        para activar a ligação.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {# ── Email ────────────────────────────────────────────── #}
+        <div class="cartao definicoes-secao">
+            <div class="secao-cabecalho">
+                <div class="secao-titulo">
+                    <span class="secao-icone">📧</span>
+                    <div>
+                        <h2>Email</h2>
+                        <p class="secao-descricao">Recebe notificações em <strong>{{ current_user.email }}</strong></p>
+                    </div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" name="email_activo"
+                           {% if prefs.email_activo %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        {# ── Tipos de notificação ─────────────────────────────── #}
+        <div class="cartao definicoes-secao">
+            <div class="secao-cabecalho">
+                <div class="secao-titulo">
+                    <span class="secao-icone">🔔</span>
+                    <div>
+                        <h2>O que notificar</h2>
+                        <p class="secao-descricao">Escolhe os eventos que queres receber</p>
+                    </div>
+                </div>
+            </div>
+            <div class="secao-corpo">
+                <label class="opcao-check">
+                    <input type="checkbox" name="notificar_resultados"
+                           {% if prefs.notificar_resultados %}checked{% endif %}>
+                    <span>Resultados dos sorteios Euromilhões</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="definicoes-acoes">
+            <button type="submit" class="btn btn-primario">Guardar definições</button>
+        </div>
+    </form>
+
+    {# ── Teste Telegram ───────────────────────────────────────── #}
+    {% if prefs.telegram_chat_id %}
+    <div class="cartao definicoes-secao definicoes-teste">
+        <div class="secao-cabecalho">
+            <div class="secao-titulo">
+                <span class="secao-icone">🧪</span>
+                <div>
+                    <h2>Testar Telegram</h2>
+                    <p class="secao-descricao">Envia uma mensagem de teste para confirmar que está tudo correcto</p>
+                </div>
+            </div>
+        </div>
+        <div class="secao-corpo">
+            <form method="POST" action="{{ url_for('settings.testar_telegram') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-secundario">Enviar mensagem de teste</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

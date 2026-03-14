@@ -25,6 +25,8 @@
     </div>
     <div class="navbar-utilizador">
         <span class="utilizador-nome">{{ current_user.username }}</span>
+        <a href="{{ url_for('settings.index') }}"
+           class="btn-logout {% if request.blueprint == 'settings' %}activo{% endif %}">⚙️</a>
         <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>
     </div>
 </nav>

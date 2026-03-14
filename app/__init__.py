@@ -28,6 +28,9 @@ def create_app(config_name='default'):
     from app.euromilhoes import euromilhoes as euro_bp
     app.register_blueprint(euro_bp, url_prefix='/euromilhoes')
 
+    from app.settings import settings as settings_bp
+    app.register_blueprint(settings_bp, url_prefix='/definicoes')
+
     # Rota raiz — redireciona para dashboard
     from flask import redirect, url_for
     from flask_login import login_required
@@ -40,6 +43,7 @@ def create_app(config_name='default'):
 
     # Criar tabelas se não existirem
     with app.app_context():
+        from app.notifications.models import UserNotificationPreferences  # noqa: F401
         db.create_all()
 
     return app

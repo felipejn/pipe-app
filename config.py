@@ -16,6 +16,13 @@ class Config:
         'sqlite:///' + os.path.join(BASE_DIR, 'instance', 'pipe.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Notificações — Telegram
+    TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+
+    # Notificações — SendGrid
+    SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
+    SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL')
+
     # Sessões
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
