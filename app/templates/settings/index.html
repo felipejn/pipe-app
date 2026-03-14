@@ -44,9 +44,7 @@
                     <p class="campo-ajuda">
                         Para obteres o teu Chat ID, envia qualquer mensagem ao
                         <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>
-                        no Telegram. Depois envia uma mensagem ao
-                        <a href="https://t.me/{{ config.get('TELEGRAM_BOT_USERNAME', 'bot') }}" target="_blank">nosso bot</a>
-                        para activar a ligação.
+                        no Telegram. Depois envia uma mensagem ao nosso bot para activar a ligação.
                     </p>
                 </div>
             </div>
@@ -95,23 +93,31 @@
         </div>
     </form>
 
-    {# ── Teste Telegram ───────────────────────────────────────── #}
-    {% if prefs.telegram_chat_id %}
+    {# ── Testar canais ────────────────────────────────────────── #}
+    {% if prefs.telegram_chat_id or prefs.email_activo %}
     <div class="cartao definicoes-secao definicoes-teste">
         <div class="secao-cabecalho">
             <div class="secao-titulo">
                 <span class="secao-icone">🧪</span>
                 <div>
-                    <h2>Testar Telegram</h2>
+                    <h2>Testar canais</h2>
                     <p class="secao-descricao">Envia uma mensagem de teste para confirmar que está tudo correcto</p>
                 </div>
             </div>
         </div>
-        <div class="secao-corpo">
+        <div class="secao-corpo testes-acoes">
+            {% if prefs.telegram_chat_id %}
             <form method="POST" action="{{ url_for('settings.testar_telegram') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-secundario">Enviar mensagem de teste</button>
+                <button type="submit" class="btn btn-secundario">✈️ Testar Telegram</button>
             </form>
+            {% endif %}
+            {% if prefs.email_activo %}
+            <form method="POST" action="{{ url_for('settings.testar_email') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-secundario">📧 Testar Email</button>
+            </form>
+            {% endif %}
         </div>
     </div>
     {% endif %}

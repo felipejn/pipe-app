@@ -81,3 +81,37 @@ def testar_telegram():
         flash('TELEGRAM_BOT_TOKEN não configurado no servidor.', 'erro')
 
     return redirect(url_for('settings.index'))
+
+
+@settings.route('/testar-email', methods=['POST'])
+@login_required
+def testar_email():
+    """Envia email de teste ao utilizador via SendGrid."""
+    from app.notifications.channels.email import EmailChannel
+    import os
+
+    prefs = current_user.notificacao_prefs
+    if not prefs or not prefs.email_activo:
+        flash('Activa primeiro o canal de email.', 'erro')
+        return redirect(url_for('settings.index'))
+
+    api_key = os.environ.get('SENDGRID_API_KEY')
+    remetente = os.environ.get('SENDGRID_FROM_EMAIL')
+
+    if not api_key or not remetente:
+        flash('SENDGRID_API_KEY ou SENDGRID_FROM_EMAIL não configurados no servidor.', 'erro')
+        return redirect(url_for('settings.index'))
+
+    canal = EmailChannel(api_key=api_key, remetente=remetente)
+    sucesso = canal.enviar(
+        current_user,
+        'Teste PIPE',
+        'Notificações email configuradas com sucesso!\n\nVais receber aqui as notificações do PIPE.',
+    )
+
+    if sucesso:
+        flash(f'Email de teste enviado para {current_user.email}.', 'sucesso')
+    else:
+        flash('Erro ao enviar. Confirma as credenciais SendGrid no servidor.', 'erro')
+
+    return redirect(url_for('settings.index'))

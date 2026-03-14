@@ -995,3 +995,9 @@ a:hover { text-decoration: underline; }
     margin-top: 2rem;
     border-top: 1px solid var(--cor-borda);
 }
+
+.testes-acoes {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
