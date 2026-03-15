@@ -14,6 +14,7 @@ O módulo Euromilhões é o primeiro módulo. A arquitectura suporta adição de
 - Suporte a `.env` com `python-dotenv` para gerir variáveis de ambiente localmente
 - `.gitignore` configurado (exclui `.env`, `instance/`, `__pycache__`, `*.db`)
 - `.env.example` incluído no repositório como referência
+- **Deploy concluído no PythonAnywhere** — app online em `https://felipejn.pythonanywhere.com`
 
 ### Estrutura do projecto (Flask) — estado actual
 ```
@@ -66,7 +67,7 @@ pipe-app/
 - Rotas: `/auth/login`, `/auth/registo`, `/auth/logout`, `/auth/perfil`
 - Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
 - Rotas TOTP: `/auth/2fa/totp/configurar`, `/auth/2fa/totp/desactivar`
-- Script utilitário `scripts/criar_admin.py` para criar o primeiro utilizador
+- Primeiro utilizador criado via `/auth/registo` na app (sem script necessário)
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
 - Modelo `Jogo` (SQLite) — substitui o `jogos.json` dos scripts anteriores
@@ -107,7 +108,7 @@ pipe-app/
 - `EmailChannel` — SendGrid API v3, testado e a funcionar ✅
 - `UserNotificationPreferences` — preferências por utilizador na BD (canal activo, chat_id, tipos)
 - Página de definições em `/definicoes` com toggles por canal e botões de teste
-- `scripts/verificar_resultados.py` — scheduled task para o PA (corre às 23:00 às terças e sextas)
+- `scripts/verificar_resultados.py` — scheduled task configurada no PA (corre às 23:00)
 
 ### Autenticação 2FA (`app/auth/`)
 - **2FA opcional** — activado/desactivado na página de perfil por cada utilizador
@@ -126,7 +127,7 @@ pipe-app/
 - Layout responsivo (grid de 2 colunas colapsa para 1 em mobile)
 - Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/registo.html`, `auth/perfil.html`, `auth/verificar_2fa.html`, `auth/escolher_2fa.html`, `auth/configurar_totp.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`
 
-### Testes realizados localmente
+### Testes realizados
 - Login e registo de utilizador ✅
 - Dashboard ✅
 - Registo de jogo (data próximo sorteio e data manual) ✅
@@ -142,6 +143,49 @@ pipe-app/
 - Notificação Telegram (teste manual) ✅
 - Notificação Email SendGrid (teste manual) ✅
 - Script `verificar_resultados.py` (teste manual com dia comentado) ✅
+- App online no PythonAnywhere ✅
+
+---
+
+## Deploy — PythonAnywhere
+
+### Estado
+- **App online** em `https://felipejn.pythonanywhere.com` ✅
+- **WSGI configurado** — `/var/www/felipejn_pythonanywhere_com_wsgi.py` ✅
+- **Static files** configurados — `/static/` → `/home/felipejn/pipe-app/app/static` ✅
+- **Scheduled task** configurada — `python /home/felipejn/pipe-app/scripts/verificar_resultados.py` às 23:00 ✅
+- **API externa bloqueada** — `euromillions.api.pedromealha.dev` aguarda whitelist do suporte PA ⏳
+
+### Configuração WSGI
+```python
+import sys
+import os
+from dotenv import load_dotenv
+
+project_home = '/home/felipejn/pipe-app'
+if project_home not in sys.path:
+    sys.path.insert(0, project_home)
+
+load_dotenv(os.path.join(project_home, '.env'))
+
+from app import create_app
+application = create_app()
+```
+
+### Variáveis de ambiente no PA (`.env`)
+```
+FLASK_ENV=production
+SECRET_KEY=<gerado com secrets.token_hex(32)>
+TELEGRAM_BOT_TOKEN=...
+SENDGRID_API_KEY=...
+SENDGRID_FROM_EMAIL=...
+```
+
+### Notas de deploy
+- Dependências instaladas com `pip install -r requirements.txt --user`
+- Pasta `instance/` criada manualmente antes do primeiro arranque (`mkdir -p ~/pipe-app/instance`)
+- Primeiro utilizador criado via `/auth/registo` na própria app (não é necessário script)
+- Plano free PA: 512 MB disco, 100s CPU/dia — suficiente para uso pessoal
 
 ---
 
@@ -203,22 +247,16 @@ O utilizador pode ter múltiplos métodos activos em simultâneo e escolhe qual 
 
 ## Ponto onde estamos
 
-O módulo Euromilhões está completo e testado. O sistema de notificações está implementado e testado (Telegram + Email). O sistema de autenticação está completo com registo, perfil e 2FA via Telegram, Email e TOTP. A scheduled task está pronta para configurar no PA. Falta fazer o deploy no PythonAnywhere.
+O PIPE está deployed e operacional em `https://felipejn.pythonanywhere.com`. O módulo Euromilhões está completo (jogos, gerador, frequências, resultados). O sistema de notificações está implementado (Telegram + Email). A autenticação está completa com 2FA via Telegram, Email e TOTP. A scheduled task está configurada no PA. A única pendência é a whitelist da API externa junto ao suporte do PA.
 
 ---
 
 ## Próximos passos (por ordem)
 
-### 1. Deploy no PythonAnywhere
-```bash
-git clone https://github.com/felipejn/pipe-app.git
-cd pipe-app
-pip install -r requirements.txt --user
-cp .env.example .env   # preencher todas as variáveis
-python scripts/criar_admin.py
-```
-- Configurar `wsgi.py` com o username do PA
-- Configurar scheduled task: `python ~/pipe-app/scripts/verificar_resultados.py` às 23:00
+### 1. Whitelist API externa no PA
+- Aguardar resposta do suporte (`support@pythonanywhere.com`)
+- Domínio a whitelist: `euromillions.api.pedromealha.dev`
+- Após confirmação: testar `curl` e reload da app
 
 ### 2. Novos módulos PIPE
 A arquitectura com Flask Blueprints permite adicionar módulos independentes com a mesma identidade visual.
@@ -241,22 +279,9 @@ qrcode==7.4.2
 pillow==10.4.0
 ```
 
-## Variáveis de ambiente (`.env`)
-```
-FLASK_ENV=development
-SECRET_KEY=...
-
-# Telegram
-TELEGRAM_BOT_TOKEN=...
-
-# SendGrid
-SENDGRID_API_KEY=...
-SENDGRID_FROM_EMAIL=...
-```
-
 ## Contexto técnico
 - Python com ortografia Portuguesa Europeia em todos os comentários e mensagens
-- Hosting alvo: PythonAnywhere (plano free) — espaço em disco não é problema (~37MB para .venv)
+- Hosting: PythonAnywhere (plano free) — `https://felipejn.pythonanywhere.com`
 - Custo total: zero
 - Base de dados: SQLite
 - Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅)
