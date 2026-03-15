@@ -32,6 +32,10 @@ class User(UserMixin, db.Model):
     dois_fa_codigo = db.Column(db.String(6), nullable=True)
     dois_fa_expira = db.Column(db.DateTime, nullable=True)
 
+    # Recuperação de password
+    reset_token = db.Column(db.String(100), nullable=True)
+    reset_token_expira = db.Column(db.DateTime, nullable=True)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 

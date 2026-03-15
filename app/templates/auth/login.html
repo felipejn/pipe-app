@@ -35,6 +35,9 @@
         </form>
 
         <p class="auth-link">
+            <a href="{{ url_for('auth.recuperar_password') }}">Esqueci a palavra-passe</a>
+        </p>
+        <p class="auth-link">
             Ainda não tens conta?
             <a href="{{ url_for('auth.registo') }}">Criar conta</a>
         </p>

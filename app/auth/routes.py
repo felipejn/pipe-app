@@ -2,6 +2,7 @@ import random
 import os
 import io
 import base64
+import secrets
 from datetime import datetime, timedelta
 
 import qrcode
@@ -12,7 +13,8 @@ from app import db
 from app.auth import auth
 from app.auth.forms import (
     LoginForm, RegistoForm, AlterarPasswordForm,
-    VerificarCodigoForm, ConfigurarDoisFAForm, ConfirmarTOTPForm
+    VerificarCodigoForm, ConfigurarDoisFAForm, ConfirmarTOTPForm,
+    PedirResetForm, ResetPasswordForm
 )
 from app.auth.models import User
 from app.notifications.channels.telegram import TelegramChannel
@@ -335,6 +337,71 @@ def desactivar_totp():
     db.session.commit()
     flash('Autenticador desactivado.', 'sucesso')
     return redirect(url_for('auth.perfil'))
+
+
+# ── Recuperação de password ────────────────────────────────────────────────
+
+@auth.route('/recuperar-password', methods=['GET', 'POST'])
+def recuperar_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+    form = PedirResetForm()
+    mensagem = None
+
+    if form.validate_on_submit():
+        utilizador = User.query.filter_by(email=form.email.data.strip().lower()).first()
+
+        if utilizador:
+            token = secrets.token_urlsafe(32)
+            utilizador.reset_token = token
+            utilizador.reset_token_expira = datetime.utcnow() + timedelta(hours=1)
+            db.session.commit()
+
+            link = url_for('auth.reset_password', token=token, _external=True)
+            api_key = current_app.config.get('SENDGRID_API_KEY')
+            remetente = current_app.config.get('SENDGRID_FROM_EMAIL')
+            canal = EmailChannel(api_key=api_key, remetente=remetente)
+            canal.enviar(
+                utilizador,
+                assunto='PIPE — Recuperação de palavra-passe',
+                corpo=(
+                    f'Olá {utilizador.username},\n\n'
+                    f'Recebemos um pedido de recuperação de palavra-passe para a tua conta PIPE.\n\n'
+                    f'Clica no link abaixo para definir uma nova palavra-passe (válido durante 1 hora):\n\n'
+                    f'{link}\n\n'
+                    f'Se não fizeste este pedido, ignora este email — a tua conta está segura.'
+                ),
+            )
+
+        # Resposta sempre igual — evita enumeração de emails
+        mensagem = 'Se o email existir na plataforma, receberás um link em breve.'
+
+    return render_template('auth/recuperar_password.html', form=form, mensagem=mensagem)
+
+
+@auth.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+    utilizador = User.query.filter_by(reset_token=token).first()
+
+    if not utilizador or utilizador.reset_token_expira < datetime.utcnow():
+        flash('O link de recuperação é inválido ou expirou.', 'erro')
+        return redirect(url_for('auth.recuperar_password'))
+
+    form = ResetPasswordForm()
+
+    if form.validate_on_submit():
+        utilizador.set_password(form.password_nova.data)
+        utilizador.reset_token = None
+        utilizador.reset_token_expira = None
+        db.session.commit()
+        flash('Palavra-passe alterada com sucesso. Podes iniciar sessão.', 'sucesso')
+        return redirect(url_for('auth.login'))
+
+    return render_template('auth/reset_password.html', form=form)
 
 
 # ── Logout ─────────────────────────────────────────────────────────────────

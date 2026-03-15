@@ -66,6 +66,23 @@ class ConfigurarDoisFAForm(FlaskForm):
     submeter_email = SubmitField('Guardar Email')
 
 
+class PedirResetForm(FlaskForm):
+    """Formulário para pedir recuperação de password por email."""
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submeter = SubmitField('Enviar link de recuperação')
+
+
+class ResetPasswordForm(FlaskForm):
+    """Formulário para definir nova password via token de recuperação."""
+    password_nova = PasswordField('Nova palavra-passe', validators=[
+        DataRequired(), Length(min=8, message='Mínimo 8 caracteres')
+    ])
+    password_nova2 = PasswordField('Confirmar nova palavra-passe', validators=[
+        DataRequired(), EqualTo('password_nova', message='As palavras-passe não coincidem')
+    ])
+    submeter = SubmitField('Guardar nova palavra-passe')
+
+
 class ConfirmarTOTPForm(FlaskForm):
     """Formulário para confirmar a configuração do TOTP com um código do autenticador."""
     codigo = StringField('Código do autenticador', validators=[
