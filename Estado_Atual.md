@@ -63,10 +63,11 @@ pipe-app/
 
 ### Módulo Auth (`app/auth/`)
 - Modelo `User` com password em hash (Werkzeug)
-- Formulários com validação: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`
+- Formulários com validação: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`, `PedirResetForm`, `ResetPasswordForm`
 - Rotas: `/auth/login`, `/auth/registo`, `/auth/logout`, `/auth/perfil`
 - Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
 - Rotas TOTP: `/auth/2fa/totp/configurar`, `/auth/2fa/totp/desactivar`
+- Rotas recuperação de password: `/auth/recuperar-password`, `/auth/reset-password/<token>`
 - Primeiro utilizador criado via `/auth/registo` na app (sem script necessário)
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
@@ -101,6 +102,12 @@ pipe-app/
   - Top 3 estrelas mais e menos frequentes
   - Tabela completa 1–50 e 1–12 com barras proporcionais
   - Aviso explícito de que a frequência não prevê sorteios futuros
+- **Recuperação de password** — fluxo completo por email:
+  - Link "Esqueci a palavra-passe" na página de login
+  - Token seguro gerado com `secrets.token_urlsafe(32)`, válido 1 hora
+  - Email enviado via SendGrid com link de reset
+  - Token consumido após uso (one-time) e apagado da BD
+  - Resposta ao formulário sempre igual (evita enumeração de emails)
 
 ### Sistema de notificações (`app/notifications/`)
 - Serviço central `NotificationService` — cada módulo chama apenas `notification_service.send()`
@@ -117,7 +124,7 @@ pipe-app/
 - **TOTP** ✅ — código gerado por Google Authenticator, MS Authenticator, Authy, etc.
 - **Múltiplos métodos em simultâneo** — se vários activos, utilizador escolhe qual usar no login
 - Fluxo: login com password → (se 2FA activo) escolha de método → código → acesso
-- Campos no modelo `User`: `dois_fa_activo`, `dois_fa_chat_id`, `dois_fa_email_activo`, `dois_fa_codigo`, `dois_fa_expira`, `totp_secret`, `totp_activo`
+- Campos no modelo `User`: `dois_fa_activo`, `dois_fa_chat_id`, `dois_fa_email_activo`, `dois_fa_codigo`, `dois_fa_expira`, `totp_secret`, `totp_activo`, `reset_token`, `reset_token_expira`
 - Templates: `verificar_2fa.html`, `escolher_2fa.html`, `configurar_totp.html`
 
 ### Design System (`app/static/css/pipe.css`)
@@ -125,7 +132,7 @@ pipe-app/
 - Componentes base: navbar, cartões, formulários, botões, alertas, bolas de números/estrelas
 - Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado, toggle switch, página de definições, página de perfil, grelha 2 colunas, campos de informação (só leitura)
 - Layout responsivo (grid de 2 colunas colapsa para 1 em mobile)
-- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/registo.html`, `auth/perfil.html`, `auth/verificar_2fa.html`, `auth/escolher_2fa.html`, `auth/configurar_totp.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`
+- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/registo.html`, `auth/perfil.html`, `auth/verificar_2fa.html`, `auth/escolher_2fa.html`, `auth/configurar_totp.html`, `auth/recuperar_password.html`, `auth/reset_password.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`
 
 ### Testes realizados
 - Login e registo de utilizador ✅
@@ -144,6 +151,7 @@ pipe-app/
 - Notificação Email SendGrid (teste manual) ✅
 - Script `verificar_resultados.py` (teste manual com dia comentado) ✅
 - App online no PythonAnywhere ✅
+- Recuperação de password por email (pedido, email recebido, reset, login) ✅
 
 ---
 
@@ -154,7 +162,7 @@ pipe-app/
 - **WSGI configurado** — `/var/www/felipejn_pythonanywhere_com_wsgi.py` ✅
 - **Static files** configurados — `/static/` → `/home/felipejn/pipe-app/app/static` ✅
 - **Scheduled task** configurada — `python /home/felipejn/pipe-app/scripts/verificar_resultados.py` às 23:00 ✅
-- **API externa bloqueada** — `euromillions.api.pedromealha.dev` aguarda whitelist do suporte PA ⏳
+- **API externa** — `euromillions.api.pedromealha.dev` na whitelist do PA, consulta de resultados a funcionar ✅
 
 ### Configuração WSGI
 ```python
@@ -247,18 +255,13 @@ O utilizador pode ter múltiplos métodos activos em simultâneo e escolhe qual 
 
 ## Ponto onde estamos
 
-O PIPE está deployed e operacional em `https://felipejn.pythonanywhere.com`. O módulo Euromilhões está completo (jogos, gerador, frequências, resultados). O sistema de notificações está implementado (Telegram + Email). A autenticação está completa com 2FA via Telegram, Email e TOTP. A scheduled task está configurada no PA. A única pendência é a whitelist da API externa junto ao suporte do PA.
+O PIPE está deployed e operacional em `https://felipejn.pythonanywhere.com`. O módulo Euromilhões está completo (jogos, gerador, frequências, resultados com consulta à API externa). O sistema de notificações está implementado (Telegram + Email). A autenticação está completa com 2FA via Telegram, Email e TOTP, e recuperação de password por email. A scheduled task está configurada no PA. Não há pendências de infraestrutura — o próximo foco é o desenvolvimento de novos módulos.
 
 ---
 
 ## Próximos passos (por ordem)
 
-### 1. Whitelist API externa no PA
-- Aguardar resposta do suporte (`support@pythonanywhere.com`)
-- Domínio a whitelist: `euromillions.api.pedromealha.dev`
-- Após confirmação: testar `curl` e reload da app
-
-### 2. Novos módulos PIPE
+### 1. Novos módulos PIPE
 A arquitectura com Flask Blueprints permite adicionar módulos independentes com a mesma identidade visual.
 
 ---
@@ -284,5 +287,5 @@ pillow==10.4.0
 - Hosting: PythonAnywhere (plano free) — `https://felipejn.pythonanywhere.com`
 - Custo total: zero
 - Base de dados: SQLite
-- Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅)
+- Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅) + recuperação de password por email ✅
 - Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes
