@@ -12,10 +12,14 @@
         <p style="font-size:0.9rem; color:var(--cor-texto-suave); margin-bottom:1.5rem; text-align:center;">
             {% if metodo == 'telegram' %}
                 ✈️ Código enviado para o teu <strong>Telegram</strong>.
-            {% else %}
+                <br>Expira em 10 minutos.
+            {% elif metodo == 'email' %}
                 📧 Código enviado para <strong>{{ user.email }}</strong>.
+                <br>Expira em 10 minutos.
+            {% else %}
+                📱 Introduz o código gerado pelo teu <strong>autenticador</strong>.
+                <br>O código renova-se a cada 30 segundos.
             {% endif %}
-            <br>Expira em 10 minutos.
         </p>
 
         <form method="POST" action="{{ url_for('auth.verificar_2fa') }}">
@@ -32,12 +36,14 @@
             </div>
         </form>
 
+        {% if metodo != 'totp' %}
         <form method="POST" action="{{ url_for('auth.reenviar_codigo') }}" style="margin-top:0.75rem;">
             {{ form.hidden_tag() }}
             <button type="submit" class="btn btn-secundario btn-bloco">
                 Reenviar código
             </button>
         </form>
+        {% endif %}
 
         {% if metodos_disponiveis is defined and metodos_disponiveis|length > 1 %}
         <p class="auth-link" style="margin-top:0.75rem;">

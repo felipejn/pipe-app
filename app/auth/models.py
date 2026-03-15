@@ -1,3 +1,5 @@
+import pyotp
+
 from app import db, login_manager
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -22,7 +24,11 @@ class User(UserMixin, db.Model):
     # 2FA — Email
     dois_fa_email_activo = db.Column(db.Boolean, default=False)
 
-    # Código partilhado por ambos os métodos
+    # 2FA — TOTP (Google Authenticator / Authy)
+    totp_secret = db.Column(db.String(64), nullable=True)
+    totp_activo = db.Column(db.Boolean, default=False)
+
+    # Código partilhado por Telegram e Email
     dois_fa_codigo = db.Column(db.String(6), nullable=True)
     dois_fa_expira = db.Column(db.DateTime, nullable=True)
 
@@ -39,7 +45,30 @@ class User(UserMixin, db.Model):
             metodos.append('telegram')
         if self.dois_fa_email_activo:
             metodos.append('email')
+        if self.totp_activo and self.totp_secret:
+            metodos.append('totp')
         return metodos
+
+    def gerar_totp_secret(self):
+        """Gera um novo secret TOTP e guarda no modelo (sem commit)."""
+        self.totp_secret = pyotp.random_base32()
+        return self.totp_secret
+
+    def totp_uri(self, nome_app='PIPE'):
+        """Devolve o URI otpauth:// para gerar o QR code."""
+        if not self.totp_secret:
+            return None
+        return pyotp.totp.TOTP(self.totp_secret).provisioning_uri(
+            name=self.username,
+            issuer_name=nome_app
+        )
+
+    def verificar_totp(self, codigo):
+        """Verifica um código TOTP. Aceita janela de ±1 intervalo (30s)."""
+        if not self.totp_secret or not self.totp_activo:
+            return False
+        totp = pyotp.TOTP(self.totp_secret)
+        return totp.verify(codigo.strip(), valid_window=1)
 
     def codigo_valido(self, codigo):
         """Verifica se o código 2FA introduzido é válido e não expirou."""

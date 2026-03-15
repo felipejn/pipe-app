@@ -1,7 +1,10 @@
 import random
 import os
+import io
+import base64
 from datetime import datetime, timedelta
 
+import qrcode
 from flask import render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
 
@@ -9,7 +12,7 @@ from app import db
 from app.auth import auth
 from app.auth.forms import (
     LoginForm, RegistoForm, AlterarPasswordForm,
-    VerificarCodigoForm, ConfigurarDoisFAForm
+    VerificarCodigoForm, ConfigurarDoisFAForm, ConfirmarTOTPForm
 )
 from app.auth.models import User
 from app.notifications.channels.telegram import TelegramChannel
@@ -127,6 +130,10 @@ def enviar_2fa(metodo):
 
     session['2fa_metodo'] = metodo
 
+    if metodo == 'totp':
+        # TOTP não envia código — redireciona directamente para verificação
+        return redirect(url_for('auth.verificar_2fa'))
+
     if metodo == 'telegram':
         enviado = _enviar_codigo_telegram(user)
         destino = 'Telegram'
@@ -161,8 +168,14 @@ def verificar_2fa():
     form = VerificarCodigoForm()
 
     if form.validate_on_submit():
-        if user.codigo_valido(form.codigo.data):
-            user.limpar_codigo()
+        if metodo == 'totp':
+            valido = user.verificar_totp(form.codigo.data)
+        else:
+            valido = user.codigo_valido(form.codigo.data)
+            if valido:
+                user.limpar_codigo()
+
+        if valido:
             user.ultimo_login = datetime.utcnow()
             db.session.commit()
             lembrar = session.pop('2fa_lembrar', False)
@@ -266,6 +279,62 @@ def perfil():
         form_2fa.dois_fa_email_activo.data = current_user.dois_fa_email_activo
 
     return render_template('auth/perfil.html', form_password=form_password, form_2fa=form_2fa)
+
+
+# ── TOTP — configurar ─────────────────────────────────────────────────────
+
+def _gerar_qrcode_base64(uri):
+    """Gera um QR code a partir do URI e devolve como string base64 PNG."""
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode('utf-8')
+
+
+@auth.route('/2fa/totp/configurar', methods=['GET', 'POST'])
+@login_required
+def configurar_totp():
+    """Gera um novo secret TOTP e mostra o QR code para o utilizador digitalizar."""
+    form = ConfirmarTOTPForm()
+
+    if request.method == 'GET':
+        # Gera sempre um secret novo (sobrescreve qualquer anterior não confirmado)
+        current_user.gerar_totp_secret()
+        current_user.totp_activo = False  # Só activa após confirmação
+        db.session.commit()
+
+    uri = current_user.totp_uri()
+    qr_b64 = _gerar_qrcode_base64(uri)
+
+    if form.validate_on_submit():
+        # Valida o código antes de activar
+        import pyotp
+        totp = pyotp.TOTP(current_user.totp_secret)
+        if totp.verify(form.codigo.data.strip(), valid_window=1):
+            current_user.totp_activo = True
+            db.session.commit()
+            flash('Autenticador configurado com sucesso.', 'sucesso')
+            return redirect(url_for('auth.perfil'))
+        flash('Código incorrecto. Verifica o teu autenticador e tenta novamente.', 'erro')
+
+    return render_template(
+        'auth/configurar_totp.html',
+        form=form,
+        qr_b64=qr_b64,
+        totp_secret=current_user.totp_secret
+    )
+
+
+@auth.route('/2fa/totp/desactivar', methods=['POST'])
+@login_required
+def desactivar_totp():
+    """Desactiva e apaga o TOTP do utilizador."""
+    current_user.totp_activo = False
+    current_user.totp_secret = None
+    db.session.commit()
+    flash('Autenticador desactivado.', 'sucesso')
+    return redirect(url_for('auth.perfil'))
 
 
 # ── Logout ─────────────────────────────────────────────────────────────────

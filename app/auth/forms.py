@@ -64,3 +64,11 @@ class ConfigurarDoisFAForm(FlaskForm):
     # Email
     dois_fa_email_activo = BooleanField('Activar via Email')
     submeter_email = SubmitField('Guardar Email')
+
+
+class ConfirmarTOTPForm(FlaskForm):
+    """Formulário para confirmar a configuração do TOTP com um código do autenticador."""
+    codigo = StringField('Código do autenticador', validators=[
+        DataRequired(), Length(min=6, max=6, message='O código tem 6 dígitos')
+    ])
+    submeter = SubmitField('Activar autenticador')

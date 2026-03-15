@@ -151,9 +151,44 @@
             </div>
 
         </form>
-    </div>
 
-</div>
+        {# ── TOTP — fora do form principal (tem o seu próprio fluxo) ── #}
+        <div style="padding:1rem 0; margin-top:0.5rem; border-top:1px solid var(--cor-borda);">
+            <div class="secao-cabecalho">
+                <div class="secao-titulo">
+                    <span class="secao-icone">📱</span>
+                    <div>
+                        <h2>Autenticador (TOTP)</h2>
+                        <p class="secao-descricao">
+                            Código gerado pela app Google Authenticator ou Authy
+                            {% if current_user.totp_activo %}
+                            — <span style="color:var(--cor-sucesso); font-weight:600;">activo</span>
+                            {% else %}
+                            — <span style="color:var(--cor-texto-suave);">inactivo</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:0.75rem;">
+                {% if current_user.totp_activo %}
+                <form method="POST" action="{{ url_for('auth.desactivar_totp') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-perigo"
+                            onclick="return confirm('Tens a certeza que queres desactivar o autenticador?')">
+                        Desactivar autenticador
+                    </button>
+                </form>
+                {% else %}
+                <a href="{{ url_for('auth.configurar_totp') }}" class="btn btn-primario">
+                    Configurar autenticador
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>{# fim cartão 2FA #}
+
+</div>{# fim pagina-conteudo #}
 
 {% block scripts_extra %}
 <script>

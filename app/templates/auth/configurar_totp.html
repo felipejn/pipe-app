@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block titulo %}Configurar autenticador{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo">
+    <div class="cabecalho-pagina">
+        <h2>Configurar autenticador TOTP</h2>
+    </div>
+
+    <div class="grelha-2col">
+
+        <!-- Instruções -->
+        <div class="cartao">
+            <div class="cartao-cabecalho">
+                <h3>Como configurar</h3>
+            </div>
+
+            <ol style="padding-left:1.25rem; line-height:2rem; color:var(--cor-texto-suave);">
+                <li>Instala o <strong style="color:var(--cor-texto);">Google Authenticator</strong> ou <strong style="color:var(--cor-texto);">Authy</strong> no teu telemóvel.</li>
+                <li>Abre a aplicação e escolhe <em>Adicionar conta</em>.</li>
+                <li>Digitaliza o QR code ao lado <strong style="color:var(--cor-texto);">ou</strong> introduz a chave manualmente.</li>
+                <li>Introduz o código de 6 dígitos gerado pela aplicação para confirmar.</li>
+            </ol>
+
+            <div style="margin-top:1.5rem;">
+                <p style="font-size:0.8rem; color:var(--cor-texto-suave); margin-bottom:0.5rem;">
+                    Chave manual (caso não consiga digitalizar o QR code):
+                </p>
+                <div style="
+                    background:var(--cor-fundo);
+                    border:1px solid var(--cor-borda);
+                    border-radius:6px;
+                    padding:0.75rem 1rem;
+                    font-family:monospace;
+                    font-size:0.95rem;
+                    letter-spacing:0.1em;
+                    color:var(--cor-ambar);
+                    word-break:break-all;
+                ">{{ totp_secret }}</div>
+            </div>
+
+            <div style="margin-top:1.5rem; padding:0.75rem; background:rgba(255,200,0,0.06); border:1px solid rgba(255,200,0,0.15); border-radius:6px;">
+                <p style="font-size:0.82rem; color:var(--cor-texto-suave); margin:0;">
+                    ⚠️ <strong style="color:var(--cor-texto);">Guarda a chave manual</strong> num lugar seguro. Se perderes o telemóvel sem ela, não conseguirás aceder à conta.
+                </p>
+            </div>
+        </div>
+
+        <!-- QR Code + confirmação -->
+        <div class="cartao">
+            <div class="cartao-cabecalho">
+                <h3>QR Code</h3>
+            </div>
+
+            <div style="display:flex; justify-content:center; margin-bottom:1.5rem;">
+                <div style="
+                    background:#fff;
+                    padding:1rem;
+                    border-radius:8px;
+                    display:inline-block;
+                    line-height:0;
+                ">
+                    <img src="data:image/png;base64,{{ qr_b64 }}"
+                         alt="QR Code TOTP"
+                         style="width:180px; height:180px; display:block;">
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('auth.configurar_totp') }}">
+                {{ form.hidden_tag() }}
+                <div class="campo">
+                    {{ form.codigo.label }}
+                    {{ form.codigo(
+                        class="input",
+                        placeholder="000000",
+                        autocomplete="one-time-code",
+                        autofocus=true,
+                        inputmode="numeric",
+                        maxlength=6
+                    ) }}
+                    {% for erro in form.codigo.errors %}
+                    <span class="erro-campo">{{ erro }}</span>
+                    {% endfor %}
+                    <p class="campo-ajuda">Introduz o código de 6 dígitos que aparece no teu autenticador.</p>
+                </div>
+                <div class="campo">
+                    {{ form.submeter(class="btn btn-primario btn-bloco") }}
+                </div>
+            </form>
+
+            <div style="margin-top:0.75rem; text-align:center;">
+                <a href="{{ url_for('auth.perfil') }}" class="btn btn-secundario btn-bloco">
+                    Cancelar
+                </a>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
