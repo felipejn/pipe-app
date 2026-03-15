@@ -24,7 +24,10 @@
         {# Futuros módulos aqui #}
     </div>
     <div class="navbar-utilizador">
-        <span class="utilizador-nome">{{ current_user.username }}</span>
+        <a href="{{ url_for('auth.perfil') }}"
+           class="utilizador-nome utilizador-link {% if request.endpoint == 'auth.perfil' %}activo{% endif %}">
+            {{ current_user.username }}
+        </a>
         <a href="{{ url_for('settings.index') }}"
            class="btn-logout {% if request.blueprint == 'settings' %}activo{% endif %}">⚙️</a>
         <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}Verificação de dois factores{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-auth">
+    <div class="cartao-auth">
+        <div class="auth-cabecalho">
+            <h1 class="marca-pipe-grande">PIPE</h1>
+            <p>Escolhe como receber o código</p>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1.5rem;">
+            {% if 'telegram' in metodos %}
+            <a href="{{ url_for('auth.enviar_2fa', metodo='telegram') }}"
+               class="btn btn-secundario btn-bloco" style="text-align:center; display:block; padding:0.75rem;">
+                ✈️ Enviar código por Telegram
+            </a>
+            {% endif %}
+            {% if 'email' in metodos %}
+            <a href="{{ url_for('auth.enviar_2fa', metodo='email') }}"
+               class="btn btn-secundario btn-bloco" style="text-align:center; display:block; padding:0.75rem;">
+                📧 Enviar código por Email
+            </a>
+            {% endif %}
+        </div>
+
+        <p class="auth-link">
+            <a href="{{ url_for('auth.login') }}">← Voltar ao login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

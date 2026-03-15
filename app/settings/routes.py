@@ -45,40 +45,31 @@ def guardar_notificacoes():
 @login_required
 def testar_telegram():
     """Envia mensagem de teste ao utilizador via Telegram."""
-    from app.notifications import notification_service
+    from app.notifications.channels.telegram import TelegramChannel
+    import os
 
     prefs = current_user.notificacao_prefs
     if not prefs or not prefs.telegram_chat_id:
         flash('Introduz primeiro o teu chat_id do Telegram.', 'erro')
         return redirect(url_for('settings.index'))
 
-    # Activa temporariamente para o teste mesmo que o toggle esteja off
+    token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if not token:
+        flash('TELEGRAM_BOT_TOKEN não configurado no servidor.', 'erro')
+        return redirect(url_for('settings.index'))
+
+    canal = TelegramChannel(token=token)
     current_user.telegram_chat_id = prefs.telegram_chat_id
-    resultado = notification_service.send(
-        user=current_user,
-        type='teste',
-        subject='Teste PIPE',
-        body='✅ Notificações Telegram configuradas com sucesso!',
+    sucesso = canal.enviar(
+        current_user,
+        'Teste PIPE',
+        '✅ Notificações Telegram configuradas com sucesso!\n\nVais receber aqui as notificações do PIPE.',
     )
 
-    # Para o teste forçamos o envio directamente pelo canal
-    from app.notifications.channels.telegram import TelegramChannel
-    import os
-    token = os.environ.get('TELEGRAM_BOT_TOKEN')
-    if token:
-        canal = TelegramChannel(token=token)
-        current_user.telegram_chat_id = prefs.telegram_chat_id
-        sucesso = canal.enviar(
-            current_user,
-            'Teste PIPE',
-            '✅ Notificações Telegram configuradas com sucesso!\n\nVais receber aqui as notificações do PIPE.',
-        )
-        if sucesso:
-            flash('Mensagem de teste enviada com sucesso!', 'sucesso')
-        else:
-            flash('Erro ao enviar. Confirma que o chat_id está correcto e que enviaste uma mensagem ao bot primeiro.', 'erro')
+    if sucesso:
+        flash('Mensagem de teste enviada com sucesso!', 'sucesso')
     else:
-        flash('TELEGRAM_BOT_TOKEN não configurado no servidor.', 'erro')
+        flash('Erro ao enviar. Confirma que o chat_id está correcto e que enviaste uma mensagem ao bot primeiro.', 'erro')
 
     return redirect(url_for('settings.index'))
 

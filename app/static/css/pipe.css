@@ -1001,3 +1001,85 @@ a:hover { text-decoration: underline; }
     gap: 1rem;
     flex-wrap: wrap;
 }
+/* ---- Página genérica (perfil, etc.) ---- */
+.pagina-conteudo {
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+.cabecalho-pagina {
+    margin-bottom: 1.75rem;
+}
+
+.cabecalho-pagina h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--cor-texto);
+}
+
+/* ---- Grelha 2 colunas genérica ---- */
+.grelha-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    .grelha-2col { grid-template-columns: 1fr; }
+}
+
+/* ---- Cartão com cabeçalho e corpo ---- */
+.cartao-cabecalho {
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--cor-borda);
+}
+
+.cartao-cabecalho h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--cor-texto-suave);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+/* ---- Campo de informação (só leitura) ---- */
+.campo-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--cor-borda);
+}
+
+.campo-info:last-child {
+    border-bottom: none;
+}
+
+.campo-info-label {
+    font-size: 0.78rem;
+    color: var(--cor-texto-suave);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+.campo-info-valor {
+    font-size: 0.95rem;
+    color: var(--cor-texto);
+    font-weight: 500;
+}
+
+/* ---- Navbar: nome de utilizador clicável ---- */
+.utilizador-link {
+    color: var(--cor-texto-suave);
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.utilizador-link:hover,
+.utilizador-link.activo {
+    color: var(--cor-primaria);
+    text-decoration: none;
+}

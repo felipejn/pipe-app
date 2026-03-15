@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block titulo %}Perfil{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo">
+    <div class="cabecalho-pagina">
+        <h2>O meu perfil</h2>
+    </div>
+
+    <div class="grelha-2col">
+
+        <!-- Dados da conta -->
+        <div class="cartao">
+            <div class="cartao-cabecalho">
+                <h3>Dados da conta</h3>
+            </div>
+            <div class="campo-info">
+                <span class="campo-info-label">Utilizador</span>
+                <span class="campo-info-valor">{{ current_user.username }}</span>
+            </div>
+            <div class="campo-info">
+                <span class="campo-info-label">Email</span>
+                <span class="campo-info-valor">{{ current_user.email }}</span>
+            </div>
+            <div class="campo-info">
+                <span class="campo-info-label">Conta criada em</span>
+                <span class="campo-info-valor">{{ current_user.data_criacao.strftime('%d/%m/%Y') }}</span>
+            </div>
+            <div class="campo-info">
+                <span class="campo-info-label">Último login</span>
+                <span class="campo-info-valor">
+                    {% if current_user.ultimo_login %}
+                        {{ current_user.ultimo_login.strftime('%d/%m/%Y às %H:%M') }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- Alterar palavra-passe -->
+        <div class="cartao">
+            <div class="cartao-cabecalho">
+                <h3>Alterar palavra-passe</h3>
+            </div>
+            <form method="POST" action="{{ url_for('auth.perfil') }}">
+                {{ form_password.hidden_tag() }}
+                <div class="campo">
+                    {{ form_password.password_actual.label }}
+                    {{ form_password.password_actual(class="input", placeholder="Palavra-passe actual") }}
+                    {% for erro in form_password.password_actual.errors %}
+                    <span class="erro-campo">{{ erro }}</span>
+                    {% endfor %}
+                </div>
+                <div class="campo">
+                    {{ form_password.password_nova.label }}
+                    {{ form_password.password_nova(class="input", placeholder="Nova palavra-passe (mín. 8 caracteres)") }}
+                    {% for erro in form_password.password_nova.errors %}
+                    <span class="erro-campo">{{ erro }}</span>
+                    {% endfor %}
+                </div>
+                <div class="campo">
+                    {{ form_password.password_nova2.label }}
+                    {{ form_password.password_nova2(class="input", placeholder="Repetir nova palavra-passe") }}
+                    {% for erro in form_password.password_nova2.errors %}
+                    <span class="erro-campo">{{ erro }}</span>
+                    {% endfor %}
+                </div>
+                <div class="campo">
+                    {{ form_password.submeter(class="btn btn-primario btn-bloco") }}
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Autenticação de dois factores -->
+    <div class="cartao definicoes-secao" style="margin-top:1.25rem;">
+        <div class="secao-titulo" style="margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid var(--cor-borda);">
+            <span class="secao-icone">🔐</span>
+            <div>
+                <h2 style="font-size:1rem; font-weight:600; color:var(--cor-texto);">Autenticação de dois factores</h2>
+                <p class="secao-descricao">Adiciona uma camada extra de segurança ao teu login</p>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.perfil') }}" id="form-2fa">
+            {{ form_2fa.hidden_tag() }}
+
+            {# ── Telegram ── #}
+            <div class="secao-cabecalho" style="padding:1rem 0; border-bottom:1px solid var(--cor-borda);">
+                <div class="secao-titulo">
+                    <span class="secao-icone">✈️</span>
+                    <div>
+                        <h2>Telegram</h2>
+                        <p class="secao-descricao">
+                            Código enviado para o teu Telegram
+                            {% if current_user.dois_fa_activo %}
+                            — <span style="color:var(--cor-sucesso); font-weight:600;">activo</span>
+                            {% else %}
+                            — <span style="color:var(--cor-texto-suave);">inactivo</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <label class="toggle">
+                    {{ form_2fa.dois_fa_activo(id="toggle-telegram") }}
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div id="corpo-telegram" style="{{ 'display:none' if not current_user.dois_fa_activo else '' }}; padding-top:1rem;">
+                <div class="campo">
+                    {{ form_2fa.dois_fa_chat_id.label }}
+                    {{ form_2fa.dois_fa_chat_id(class="input", placeholder="ex: 123456789") }}
+                    <p class="campo-ajuda">
+                        Envia qualquer mensagem ao
+                        <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>
+                        no Telegram para obteres o teu Chat ID.
+                    </p>
+                </div>
+                <div style="display:flex; justify-content:flex-end;">
+                    {{ form_2fa.submeter_telegram(class="btn btn-primario") }}
+                </div>
+            </div>
+
+            {# ── Email ── #}
+            <div class="secao-cabecalho" style="padding:1rem 0; margin-top:0.5rem;">
+                <div class="secao-titulo">
+                    <span class="secao-icone">📧</span>
+                    <div>
+                        <h2>Email</h2>
+                        <p class="secao-descricao">
+                            Código enviado para <strong>{{ current_user.email }}</strong>
+                            {% if current_user.dois_fa_email_activo %}
+                            — <span style="color:var(--cor-sucesso); font-weight:600;">activo</span>
+                            {% else %}
+                            — <span style="color:var(--cor-texto-suave);">inactivo</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <label class="toggle">
+                    {{ form_2fa.dois_fa_email_activo(id="toggle-email") }}
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div id="corpo-email" style="{{ '' if current_user.dois_fa_email_activo else 'display:none' }}; padding-top:0.5rem;">
+                <div style="display:flex; justify-content:flex-end;">
+                    {{ form_2fa.submeter_email(class="btn btn-primario") }}
+                </div>
+            </div>
+
+        </form>
+    </div>
+
+</div>
+
+{% block scripts_extra %}
+<script>
+    // Toggle Telegram
+    const toggleTelegram = document.getElementById('toggle-telegram');
+    const corpoTelegram = document.getElementById('corpo-telegram');
+    toggleTelegram.addEventListener('change', function () {
+        corpoTelegram.style.display = this.checked ? '' : 'none';
+        if (!this.checked) {
+            // Desactivar imediatamente via submit do telegram
+            document.querySelector('[name="2fa-submeter_telegram"]').click();
+        }
+    });
+
+    // Toggle Email
+    const toggleEmail = document.getElementById('toggle-email');
+    const corpoEmail = document.getElementById('corpo-email');
+    toggleEmail.addEventListener('change', function () {
+        corpoEmail.style.display = this.checked ? '' : 'none';
+        if (!this.checked) {
+            document.querySelector('[name="2fa-submeter_email"]').click();
+        }
+    });
+</script>
+{% endblock %}
+
+{% endblock %}

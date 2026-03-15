@@ -26,12 +26,12 @@ pipe-app/
 │   │   ├── base.html
 │   │   ├── dashboard.html
 │   │   ├── auth/
-│   │   ├── euromilhoes/
+│   │   └── euromilhoes/
 │   │   └── settings/
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
-│   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout
-│   │   ├── forms.py         # LoginForm, RegistoForm
+│   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout, /auth/perfil, /auth/2fa/*
+│   │   ├── forms.py         # LoginForm, RegistoForm, AlterarPasswordForm, VerificarCodigoForm, ConfigurarDoisFAForm
 │   │   └── models.py        # modelo User
 │   ├── euromilhoes/         # Blueprint Euromilhões
 │   │   ├── __init__.py
@@ -62,8 +62,9 @@ pipe-app/
 
 ### Módulo Auth (`app/auth/`)
 - Modelo `User` com password em hash (Werkzeug)
-- Formulários com validação: `LoginForm`, `RegistoForm`
-- Rotas: `/auth/login`, `/auth/registo`, `/auth/logout`
+- Formulários com validação: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`
+- Rotas: `/auth/login`, `/auth/registo`, `/auth/logout`, `/auth/V`
+- Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
 - Script utilitário `scripts/criar_admin.py` para criar o primeiro utilizador
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
@@ -80,6 +81,9 @@ pipe-app/
 - Cálculo local do próximo sorteio (terça ou sexta)
 
 ### Funcionalidades implementadas
+- **Registo de utilizador** — página `/auth/registo` com validação de duplicados (username e email)
+- **Página de perfil** — `/auth/perfil` com dados da conta, alteração de password e configuração 2FA
+- **Nome de utilizador na navbar** clicável → perfil
 - **Registo de jogo** com selector de data: próximo sorteio (default) ou data manual
   - Validação JS: só aceita terças-feiras e sextas-feiras
   - Botão de registo bloqueado até data + 5 números + 2 estrelas seleccionados
@@ -104,12 +108,21 @@ pipe-app/
 - Página de definições em `/definicoes` com toggles por canal e botões de teste
 - `scripts/verificar_resultados.py` — scheduled task para o PA (corre às 23:00 às terças e sextas)
 
+### Autenticação 2FA (`app/auth/`)
+- **2FA opcional** — activado/desactivado na página de perfil por cada utilizador
+- **Telegram** ✅ — código de 6 dígitos enviado via bot, expira em 10 minutos
+- **Email** ✅ — código de 6 dígitos enviado via SendGrid, expira em 10 minutos
+- **Múltiplos métodos em simultâneo** — se ambos activos, utilizador escolhe qual usar no login
+- Fluxo: login com password → (se 2FA activo) escolha de método → código → acesso
+- Campos no modelo `User`: `dois_fa_activo`, `dois_fa_chat_id`, `dois_fa_email_activo`, `dois_fa_codigo`, `dois_fa_expira`
+- Templates: `verificar_2fa.html`, `escolher_2fa.html`
+
 ### Design System (`app/static/css/pipe.css`)
 - Tema escuro com acentos em âmbar/dourado
 - Componentes base: navbar, cartões, formulários, botões, alertas, bolas de números/estrelas
-- Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado, toggle switch, página de definições
+- Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado, toggle switch, página de definições, página de perfil, grelha 2 colunas, campos de informação (só leitura)
 - Layout responsivo (grid de 2 colunas colapsa para 1 em mobile)
-- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/register.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`
+- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/registo.html`, `auth/perfil.html`, `auth/verificar_2fa.html`, `auth/escolher_2fa.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`
 
 ### Testes realizados localmente
 - Login e registo de utilizador ✅
@@ -119,6 +132,10 @@ pipe-app/
 - Apagar jogo ✅
 - Página de resultados com skeleton loader ✅
 - Página de frequências ✅
+- Página de perfil (dados da conta + alterar password) ✅
+- 2FA Telegram (activar, login com código, desactivar) ✅
+- 2FA Email (activar, login com código, desactivar) ✅
+- Escolha de método quando ambos activos ✅
 - Notificação Telegram (teste manual) ✅
 - Notificação Email SendGrid (teste manual) ✅
 - Script `verificar_resultados.py` (teste manual com dia comentado) ✅
@@ -155,39 +172,39 @@ notification_service.send(
 
 ## Arquitectura de 2FA (decisão de design)
 
-O 2FA é obrigatório para todos os utilizadores.
+O 2FA é opcional para cada utilizador e configurado na página de perfil.
 O utilizador pode ter múltiplos métodos activos em simultâneo e escolhe qual usar no momento do login.
 
-### Métodos planeados
-| Método | Biblioteca | Descrição |
+### Métodos implementados
+| Método | Estado | Descrição |
 |---|---|---|
-| TOTP | `pyotp` + `qrcode` | Google Authenticator / Authy — código gerado localmente |
-| Telegram | canal existente | Bot envia código de 6 dígitos |
-| Email | canal existente | SendGrid envia código de 6 dígitos |
+| Telegram | Implementado ✅ | Bot envia código de 6 dígitos |
+| Email | Implementado ✅ | SendGrid envia código de 6 dígitos |
+| TOTP (QR code) | Pendente | Google Authenticator / Authy — `pyotp` + `qrcode` |
 
 ### Fluxo de login com 2FA
 1. Utilizador introduz username + password
-2. Se credenciais válidas → redireciona para página de verificação 2FA
-3. Utilizador escolhe o método e introduz o código
-4. Código válido → acesso concedido
+2. Se 0 métodos activos → acesso directo
+3. Se 1 método activo → código enviado automaticamente
+4. Se 2+ métodos activos → página de escolha de método
+5. Utilizador introduz o código → acesso concedido
 
 ---
 
 ## Ponto onde estamos
 
-O módulo Euromilhões está completo e testado. O sistema de notificações está implementado e testado (Telegram + Email). A scheduled task está pronta para configurar no PA. A arquitectura do 2FA está definida, implementação a iniciar.
+O módulo Euromilhões está completo e testado. O sistema de notificações está implementado e testado (Telegram + Email). O sistema de autenticação está completo com registo, perfil e 2FA via Telegram e Email. A scheduled task está pronta para configurar no PA. Falta implementar o 2FA TOTP (QR code) e fazer o deploy no PythonAnywhere.
 
 ---
 
 ## Próximos passos (por ordem)
 
-### 1. Autenticação 2FA
-- Obrigatório para todos os utilizadores
-- Métodos: TOTP (`pyotp` + `qrcode`), Telegram, Email
-- Utilizador pode ter múltiplos métodos activos — escolhe qual usar no login
-- Adicionar ao modelo `User`: `totp_secret`, `dois_fa_activo`
-- Novas rotas em `app/auth/`: `/auth/2fa/verificar`, `/auth/2fa/configurar`
-- Interface na página de definições (`/definicoes`)
+### 1. 2FA TOTP (QR code)
+- Biblioteca: `pyotp` + `qrcode`
+- Compatível com Google Authenticator, Authy, e outros
+- Adicionar ao modelo `User`: `totp_secret`, `totp_activo`
+- Fluxo de configuração: gerar secret → mostrar QR code → utilizador confirma com código → activar
+- Interface na página de perfil (igual aos outros métodos)
 
 ### 2. Deploy no PythonAnywhere
 ```bash
@@ -215,6 +232,7 @@ Werkzeug==3.0.3
 WTForms==3.1.2
 python-dotenv==1.0.1
 requests==2.32.3
+email-validator==2.2.0
 ```
 
 ## Variáveis de ambiente (`.env`)
@@ -235,5 +253,5 @@ SENDGRID_FROM_EMAIL=...
 - Hosting alvo: PythonAnywhere (plano free) — espaço em disco não é problema (~37MB para .venv)
 - Custo total: zero
 - Base de dados: SQLite
-- Autenticação actual: username/password — 2FA obrigatório a implementar
+- Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP pendente)
 - Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes

@@ -3,6 +3,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
+
 class User(UserMixin, db.Model):
     __tablename__ = 'utilizadores'
 
@@ -14,14 +15,48 @@ class User(UserMixin, db.Model):
     ultimo_login = db.Column(db.DateTime)
     activo = db.Column(db.Boolean, default=True)
 
+    # 2FA — Telegram
+    dois_fa_activo = db.Column(db.Boolean, default=False)
+    dois_fa_chat_id = db.Column(db.String(64), nullable=True)
+
+    # 2FA — Email
+    dois_fa_email_activo = db.Column(db.Boolean, default=False)
+
+    # Código partilhado por ambos os métodos
+    dois_fa_codigo = db.Column(db.String(6), nullable=True)
+    dois_fa_expira = db.Column(db.DateTime, nullable=True)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    def metodos_2fa_activos(self):
+        """Devolve lista de métodos 2FA activos para este utilizador."""
+        metodos = []
+        if self.dois_fa_activo and self.dois_fa_chat_id:
+            metodos.append('telegram')
+        if self.dois_fa_email_activo:
+            metodos.append('email')
+        return metodos
+
+    def codigo_valido(self, codigo):
+        """Verifica se o código 2FA introduzido é válido e não expirou."""
+        if not self.dois_fa_codigo or not self.dois_fa_expira:
+            return False
+        if datetime.utcnow() > self.dois_fa_expira:
+            return False
+        return self.dois_fa_codigo == codigo.strip()
+
+    def limpar_codigo(self):
+        """Remove o código 2FA após uso ou expiração."""
+        self.dois_fa_codigo = None
+        self.dois_fa_expira = None
+
     def __repr__(self):
         return f'<User {self.username}>'
+
 
 @login_manager.user_loader
 def load_user(user_id):
