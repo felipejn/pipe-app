@@ -16,6 +16,11 @@
     --cor-erro: #ef4444;
     --cor-info: #3b82f6;
     --cor-estrela: #f59e0b;
+    --cor-destaque: #f59e0b;       /* âmbar */
+    --cor-destaque-rgb: 245, 158, 11;   /* ADICIONAR se não existir */
+    --cor-superficie: #1e1e2e;
+    --cor-borda: #2e2e3e;
+    --cor-texto-subtil: #6b7280;
     --raio: 10px;
     --raio-sm: 6px;
     --sombra: 0 4px 24px rgba(0,0,0,0.4);
@@ -1082,4 +1087,154 @@ a:hover { text-decoration: underline; }
 .utilizador-link.activo {
     color: var(--cor-primaria);
     text-decoration: none;
+}
+
+/* ── Grelha de estatísticas ──────────────────────────────────── */
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .admin-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.admin-stat-cartao {
+    text-align: center;
+    padding: 1.5rem 1rem;
+}
+
+.admin-stat-valor {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--cor-destaque);
+    line-height: 1;
+    margin-bottom: 0.4rem;
+}
+
+.admin-stat-label {
+    font-size: 0.8rem;
+    color: var(--cor-texto-subtil);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Tabela admin ────────────────────────────────────────────── */
+.admin-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.admin-tabela th {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    color: var(--cor-texto-subtil);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--cor-borda);
+}
+
+.admin-tabela td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--cor-borda);
+    vertical-align: middle;
+}
+
+.admin-tabela tr:last-child td {
+    border-bottom: none;
+}
+
+.admin-tabela tr.linha-inactiva td {
+    opacity: 0.5;
+}
+
+.col-id {
+    color: var(--cor-texto-subtil);
+    font-size: 0.8rem;
+    width: 2.5rem;
+}
+
+.texto-subtil {
+    color: var(--cor-texto-subtil);
+}
+
+/* ── Badges ──────────────────────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-left: 0.25rem;
+}
+
+.badge-admin {
+    background: rgba(var(--cor-destaque-rgb), 0.15);
+    color: var(--cor-destaque);
+    border: 1px solid rgba(var(--cor-destaque-rgb), 0.3);
+}
+
+.badge-activo {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.badge-inactivo {
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.badge-2fa {
+    background: rgba(129, 140, 248, 0.1);
+    color: #818cf8;
+    border: 1px solid rgba(129, 140, 248, 0.3);
+    margin-left: 0;
+    margin-right: 0.2rem;
+}
+
+/* ── Botões de acção da tabela ───────────────────────────────── */
+.acoes-celula {
+    white-space: nowrap;
+}
+
+.btn-acao {
+    background: none;
+    border: 1px solid var(--cor-borda);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-right: 0.25rem;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-acao:hover {
+    background: var(--cor-superficie);
+    border-color: var(--cor-destaque);
+}
+
+.btn-acao-apagar:hover {
+    border-color: #f87171;
+    background: rgba(248, 113, 113, 0.1);
+}
+
+/* ── Página admin (largura alargada) ─────────────────────────── */
+.pagina-admin {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+input[type="date"] {
+    color-scheme: dark;
 }

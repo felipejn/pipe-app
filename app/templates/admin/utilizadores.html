@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block titulo %}Utilizadores — Admin{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-admin">
+
+    <div class="pagina-cabecalho">
+        <h1>👥 Utilizadores</h1>
+        <p class="subtitulo">{{ utilizadores|length }} utilizador{{ 'es' if utilizadores|length != 1 else '' }} registado{{ 's' if utilizadores|length != 1 else '' }}</p>
+    </div>
+
+    <div class="cartao definicoes-secao">
+        <div class="secao-corpo">
+            <table class="admin-tabela">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Registo</th>
+                        <th>Último login</th>
+                        <th>Estado</th>
+                        <th>Acções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in utilizadores %}
+                    <tr class="{{ 'linha-inactiva' if not u.activo else '' }}">
+                        <td>
+                            {{ u.username }}
+                            {% if u.is_admin %}<span class="badge badge-admin">admin</span>{% endif %}
+                        </td>
+                        <td>{{ u.email }}</td>
+                        <td>{{ u.data_criacao.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ u.ultimo_login.strftime('%d/%m/%Y %H:%M') if u.ultimo_login else '—' }}</td>
+                        <td>
+                            {% if u.activo %}
+                                <span class="badge badge-activo">activo</span>
+                            {% else %}
+                                <span class="badge badge-inactivo">inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="acoes-celula">
+                            {% if u.id != current_user.id %}
+
+                            {# Toggle activo #}
+                            <form method="POST"
+                                  action="{{ url_for('admin.toggle_activo', user_id=u.id) }}"
+                                  style="display:inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit"
+                                        class="btn-acao"
+                                        title="{{ 'Desactivar' if u.activo else 'Activar' }}">
+                                    {{ '🔒' if u.activo else '🔓' }}
+                                </button>
+                            </form>
+
+                            {# Toggle admin #}
+                            <form method="POST"
+                                  action="{{ url_for('admin.toggle_admin', user_id=u.id) }}"
+                                  style="display:inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit"
+                                        class="btn-acao"
+                                        title="{{ 'Remover admin' if u.is_admin else 'Promover a admin' }}">
+                                    {{ '⭐' if u.is_admin else '☆' }}
+                                </button>
+                            </form>
+
+                            {# Apagar #}
+                            <form method="POST"
+                                  action="{{ url_for('admin.apagar_utilizador', user_id=u.id) }}"
+                                  style="display:inline"
+                                  onsubmit="return confirm('Apagar {{ u.username }}? Esta acção é irreversível.')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit"
+                                        class="btn-acao btn-acao-apagar"
+                                        title="Apagar">
+                                    🗑️
+                                </button>
+                            </form>
+
+                            {% else %}
+                            <span class="texto-subtil">(tu)</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
