@@ -34,6 +34,9 @@ def create_app(config_name='default'):
     from app.admin import admin as admin_bp
     app.register_blueprint(admin_bp, url_prefix='/admin')
 
+    from app.tarefas import tarefas as tarefas_bp
+    app.register_blueprint(tarefas_bp, url_prefix='/tarefas')
+
     # Rota raiz — redireciona para dashboard
     from flask import redirect, url_for
     from flask_login import login_required
@@ -47,6 +50,7 @@ def create_app(config_name='default'):
     # Criar tabelas se não existirem
     with app.app_context():
         from app.notifications.models import UserNotificationPreferences  # noqa: F401
+        from app.tarefas.models import Lista, Tarefa, TagTarefa  # noqa: F401
         db.create_all()
 
     return app

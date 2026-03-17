@@ -1,0 +1,391 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Tarefas{% endblock %}
+
+{% block conteudo %}
+<div class="tarefas-pagina">
+
+  {# ── Cabeçalho ─────────────────────────────────────────── #}
+  <div class="tarefas-header">
+    <h1 class="tarefas-titulo">✅ <span class="destaque-ouro">Tarefas</span></h1>
+    <button class="btn btn-primario" onclick="abrirModalLista()">+ Nova lista</button>
+  </div>
+
+  {# ── Estatísticas ──────────────────────────────────────── #}
+  <div class="tarefas-stats">
+    <div class="tarefa-stat">
+      <span class="stat-valor destaque-ouro">{{ stats.total }}</span>
+      <span class="stat-etiqueta">Total</span>
+    </div>
+    <div class="tarefa-stat">
+      <span class="stat-valor">{{ stats.pendentes }}</span>
+      <span class="stat-etiqueta">Por fazer</span>
+    </div>
+    <div class="tarefa-stat">
+      <span class="stat-valor cor-sucesso">{{ stats.concluidas }}</span>
+      <span class="stat-etiqueta">Concluídas</span>
+    </div>
+    <div class="tarefa-stat {% if stats.atraso > 0 %}stat-alerta{% endif %}">
+      <span class="stat-valor {% if stats.atraso > 0 %}cor-erro{% endif %}">{{ stats.atraso }}</span>
+      <span class="stat-etiqueta">Em atraso</span>
+    </div>
+  </div>
+
+  {# ── Grelha: sidebar + conteúdo ────────────────────────── #}
+  <div class="tarefas-grelha">
+
+    {# ── Sidebar de listas ─────────────────────────────────── #}
+    <aside class="tarefas-sidebar">
+      <h2 class="sidebar-titulo">Listas</h2>
+
+      {# Opção especial: Todas #}
+      <a href="{{ url_for('tarefas.index', lista='todas') }}"
+         class="lista-item {% if mostrar_todas %}activo{% endif %}">
+        <span class="lista-icone">🗂</span>
+        <span class="lista-nome">Todas</span>
+        <span class="lista-badge">{{ stats.pendentes }}</span>
+      </a>
+
+      {% if listas %}
+        {% for lista in listas %}
+        <a href="{{ url_for('tarefas.index', lista=lista.id) }}"
+           class="lista-item {% if not mostrar_todas and lista_activa and lista.id == lista_activa.id %}activo{% endif %}">
+          <span class="lista-icone">{{ lista.icone }}</span>
+          <span class="lista-nome">{{ lista.nome }}</span>
+          <span class="lista-badge">{{ lista.pendentes() }}</span>
+        </a>
+        {% endfor %}
+      {% else %}
+        <p class="sem-listas">Sem listas ainda.<br>Cria a primeira!</p>
+      {% endif %}
+    </aside>
+
+    {# ── Conteúdo de tarefas ───────────────────────────────── #}
+    <section class="tarefas-conteudo">
+
+      {% if mostrar_todas or lista_activa %}
+
+        {# Campo de busca #}
+        <form method="get" action="{{ url_for('tarefas.index') }}" class="busca-form" id="form-busca">
+          <input type="hidden" name="lista" value="{{ 'todas' if mostrar_todas else lista_activa.id }}">
+          <input type="hidden" name="filtro" value="{{ filtro }}">
+          <div class="busca-wrap">
+            <span class="busca-icone">🔍</span>
+            <input type="text"
+                   name="busca"
+                   id="campo-busca"
+                   class="campo-busca"
+                   value="{{ busca }}"
+                   placeholder="Pesquisar por título ou etiqueta..."
+                   autocomplete="off">
+            {% if busca %}
+            <a href="{{ url_for('tarefas.index', lista=('todas' if mostrar_todas else lista_activa.id), filtro=filtro) }}"
+               class="busca-limpar" title="Limpar pesquisa">✕</a>
+            {% endif %}
+          </div>
+        </form>
+
+        {# Filtros rápidos #}
+        <div class="tarefas-filtros">
+          {% set lista_param = 'todas' if mostrar_todas else lista_activa.id %}
+          {% set filtros = [
+            ('todas',     'Todas'),
+            ('hoje',      'Hoje'),
+            ('semana',    'Esta semana'),
+            ('alta',      'Alta prioridade'),
+            ('concluidas','Concluídas'),
+          ] %}
+          {% for chave, label in filtros %}
+          <a href="{{ url_for('tarefas.index', lista=lista_param, filtro=chave, busca=busca) }}"
+             class="btn-filtro-tarefa {% if filtro == chave %}activo{% endif %}">
+            {{ label }}
+          </a>
+          {% endfor %}
+        </div>
+
+        {# Input de adição rápida — só aparece em listas concretas, não em "Todas" #}
+        {% if not mostrar_todas %}
+        <div class="input-rapida" id="input-rapida-wrap">
+          <input type="text"
+                 id="input-rapida"
+                 class="campo-rapida"
+                 placeholder="Adicionar tarefa rápida e pressionar Enter..."
+                 autocomplete="off">
+          <a href="{{ url_for('tarefas.nova_tarefa', lista=lista_activa.id) }}"
+             id="btn-detalhes"
+             class="btn-detalhe-nova" title="Criar tarefa com detalhes">+ Detalhes</a>
+        </div>
+        {% endif %}
+
+        {# Lista de tarefas #}
+        {% if tarefas_lista %}
+          {% if busca %}
+            <div class="secao-label">{{ tarefas_lista | length }} resultado(s) para "{{ busca }}"</div>
+            <div class="tarefas-lista">
+              {% for t in tarefas_lista %}
+                {% include 'tarefas/_tarefa.html' %}
+              {% endfor %}
+            </div>
+          {% else %}
+            {% set pendentes  = tarefas_lista | selectattr('concluida', 'equalto', false) | list %}
+            {% set concluidas = tarefas_lista | selectattr('concluida', 'equalto', true)  | list %}
+
+            {% if pendentes %}
+            <div class="secao-label">Pendentes ({{ pendentes | length }})</div>
+            <div class="tarefas-lista" id="lista-pendentes">
+              {% for t in pendentes %}
+                {% include 'tarefas/_tarefa.html' %}
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if concluidas and filtro not in ('alta', 'hoje', 'semana') %}
+            <div class="secao-label" style="margin-top:1.2rem">
+              Concluídas ({{ concluidas | length }})
+              <button class="btn-colapsar" onclick="toggleConcluidas(this)">▾ ocultar</button>
+            </div>
+            <div class="tarefas-lista" id="lista-concluidas">
+              {% for t in concluidas %}
+                {% include 'tarefas/_tarefa.html' %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          {% endif %}
+
+        {% else %}
+          <div class="estado-vazio">
+            <div class="vazio-icone">{% if busca %}🔍{% else %}✅{% endif %}</div>
+            <p class="vazio-texto">
+              {% if busca %}
+                Nenhuma tarefa encontrada para "{{ busca }}".
+              {% elif filtro != 'todas' %}
+                Nenhuma tarefa para este filtro.
+              {% elif mostrar_todas %}
+                Não tens tarefas ainda. Cria uma lista e começa!
+              {% else %}
+                Lista vazia. Adiciona a primeira tarefa acima!
+              {% endif %}
+            </p>
+          </div>
+        {% endif %}
+
+        {# Apagar lista — só disponível numa lista concreta #}
+        {% if not mostrar_todas %}
+        <div class="tarefas-rodape-lista">
+          <form method="post" action="{{ url_for('tarefas.apagar_lista', lista_id=lista_activa.id) }}"
+                onsubmit="return confirm('Apagar a lista &quot;{{ lista_activa.nome }}&quot; e todas as suas tarefas?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-apagar-lista">🗑 Apagar lista</button>
+          </form>
+        </div>
+        {% endif %}
+
+      {% else %}
+        <div class="estado-vazio">
+          <div class="vazio-icone">📋</div>
+          <p class="vazio-texto">Cria a tua primeira lista para começar a organizar as tarefas.</p>
+          <button class="btn btn-primario" onclick="abrirModalLista()">+ Criar lista</button>
+        </div>
+      {% endif %}
+
+    </section>
+  </div>
+</div>
+
+{# ── Modal: Nova Lista ─────────────────────────────────── #}
+<div class="modal-overlay" id="modal-lista" onclick="fecharModalLista(event)">
+  <div class="modal-caixa" onclick="event.stopPropagation()">
+    <div class="modal-cabecalho">
+      <h3>Nova lista</h3>
+      <button class="modal-fechar" onclick="fecharModalLista()">&times;</button>
+    </div>
+    <form method="post" action="{{ url_for('tarefas.criar_lista') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="campo-grupo">
+        <label class="campo-label">Ícone</label>
+        <div class="icones-grid">
+          {% for valor, descricao in form_lista.icone.choices %}
+          <label class="icone-opcao">
+            <input type="radio" name="icone" value="{{ valor }}"
+                   {% if loop.first %}checked{% endif %}>
+            <span class="icone-btn">{{ valor }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="campo-grupo">
+        <label class="campo-label" for="nome-lista">Nome da lista</label>
+        <input type="text" id="nome-lista" name="nome" class="campo-texto"
+               placeholder="Ex: Trabalho, Casa, Compras..." maxlength="64" required autofocus>
+      </div>
+      <div class="modal-acoes">
+        <button type="button" class="btn btn-secundario" onclick="fecharModalLista()">Cancelar</button>
+        <button type="submit" class="btn btn-primario">Criar lista</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Modal: Nova Tarefa (adição rápida com detalhes) ───── #}
+<div class="modal-overlay" id="modal-tarefa" onclick="fecharModalTarefa(event)">
+  <div class="modal-caixa" onclick="event.stopPropagation()">
+    <div class="modal-cabecalho">
+      <h3>Nova tarefa</h3>
+      <button class="modal-fechar" onclick="fecharModalTarefa()">&times;</button>
+    </div>
+    <form method="post" action="{{ url_for('tarefas.criar_tarefa') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="lista_id" value="{{ lista_activa.id if lista_activa else '' }}">
+      <div class="campo-grupo">
+        <label class="campo-label">Tarefa</label>
+        <input type="text" name="texto" class="campo-texto" placeholder="Descreve a tarefa..." maxlength="512" required>
+      </div>
+      <div class="campos-linha">
+        <div class="campo-grupo">
+          <label class="campo-label">Prioridade</label>
+          <select name="prioridade" class="campo-select">
+            <option value="alta">🔴 Alta</option>
+            <option value="media" selected>🟡 Média</option>
+            <option value="baixa">🟢 Baixa</option>
+          </select>
+        </div>
+        <div class="campo-grupo">
+          <label class="campo-label">Data limite</label>
+          <input type="date" name="data_limite" class="campo-texto" style="color-scheme: dark;">
+        </div>
+      </div>
+      <div class="campo-grupo">
+        <label class="campo-label">Etiquetas <span class="campo-hint">(separadas por vírgula)</span></label>
+        <input type="text" name="tags" class="campo-texto" placeholder="ex: trabalho, urgente, reunião">
+      </div>
+      <div class="campo-grupo">
+        <label class="campo-label">Notas</label>
+        <textarea name="notas" class="campo-textarea" placeholder="Notas ou contexto adicional..." rows="3"></textarea>
+      </div>
+      <div class="modal-acoes">
+        <button type="button" class="btn btn-secundario" onclick="fecharModalTarefa()">Cancelar</button>
+        <button type="submit" class="btn btn-primario">Adicionar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+const LISTA_ACTIVA_ID = {{ lista_activa.id if lista_activa else 'null' }};
+const CSRF_TOKEN = '{{ csrf_token() }}';
+
+// ── Modais ───────────────────────────────────────────────────────────
+function abrirModalLista() {
+  document.getElementById('modal-lista').classList.add('aberto');
+  document.getElementById('nome-lista').focus();
+}
+function fecharModalLista(e) {
+  if (!e || e.target === document.getElementById('modal-lista'))
+    document.getElementById('modal-lista').classList.remove('aberto');
+}
+function fecharModalTarefa(e) {
+  if (!e || e.target === document.getElementById('modal-tarefa'))
+    document.getElementById('modal-tarefa').classList.remove('aberto');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { fecharModalLista(); fecharModalTarefa(); }
+});
+
+// ── Campo de busca — submeter ao pressionar Enter ────────────────────
+const campoBusca = document.getElementById('campo-busca');
+if (campoBusca) {
+  campoBusca.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('form-busca').submit();
+  });
+}
+
+// ── Sincronizar texto do input rápido com link "+ Detalhes" ──────────
+const inputRapida = document.getElementById('input-rapida');
+const btnDetalhes = document.getElementById('btn-detalhes');
+const urlBaseDetalhes = {{ url_for('tarefas.nova_tarefa', lista=lista_activa.id) | tojson if lista_activa else 'null' }};
+
+if (inputRapida && btnDetalhes && urlBaseDetalhes) {
+  inputRapida.addEventListener('input', function() {
+    const texto = this.value.trim();
+    btnDetalhes.href = texto
+      ? urlBaseDetalhes + '&texto=' + encodeURIComponent(texto)
+      : urlBaseDetalhes;
+  });
+}
+
+// ── Adição rápida (Enter) ────────────────────────────────────────────
+if (inputRapida) {
+  inputRapida.addEventListener('keydown', async function(e) {
+    if (e.key !== 'Enter') return;
+    const texto = this.value.trim();
+    if (!texto || !LISTA_ACTIVA_ID) return;
+
+    this.disabled = true;
+    try {
+      const resp = await fetch('{{ url_for("tarefas.adicao_rapida") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF_TOKEN,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ texto, lista_id: LISTA_ACTIVA_ID }),
+      });
+      const dados = await resp.json();
+      if (dados.ok) {
+        this.value = '';
+        window.location.reload();
+      } else {
+        alert(dados.erro || 'Erro ao adicionar tarefa.');
+      }
+    } catch {
+      alert('Erro de ligação. Tenta novamente.');
+    } finally {
+      this.disabled = false;
+    }
+  });
+}
+
+// ── Toggle concluída — feedback imediato no DOM, sem reload ──────────
+async function toggleConcluida(btn, tarefaId) {
+  const item = document.getElementById('tarefa-' + tarefaId);
+  if (!item) return;
+
+  // Resposta visual imediata
+  const jaConcluida = item.classList.contains('concluida');
+  item.classList.toggle('concluida', !jaConcluida);
+  btn.classList.toggle('marcado', !jaConcluida);
+
+  try {
+    const resp = await fetch(`/tarefas/${tarefaId}/toggle`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': CSRF_TOKEN,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    const dados = await resp.json();
+    if (!dados.ok) {
+      // Reverter se o servidor falhou
+      item.classList.toggle('concluida', jaConcluida);
+      btn.classList.toggle('marcado', jaConcluida);
+    }
+  } catch {
+    // Reverter em caso de erro de rede
+    item.classList.toggle('concluida', jaConcluida);
+    btn.classList.toggle('marcado', jaConcluida);
+  }
+}
+
+// ── Colapsar secção de concluídas ────────────────────────────────────
+function toggleConcluidas(btn) {
+  const lista = document.getElementById('lista-concluidas');
+  if (!lista) return;
+  const oculto = lista.style.display === 'none';
+  lista.style.display = oculto ? '' : 'none';
+  btn.textContent = oculto ? '▾ ocultar' : '▸ mostrar';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,42 @@
+{# Partial: _tarefa.html — variável 't' (Tarefa) no contexto #}
+<div class="tarefa-item prioridade-{{ t.prioridade }} {% if t.concluida %}concluida{% endif %} {% if t.em_atraso() %}em-atraso{% endif %}"
+     id="tarefa-{{ t.id }}">
+
+  {# Checkbox — clicável, resposta imediata sem reload #}
+  <button class="check-circulo {% if t.concluida %}marcado{% endif %}"
+          onclick="toggleConcluida(this, {{ t.id }})"
+          title="{{ 'Marcar como pendente' if t.concluida else 'Marcar como concluída' }}"
+          aria-label="{{ 'Marcar como pendente' if t.concluida else 'Marcar como concluída' }}">
+    <span class="check-visto">✓</span>
+  </button>
+
+  {# Corpo #}
+  <div class="tarefa-corpo">
+    <span class="tarefa-texto">{{ t.texto }}</span>
+    <div class="tarefa-meta">
+      <span class="badge badge-{{ t.prioridade }}">
+        {{ {'alta': '🔴 Alta', 'media': '🟡 Média', 'baixa': '🟢 Baixa'}[t.prioridade] }}
+      </span>
+      {% if t.data_limite %}
+        <span class="badge badge-data {% if t.em_atraso() %}badge-atraso{% endif %}">
+          {% if t.em_atraso() %}⚠ {% endif %}{{ t.data_limite.strftime('%d/%m/%Y') }}
+        </span>
+      {% endif %}
+      {% for tag in t.tags %}
+        <span class="badge badge-tag">{{ tag.nome }}</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Acções — visíveis ao hover #}
+  <div class="tarefa-acoes">
+    <a href="{{ url_for('tarefas.editar_tarefa', tarefa_id=t.id) }}"
+       class="btn-acao" title="Editar">✏</a>
+    <form method="post" action="{{ url_for('tarefas.apagar_tarefa', tarefa_id=t.id) }}"
+          style="display:inline"
+          onsubmit="return confirm('Apagar esta tarefa?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn-acao btn-acao-apagar" title="Apagar">✕</button>
+    </form>
+  </div>
+</div>

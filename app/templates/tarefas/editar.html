@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block titulo %}{{ 'Nova tarefa' if tarefa.id == 0 else 'Editar tarefa' }}{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-editar-tarefa">
+  <div class="editar-cabecalho">
+    <a href="{{ url_for('tarefas.index', lista=tarefa.lista_id if tarefa.lista_id else '') }}"
+       class="btn-voltar">← Voltar</a>
+    <h1 class="editar-titulo">{{ 'Nova tarefa' if not tarefa.id else 'Editar tarefa' }}</h1>
+  </div>
+
+  <div class="cartao">
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      {# Tarefa #}
+      <div class="campo-grupo">
+        <label class="campo-label">{{ form.texto.label.text }}</label>
+        {{ form.texto(class='campo-texto', placeholder='Descreve a tarefa...', autofocus=true) }}
+        {% if form.texto.errors %}
+          <span class="campo-erro">{{ form.texto.errors[0] }}</span>
+        {% endif %}
+      </div>
+
+      <div class="campos-linha">
+        {# Prioridade #}
+        <div class="campo-grupo">
+          <label class="campo-label">{{ form.prioridade.label.text }}</label>
+          {{ form.prioridade(class='campo-select') }}
+        </div>
+
+        {# Data limite #}
+        <div class="campo-grupo">
+          <label class="campo-label">{{ form.data_limite.label.text }}</label>
+          {{ form.data_limite(class='campo-texto', style='color-scheme: dark;') }}
+        </div>
+      </div>
+
+      {# Lista (mover para outra lista) #}
+      <div class="campo-grupo">
+        <label class="campo-label">Lista</label>
+        <select name="lista_id" class="campo-select">
+          {% for lista in listas %}
+          <option value="{{ lista.id }}"
+                  {% if lista.id == (tarefa.lista_id or form.lista_id.data|int) %}selected{% endif %}>
+            {{ lista.icone }} {{ lista.nome }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {# Tags #}
+      <div class="campo-grupo">
+        <label class="campo-label">{{ form.tags.label.text }}</label>
+        {{ form.tags(class='campo-texto', placeholder='ex: trabalho, urgente, reunião') }}
+        <span class="campo-hint">Separadas por vírgula. As etiquetas são criadas automaticamente.</span>
+      </div>
+
+      {# Notas #}
+      <div class="campo-grupo">
+        <label class="campo-label">{{ form.notas.label.text }}</label>
+        {{ form.notas(class='campo-textarea', placeholder='Notas ou contexto adicional...', rows=4) }}
+      </div>
+
+      <div class="form-acoes">
+        <a href="{{ url_for('tarefas.index', lista=tarefa.lista_id if tarefa.lista_id else '') }}"
+           class="btn btn-secundario">Cancelar</a>
+        <button type="submit" class="btn btn-primario">
+          {{ 'Criar tarefa' if not tarefa.id else 'Guardar alterações' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

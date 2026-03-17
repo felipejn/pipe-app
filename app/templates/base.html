@@ -16,13 +16,6 @@
             <span class="marca-pipe">PIPE</span>
         </a>
     </div>
-    <div class="navbar-modulos">
-        <a href="{{ url_for('euromilhoes.index') }}"
-           class="modulo-link {% if request.blueprint == 'euromilhoes' %}activo{% endif %}">
-            🎯 Euromilhões
-        </a>
-        {# Futuros módulos aqui #}
-    </div>
     <div class="navbar-utilizador">
         <a href="{{ url_for('auth.perfil') }}"
            class="utilizador-nome utilizador-link {% if request.endpoint == 'auth.perfil' %}activo{% endif %}">
