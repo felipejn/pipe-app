@@ -1234,3 +1234,7 @@ a:hover { text-decoration: underline; }
     margin: 0 auto;
     padding: 2rem 1rem;
 }
+
+input[type="date"] {
+    color-scheme: dark;
+}
