@@ -1227,3 +1227,10 @@ a:hover { text-decoration: underline; }
     border-color: #f87171;
     background: rgba(248, 113, 113, 0.1);
 }
+
+/* ── Página admin (largura alargada) ─────────────────────────── */
+.pagina-admin {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
