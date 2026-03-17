@@ -27,13 +27,16 @@ pipe-app/
 │   │   ├── base.html
 │   │   ├── dashboard.html
 │   │   ├── auth/
-│   │   └── euromilhoes/
-│   │   └── settings/
+│   │   ├── euromilhoes/
+│   │   ├── settings/
+│   │   └── admin/           # NOVO
+│   │       ├── dashboard.html
+│   │       └── utilizadores.html
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout, /auth/perfil, /auth/2fa/*
 │   │   ├── forms.py         # LoginForm, RegistoForm, AlterarPasswordForm, VerificarCodigoForm, ConfigurarDoisFAForm, ConfirmarTOTPForm
-│   │   └── models.py        # modelo User
+│   │   └── models.py        # modelo User (inclui is_admin)
 │   ├── euromilhoes/         # Blueprint Euromilhões
 │   │   ├── __init__.py
 │   │   ├── routes.py
@@ -47,11 +50,17 @@ pipe-app/
 │   │       ├── base.py      # classe abstracta BaseChannel
 │   │       ├── telegram.py  # TelegramChannel
 │   │       └── email.py     # EmailChannel (SendGrid)
-│   └── settings/            # Blueprint de definições
+│   ├── settings/            # Blueprint de definições
+│   │   ├── __init__.py
+│   │   └── routes.py        # /definicoes/
+│   └── admin/               # NOVO — Blueprint de administração
 │       ├── __init__.py
-│       └── routes.py        # /definicoes/
+│       ├── decorators.py    # @admin_required
+│       └── routes.py        # /admin/
 ├── scripts/
 │   ├── criar_admin.py
+│   ├── promover_admin.py    # NOVO — promoção de utilizador a admin via CLI
+│   ├── adicionar_is_admin.py  # NOVO — migração da BD (adiciona coluna is_admin)
 │   └── verificar_resultados.py  # scheduled task PA
 ├── instance/
 │   └── pipe.db              # SQLite (excluído do git)
@@ -63,12 +72,13 @@ pipe-app/
 
 ### Módulo Auth (`app/auth/`)
 - Modelo `User` com password em hash (Werkzeug)
+- Campo `is_admin` adicionado ao modelo `User` (Boolean, default=False)
 - Formulários com validação: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`, `PedirResetForm`, `ResetPasswordForm`
 - Rotas: `/auth/login`, `/auth/registo`, `/auth/logout`, `/auth/perfil`
 - Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
 - Rotas TOTP: `/auth/2fa/totp/configurar`, `/auth/2fa/totp/desactivar`
 - Rotas recuperação de password: `/auth/recuperar-password`, `/auth/reset-password/<token>`
-- Primeiro utilizador criado via `/auth/registo` na app (sem script necessário)
+- Primeiro utilizador criado via `/auth/registo` na app → promover a admin com `scripts/promover_admin.py`
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
 - Modelo `Jogo` (SQLite) — substitui o `jogos.json` dos scripts anteriores
@@ -83,6 +93,20 @@ pipe-app/
   - `GET /frequencias` — análise histórica de frequências
 - Cálculo local do próximo sorteio (terça ou sexta)
 
+### Área Admin (`app/admin/`)
+- Blueprint registado em `/admin`
+- Decorador `@admin_required` — aborta com 403 se utilizador não for admin
+- Ícone 🛠️ na navbar visível apenas para admins
+- Rotas implementadas:
+  - `GET /admin/` — dashboard com estatísticas (total utilizadores, activos, admins) e últimos 5 registos
+  - `GET /admin/utilizadores` — lista completa de utilizadores
+  - `POST /admin/utilizadores/<id>/toggle-activo` — activar/desactivar utilizador
+  - `POST /admin/utilizadores/<id>/toggle-admin` — promover/rebaixar admin
+  - `POST /admin/utilizadores/<id>/apagar` — apagar utilizador
+- Protecções: não é possível desactivar, rebaixar ou apagar a própria conta
+- Script `scripts/promover_admin.py` — promove utilizador a admin via CLI (uso: `python scripts/promover_admin.py <username>`)
+- Script `scripts/adicionar_is_admin.py` — migração da BD para adicionar coluna `is_admin`
+
 ### Funcionalidades implementadas
 - **Registo de utilizador** — página `/auth/registo` com validação de duplicados (username e email)
 - **Página de perfil** — `/auth/perfil` com dados da conta, alteração de password e configuração 2FA
@@ -90,6 +114,7 @@ pipe-app/
 - **Registo de jogo** com selector de data: próximo sorteio (default) ou data manual
   - Validação JS: só aceita terças-feiras e sextas-feiras
   - Botão de registo bloqueado até data + 5 números + 2 estrelas seleccionados
+  - Input de data com `color-scheme: dark` para visibilidade do ícone de calendário
 - **Gerador aleatório** integrado no formulário de registo
 - **Página de resultados** com carregamento em duas fases:
   - Fase 1 (imediata): jogos locais visíveis com skeleton loader animado
@@ -124,15 +149,17 @@ pipe-app/
 - **TOTP** ✅ — código gerado por Google Authenticator, MS Authenticator, Authy, etc.
 - **Múltiplos métodos em simultâneo** — se vários activos, utilizador escolhe qual usar no login
 - Fluxo: login com password → (se 2FA activo) escolha de método → código → acesso
-- Campos no modelo `User`: `dois_fa_activo`, `dois_fa_chat_id`, `dois_fa_email_activo`, `dois_fa_codigo`, `dois_fa_expira`, `totp_secret`, `totp_activo`, `reset_token`, `reset_token_expira`
+- Campos no modelo `User`: `dois_fa_activo`, `dois_fa_chat_id`, `dois_fa_email_activo`, `dois_fa_codigo`, `dois_fa_expira`, `totp_secret`, `totp_activo`, `reset_token`, `reset_token_expira`, `is_admin`
 - Templates: `verificar_2fa.html`, `escolher_2fa.html`, `configurar_totp.html`
 
 ### Design System (`app/static/css/pipe.css`)
 - Tema escuro com acentos em âmbar/dourado
 - Componentes base: navbar, cartões, formulários, botões, alertas, bolas de números/estrelas
 - Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado, toggle switch, página de definições, página de perfil, grelha 2 colunas, campos de informação (só leitura)
+- Componentes admin: grelha de estatísticas, tabela admin, badges (admin/activo/inactivo/2fa), botões de acção, classe `.pagina-admin` (max-width: 960px)
+- `input[type="date"]` com `color-scheme: dark` para visibilidade do ícone de calendário
 - Layout responsivo (grid de 2 colunas colapsa para 1 em mobile)
-- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/registo.html`, `auth/perfil.html`, `auth/verificar_2fa.html`, `auth/escolher_2fa.html`, `auth/configurar_totp.html`, `auth/recuperar_password.html`, `auth/reset_password.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`
+- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/registo.html`, `auth/perfil.html`, `auth/verificar_2fa.html`, `auth/escolher_2fa.html`, `auth/configurar_totp.html`, `auth/recuperar_password.html`, `auth/reset_password.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`, `admin/dashboard.html`, `admin/utilizadores.html`
 
 ### Testes realizados
 - Login e registo de utilizador ✅
@@ -152,6 +179,12 @@ pipe-app/
 - Script `verificar_resultados.py` (teste manual com dia comentado) ✅
 - App online no PythonAnywhere ✅
 - Recuperação de password por email (pedido, email recebido, reset, login) ✅
+- Área admin — dashboard com estatísticas ✅
+- Área admin — lista de utilizadores ✅
+- Área admin — activar/desactivar utilizador ✅
+- Área admin — promover/rebaixar admin ✅
+- Área admin — protecção da própria conta ✅
+- Script `promover_admin.py` ✅
 
 ---
 
@@ -192,7 +225,9 @@ SENDGRID_FROM_EMAIL=...
 ### Notas de deploy
 - Dependências instaladas com `pip install -r requirements.txt --user`
 - Pasta `instance/` criada manualmente antes do primeiro arranque (`mkdir -p ~/pipe-app/instance`)
-- Primeiro utilizador criado via `/auth/registo` na própria app (não é necessário script)
+- Primeiro utilizador criado via `/auth/registo` na própria app
+- Promover a admin: `python scripts/promover_admin.py <username>`
+- Migração da BD (campo is_admin): `python scripts/adicionar_is_admin.py`
 - Plano free PA: 512 MB disco, 100s CPU/dia — suficiente para uso pessoal
 
 ---
@@ -253,9 +288,31 @@ O utilizador pode ter múltiplos métodos activos em simultâneo e escolhe qual 
 
 ---
 
+## Arquitectura admin (decisão de design)
+
+A área admin é restrita a utilizadores com `is_admin=True`.
+O decorador `@admin_required` é aplicado a todas as rotas do blueprint `/admin`.
+O ícone 🛠️ na navbar só aparece para admins.
+No primeiro deploy, o admin é criado via script CLI após o registo normal.
+
+### Fluxo de primeiro deploy
+1. Deploy da app
+2. Criar conta via `/auth/registo`
+3. Correr `python scripts/adicionar_is_admin.py` (migração da BD)
+4. Correr `python scripts/promover_admin.py <username>`
+5. Fazer login — ícone 🛠️ aparece na navbar
+
+### Gestão de utilizadores via admin
+- Activar/desactivar conta
+- Promover/rebaixar admin
+- Apagar conta e dados associados
+- Não é possível afectar a própria conta (protecção no backend)
+
+---
+
 ## Ponto onde estamos
 
-O PIPE está deployed e operacional em `https://felipejn.pythonanywhere.com`. O módulo Euromilhões está completo (jogos, gerador, frequências, resultados com consulta à API externa). O sistema de notificações está implementado (Telegram + Email). A autenticação está completa com 2FA via Telegram, Email e TOTP, e recuperação de password por email. A scheduled task está configurada no PA. Não há pendências de infraestrutura — o próximo foco é o desenvolvimento de novos módulos.
+O PIPE está deployed e operacional em `https://felipejn.pythonanywhere.com`. O módulo Euromilhões está completo (jogos, gerador, frequências, resultados com consulta à API externa). O sistema de notificações está implementado (Telegram + Email). A autenticação está completa com 2FA via Telegram, Email e TOTP, e recuperação de password por email. A área admin está implementada com gestão de utilizadores. A scheduled task está configurada no PA. Não há pendências de infraestrutura — o próximo foco é o desenvolvimento de novos módulos.
 
 ---
 
@@ -289,3 +346,4 @@ pillow==10.4.0
 - Base de dados: SQLite
 - Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅) + recuperação de password por email ✅
 - Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes
+- Admin: área restrita com gestão de utilizadores, decorador `@admin_required`, script CLI de promoção
