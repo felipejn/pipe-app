@@ -14,15 +14,10 @@ from app.auth.models import User
 @admin_required
 def dashboard():
     """Painel principal de administração."""
-    from app.euromilhoes.models import Jogo
-    from app.notifications.models import UserNotificationPreferences
-
     total_utilizadores = User.query.count()
     utilizadores_activos = User.query.filter_by(activo=True).count()
-    total_jogos = Jogo.query.count()
     total_admins = User.query.filter_by(is_admin=True).count()
 
-    # Últimos 5 utilizadores registados
     ultimos_utilizadores = (
         User.query.order_by(User.data_criacao.desc()).limit(5).all()
     )
@@ -31,11 +26,9 @@ def dashboard():
         'admin/dashboard.html',
         total_utilizadores=total_utilizadores,
         utilizadores_activos=utilizadores_activos,
-        total_jogos=total_jogos,
         total_admins=total_admins,
         ultimos_utilizadores=ultimos_utilizadores,
     )
-
 
 # ── Utilizadores ───────────────────────────────────────────────────────────
 
