@@ -28,6 +28,11 @@
            class="utilizador-nome utilizador-link {% if request.endpoint == 'auth.perfil' %}activo{% endif %}">
             {{ current_user.username }}
         </a>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('admin.dashboard') }}"
+           class="btn-logout {% if request.blueprint == 'admin' %}activo{% endif %}"
+           title="Administração">🛠️</a>
+        {% endif %}
         <a href="{{ url_for('settings.index') }}"
            class="btn-logout {% if request.blueprint == 'settings' %}activo{% endif %}">⚙️</a>
         <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block titulo %}Administração{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-definicoes">
+
+    <div class="pagina-cabecalho">
+        <h1>⚙️ Administração</h1>
+        <p class="subtitulo">Painel de gestão da plataforma</p>
+    </div>
+
+    {# ── Estatísticas ─────────────────────────────────────────── #}
+    <div class="admin-stats">
+        <div class="cartao admin-stat-cartao">
+            <div class="admin-stat-valor">{{ total_utilizadores }}</div>
+            <div class="admin-stat-label">Utilizadores</div>
+        </div>
+        <div class="cartao admin-stat-cartao">
+            <div class="admin-stat-valor">{{ utilizadores_activos }}</div>
+            <div class="admin-stat-label">Activos</div>
+        </div>
+        <div class="cartao admin-stat-cartao">
+            <div class="admin-stat-valor">{{ total_jogos }}</div>
+            <div class="admin-stat-label">Jogos registados</div>
+        </div>
+        <div class="cartao admin-stat-cartao">
+            <div class="admin-stat-valor">{{ total_admins }}</div>
+            <div class="admin-stat-label">Admins</div>
+        </div>
+    </div>
+
+    {# ── Últimos utilizadores ─────────────────────────────────── #}
+    <div class="cartao definicoes-secao">
+        <div class="secao-cabecalho">
+            <div class="secao-titulo">
+                <span class="secao-icone">👤</span>
+                <div>
+                    <h2>Últimos registos</h2>
+                    <p class="secao-descricao">Os 5 utilizadores mais recentes</p>
+                </div>
+            </div>
+            <a href="{{ url_for('admin.utilizadores') }}" class="btn btn-secundario">Ver todos</a>
+        </div>
+
+        <div class="secao-corpo">
+            <table class="admin-tabela">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Registo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in ultimos_utilizadores %}
+                    <tr>
+                        <td>
+                            {{ u.username }}
+                            {% if u.is_admin %}<span class="badge badge-admin">admin</span>{% endif %}
+                        </td>
+                        <td>{{ u.email }}</td>
+                        <td>{{ u.data_criacao.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            {% if u.activo %}
+                                <span class="badge badge-activo">activo</span>
+                            {% else %}
+                                <span class="badge badge-inactivo">inactivo</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

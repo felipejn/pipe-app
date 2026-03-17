@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, app
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -30,6 +30,9 @@ def create_app(config_name='default'):
 
     from app.settings import settings as settings_bp
     app.register_blueprint(settings_bp, url_prefix='/definicoes')
+
+    from app.admin import admin as admin_bp
+    app.register_blueprint(admin_bp, url_prefix='/admin')
 
     # Rota raiz — redireciona para dashboard
     from flask import redirect, url_for
