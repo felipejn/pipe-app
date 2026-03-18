@@ -3,7 +3,7 @@
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -24,18 +24,22 @@ pipe-app/
 │   ├── static/
 │   │   └── css/pipe.css     # design system (tema escuro, âmbar/dourado)
 │   ├── templates/
-│   │   ├── base.html
-│   │   ├── dashboard.html
+│   │   ├── base.html        # navbar sem links de módulos (navegação via dashboard)
+│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas
 │   │   ├── auth/
 │   │   ├── euromilhoes/
 │   │   ├── settings/
-│   │   └── admin/           # NOVO
-│   │       ├── dashboard.html
-│   │       └── utilizadores.html
+│   │   ├── admin/
+│   │   │   ├── dashboard.html
+│   │   │   └── utilizadores.html
+│   │   └── tarefas/         # NOVO
+│   │       ├── index.html
+│   │       ├── editar.html
+│   │       └── _tarefa.html
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout, /auth/perfil, /auth/2fa/*
-│   │   ├── forms.py         # LoginForm, RegistoForm, AlterarPasswordForm, VerificarCodigoForm, ConfigurarDoisFAForm, ConfirmarTOTPForm
+│   │   ├── forms.py
 │   │   └── models.py        # modelo User (inclui is_admin)
 │   ├── euromilhoes/         # Blueprint Euromilhões
 │   │   ├── __init__.py
@@ -43,28 +47,35 @@ pipe-app/
 │   │   ├── models.py        # modelo Jogo (SQLite)
 │   │   └── api.py           # consumo API pública + retry exponencial
 │   ├── notifications/       # serviço central de notificações
-│   │   ├── __init__.py      # expõe notification_service
+│   │   ├── __init__.py
 │   │   ├── service.py       # NotificationService
 │   │   ├── models.py        # UserNotificationPreferences (BD)
 │   │   └── channels/
-│   │       ├── base.py      # classe abstracta BaseChannel
+│   │       ├── base.py
 │   │       ├── telegram.py  # TelegramChannel
 │   │       └── email.py     # EmailChannel (SendGrid)
 │   ├── settings/            # Blueprint de definições
 │   │   ├── __init__.py
 │   │   └── routes.py        # /definicoes/
-│   └── admin/               # NOVO — Blueprint de administração
+│   ├── admin/               # Blueprint de administração
+│   │   ├── __init__.py
+│   │   ├── decorators.py    # @admin_required
+│   │   └── routes.py        # /admin/
+│   └── tarefas/             # NOVO — Blueprint Tarefas
 │       ├── __init__.py
-│       ├── decorators.py    # @admin_required
-│       └── routes.py        # /admin/
+│       ├── models.py        # Lista, Tarefa, TagTarefa
+│       ├── forms.py         # ListaForm, TarefaForm
+│       └── routes.py        # /tarefas/
 ├── scripts/
 │   ├── criar_admin.py
-│   ├── promover_admin.py    # NOVO — promoção de utilizador a admin via CLI
-│   ├── adicionar_is_admin.py  # NOVO — migração da BD (adiciona coluna is_admin)
-│   └── verificar_resultados.py  # scheduled task PA
+│   ├── promover_admin.py
+│   ├── adicionar_is_admin.py
+│   ├── migrar_notificada_em.py  # NOVO — migração BD (notificada → notificada_em)
+│   ├── pipe_tasks.py            # NOVO — única scheduled task (substitui verificar_resultados.py)
+│   └── verificar_resultados.py  # mantido para referência histórica
 ├── instance/
 │   └── pipe.db              # SQLite (excluído do git)
-├── .env                     # variáveis locais (excluído do git)
+├── .env
 ├── .env.example
 ├── requirements.txt
 └── run.py
@@ -72,119 +83,95 @@ pipe-app/
 
 ### Módulo Auth (`app/auth/`)
 - Modelo `User` com password em hash (Werkzeug)
-- Campo `is_admin` adicionado ao modelo `User` (Boolean, default=False)
-- Formulários com validação: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`, `PedirResetForm`, `ResetPasswordForm`
+- Campo `is_admin` — Boolean, default=False
+- Formulários: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`, `PedirResetForm`, `ResetPasswordForm`
 - Rotas: `/auth/login`, `/auth/registo`, `/auth/logout`, `/auth/perfil`
 - Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
 - Rotas TOTP: `/auth/2fa/totp/configurar`, `/auth/2fa/totp/desactivar`
 - Rotas recuperação de password: `/auth/recuperar-password`, `/auth/reset-password/<token>`
-- Primeiro utilizador criado via `/auth/registo` na app → promover a admin com `scripts/promover_admin.py`
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
-- Modelo `Jogo` (SQLite) — substitui o `jogos.json` dos scripts anteriores
+- Modelo `Jogo` (SQLite)
 - `api.py` — consome a API pública com retry exponencial (3 tentativas, backoff 5s/10s/20s)
-- Rotas implementadas:
-  - `GET /` — listar jogos registados
-  - `POST /registar` — registar novo jogo
-  - `POST /apagar/<id>` — apagar jogo
-  - `GET /gerar` — endpoint JSON para combinação aleatória
-  - `GET /resultados` — página de resultados (carrega imediatamente)
-  - `GET /resultados/dados` — endpoint JSON assíncrono com acertos da API
-  - `GET /frequencias` — análise histórica de frequências
+- Rotas: listar jogos, registar, apagar, gerar combinação, resultados, frequências
 - Cálculo local do próximo sorteio (terça ou sexta)
 
-### Área Admin (`app/admin/`)
-- Blueprint registado em `/admin`
-- Decorador `@admin_required` — aborta com 403 se utilizador não for admin
-- Ícone 🛠️ na navbar visível apenas para admins
-- Rotas implementadas:
-  - `GET /admin/` — dashboard com estatísticas (total utilizadores, activos, admins) e últimos 5 registos
-  - `GET /admin/utilizadores` — lista completa de utilizadores
-  - `POST /admin/utilizadores/<id>/toggle-activo` — activar/desactivar utilizador
-  - `POST /admin/utilizadores/<id>/toggle-admin` — promover/rebaixar admin
-  - `POST /admin/utilizadores/<id>/apagar` — apagar utilizador
-- Protecções: não é possível desactivar, rebaixar ou apagar a própria conta
-- Script `scripts/promover_admin.py` — promove utilizador a admin via CLI (uso: `python scripts/promover_admin.py <username>`)
-- Script `scripts/adicionar_is_admin.py` — migração da BD para adicionar coluna `is_admin`
+### Módulo Tarefas (`app/tarefas/`) — NOVO
+- **Modelos:**
+  - `Lista` — listas personalizadas (nome, ícone emoji, ordem)
+  - `Tarefa` — prioridade (alta/média/baixa), data limite, notas, `notificada_em` (Date)
+  - `TagTarefa` — etiquetas reutilizáveis, many-to-many com Tarefa
+- **Rotas:**
+  - `GET /tarefas/` — página principal (`?lista=<id>|todas`, `?filtro=`, `?busca=`)
+  - `POST /tarefas/listas/criar` — criar lista
+  - `POST /tarefas/listas/<id>/apagar` — apagar lista e todas as suas tarefas
+  - `GET/POST /tarefas/nova` — criar tarefa com formulário completo (`?texto=` para pré-preenchimento)
+  - `GET/POST /tarefas/<id>/editar` — editar tarefa
+  - `POST /tarefas/<id>/apagar` — apagar tarefa
+  - `POST /tarefas/<id>/toggle` — alternar concluída/pendente (JSON, sem reload)
+  - `POST /tarefas/rapida` — adição rápida via AJAX (JSON)
+- **Funcionalidades:**
+  - Vista "Todas" — agrega tarefas de todas as listas
+  - Campo de busca por título e etiquetas
+  - Filtros: todas / hoje / esta semana / alta prioridade / concluídas
+  - Input de adição rápida com Enter; "+ Detalhes" passa o texto via query string
+  - Toggle concluída com feedback imediato no DOM sem reload de página
+  - Secção de concluídas colapsável
+  - Ordenação: pendentes primeiro → data limite → prioridade
+  - Modal de nova lista com selector de ícone emoji
 
-### Funcionalidades implementadas
-- **Registo de utilizador** — página `/auth/registo` com validação de duplicados (username e email)
-- **Página de perfil** — `/auth/perfil` com dados da conta, alteração de password e configuração 2FA
-- **Nome de utilizador na navbar** clicável → perfil
-- **Registo de jogo** com selector de data: próximo sorteio (default) ou data manual
-  - Validação JS: só aceita terças-feiras e sextas-feiras
-  - Botão de registo bloqueado até data + 5 números + 2 estrelas seleccionados
-  - Input de data com `color-scheme: dark` para visibilidade do ícone de calendário
-- **Gerador aleatório** integrado no formulário de registo
-- **Página de resultados** com carregamento em duas fases:
-  - Fase 1 (imediata): jogos locais visíveis com skeleton loader animado
-  - Fase 2 (assíncrona): fetch ao endpoint `/resultados/dados` preenche acertos, bolas do sorteio, badges e total ganho
-  - Filtro por período: último sorteio / 30 dias / 90 dias / todos
-  - Destaque visual em bolas com acerto (outline verde)
-  - Tratamento de erro de API sem bloquear a página
-- **Página de frequências** com análise histórica completa:
-  - Top 5 números mais e menos frequentes
-  - Top 3 estrelas mais e menos frequentes
-  - Tabela completa 1–50 e 1–12 com barras proporcionais
-  - Aviso explícito de que a frequência não prevê sorteios futuros
-- **Recuperação de password** — fluxo completo por email:
-  - Link "Esqueci a palavra-passe" na página de login
-  - Token seguro gerado com `secrets.token_urlsafe(32)`, válido 1 hora
-  - Email enviado via SendGrid com link de reset
-  - Token consumido após uso (one-time) e apagado da BD
-  - Resposta ao formulário sempre igual (evita enumeração de emails)
+### Área Admin (`app/admin/`)
+- Blueprint em `/admin`, decorador `@admin_required`
+- Ícone 🛠️ na navbar visível apenas para admins
+- Dashboard com estatísticas, lista de utilizadores, toggle activo/admin, apagar utilizador
+- Protecção: não é possível afectar a própria conta
+
+### Navegação
+- **Navbar** — marca PIPE (link para dashboard) + utilizador / admin / definições / sair
+- **Dashboard** — cards de módulos. Adicionar novos módulos aqui.
+- Links de módulos removidos da navbar — não escala com muitos módulos
 
 ### Sistema de notificações (`app/notifications/`)
-- Serviço central `NotificationService` — cada módulo chama apenas `notification_service.send()`
-- `TelegramChannel` — Bot API Telegram, testado e a funcionar ✅
-- `EmailChannel` — SendGrid API v3, testado e a funcionar ✅
-- `UserNotificationPreferences` — preferências por utilizador na BD (canal activo, chat_id, tipos)
-- Página de definições em `/definicoes` com toggles por canal e botões de teste
-- `scripts/verificar_resultados.py` — scheduled task configurada no PA (corre às 23:00)
+- Serviço central `NotificationService` — `notification_service.send(user, type, subject, body, data)`
+- `TelegramChannel` ✅ e `EmailChannel` ✅ (SendGrid)
+- `UserNotificationPreferences` na BD; página de definições em `/definicoes`
 
-### Autenticação 2FA (`app/auth/`)
-- **2FA opcional** — activado/desactivado na página de perfil por cada utilizador
-- **Telegram** ✅ — código de 6 dígitos enviado via bot, expira em 10 minutos
-- **Email** ✅ — código de 6 dígitos enviado via SendGrid, expira em 10 minutos
-- **TOTP** ✅ — código gerado por Google Authenticator, MS Authenticator, Authy, etc.
-- **Múltiplos métodos em simultâneo** — se vários activos, utilizador escolhe qual usar no login
-- Fluxo: login com password → (se 2FA activo) escolha de método → código → acesso
-- Campos no modelo `User`: `dois_fa_activo`, `dois_fa_chat_id`, `dois_fa_email_activo`, `dois_fa_codigo`, `dois_fa_expira`, `totp_secret`, `totp_activo`, `reset_token`, `reset_token_expira`, `is_admin`
-- Templates: `verificar_2fa.html`, `escolher_2fa.html`, `configurar_totp.html`
+### Scheduled task — `scripts/pipe_tasks.py`
+Script unificado que corre 1x/dia no PA (23:00). Cada módulo é uma função independente.
+
+| Módulo | Quando actua | O que faz |
+|---|---|---|
+| `tarefa_euromilhoes` | Terças e sextas | Verifica resultados e notifica utilizadores com jogos |
+| `tarefa_tarefas` | Todos os dias | Notifica tarefas em atraso (diariamente enquanto persistirem) |
+
+**Notificações de atraso diárias:** campo `notificada_em` (Date). Se `notificada_em < hoje` ou `NULL`, notifica e actualiza para hoje. Ao editar o prazo, `notificada_em` é resetado para `NULL`.
+
+### Autenticação 2FA
+- Telegram ✅, Email ✅, TOTP ✅ (pyotp + qrcode)
+- Múltiplos métodos em simultâneo — utilizador escolhe no login
 
 ### Design System (`app/static/css/pipe.css`)
-- Tema escuro com acentos em âmbar/dourado
-- Componentes base: navbar, cartões, formulários, botões, alertas, bolas de números/estrelas
-- Componentes adicionais: filtro de período, skeleton loader, spinner, toggle de data, barras de frequência, badges de resultado, toggle switch, página de definições, página de perfil, grelha 2 colunas, campos de informação (só leitura)
-- Componentes admin: grelha de estatísticas, tabela admin, badges (admin/activo/inactivo/2fa), botões de acção, classe `.pagina-admin` (max-width: 960px)
-- `input[type="date"]` com `color-scheme: dark` para visibilidade do ícone de calendário
-- Layout responsivo (grid de 2 colunas colapsa para 1 em mobile)
-- Templates: `base.html`, `dashboard.html`, `auth/login.html`, `auth/registo.html`, `auth/perfil.html`, `auth/verificar_2fa.html`, `auth/escolher_2fa.html`, `auth/configurar_totp.html`, `auth/recuperar_password.html`, `auth/reset_password.html`, `euromilhoes/index.html`, `euromilhoes/resultados.html`, `euromilhoes/frequencias.html`, `settings/index.html`, `admin/dashboard.html`, `admin/utilizadores.html`
+- Tema escuro, acentos âmbar/dourado
+- Componentes: navbar, cartões, formulários, botões, alertas, skeleton loader, toggles, modais
+- Componentes Euromilhões: bolas, barras de frequência, badges de resultado
+- Componentes Tarefas: sidebar de listas, items com barra de prioridade, check circular, campo de busca, badges, estado vazio
+- Layout responsivo (sidebar tarefas oculta em mobile)
 
 ### Testes realizados
-- Login e registo de utilizador ✅
-- Dashboard ✅
-- Registo de jogo (data próximo sorteio e data manual) ✅
-- Gerador aleatório ✅
-- Apagar jogo ✅
-- Página de resultados com skeleton loader ✅
-- Página de frequências ✅
-- Página de perfil (dados da conta + alterar password) ✅
-- 2FA Telegram (activar, login com código, desactivar) ✅
-- 2FA Email (activar, login com código, desactivar) ✅
-- 2FA TOTP (activar com QR code, login com código, desactivar) ✅
-- Escolha de método quando múltiplos activos ✅
-- Notificação Telegram (teste manual) ✅
-- Notificação Email SendGrid (teste manual) ✅
-- Script `verificar_resultados.py` (teste manual com dia comentado) ✅
-- App online no PythonAnywhere ✅
-- Recuperação de password por email (pedido, email recebido, reset, login) ✅
-- Área admin — dashboard com estatísticas ✅
-- Área admin — lista de utilizadores ✅
-- Área admin — activar/desactivar utilizador ✅
-- Área admin — promover/rebaixar admin ✅
-- Área admin — protecção da própria conta ✅
-- Script `promover_admin.py` ✅
+- Login e registo ✅
+- Dashboard com cards de módulos ✅
+- Módulo Euromilhões completo ✅
+- 2FA Telegram, Email, TOTP ✅
+- Recuperação de password por email ✅
+- Notificações Telegram e Email (manual) ✅
+- Área admin completa ✅
+- Módulo Tarefas — criação de listas e tarefas ✅
+- Módulo Tarefas — edição e remoção ✅
+- Módulo Tarefas — adição rápida ✅
+- Módulo Tarefas — vista "Todas" ✅
+- Módulo Tarefas — busca por título e etiqueta (por testar no deploy)
+- Módulo Tarefas — toggle concluída sem reload (por testar no deploy)
+- `pipe_tasks.py` com módulo Tarefas (por testar no deploy após migração)
 
 ---
 
@@ -192,15 +179,24 @@ pipe-app/
 
 ### Estado
 - **App online** em `https://felipejn.pythonanywhere.com` ✅
-- **WSGI configurado** — `/var/www/felipejn_pythonanywhere_com_wsgi.py` ✅
-- **Static files** configurados — `/static/` → `/home/felipejn/pipe-app/app/static` ✅
-- **Scheduled task** configurada — `python /home/felipejn/pipe-app/scripts/verificar_resultados.py` às 23:00 ✅
-- **API externa** — `euromillions.api.pedromealha.dev` na whitelist do PA, consulta de resultados a funcionar ✅
+- **WSGI configurado** ✅
+- **Static files** configurados ✅
+- **Scheduled task** — ⚠️ actualizar para `pipe_tasks.py` (actualmente ainda aponta para `verificar_resultados.py`)
+
+### Próximo deploy (módulo Tarefas)
+```bash
+# PythonAnywhere — consola Bash
+cd ~/pipe-app
+git pull
+python scripts/migrar_notificada_em.py
+# Tab Web → Reload
+# Dashboard → Tasks → actualizar comando:
+# python /home/felipejn/pipe-app/scripts/pipe_tasks.py
+```
 
 ### Configuração WSGI
 ```python
-import sys
-import os
+import sys, os
 from dotenv import load_dotenv
 
 project_home = '/home/felipejn/pipe-app'
@@ -222,104 +218,28 @@ SENDGRID_API_KEY=...
 SENDGRID_FROM_EMAIL=...
 ```
 
-### Notas de deploy
-- Dependências instaladas com `pip install -r requirements.txt --user`
-- Pasta `instance/` criada manualmente antes do primeiro arranque (`mkdir -p ~/pipe-app/instance`)
-- Primeiro utilizador criado via `/auth/registo` na própria app
-- Promover a admin: `python scripts/promover_admin.py <username>`
-- Migração da BD (campo is_admin): `python scripts/adicionar_is_admin.py`
-- Plano free PA: 512 MB disco, 100s CPU/dia — suficiente para uso pessoal
+### Migrações de BD executadas
+- `scripts/adicionar_is_admin.py` ✅
+- `scripts/migrar_notificada_em.py` — executar no próximo deploy ⚠️
 
 ---
 
-## Arquitectura de notificações (decisão de design)
+## Arquitectura de módulos
 
-O PIPE tem um serviço central de notificações transversal a todos os módulos.
-Cada módulo chama apenas `notification_service.send()` sem conhecer os canais de entrega.
-O serviço consulta as preferências do utilizador e despacha para os canais activos.
+Cada módulo é um Flask Blueprint independente.
+A navegação é feita pelos cards no dashboard.
 
-### Uso em qualquer módulo
-```python
-from app.notifications import notification_service
-
-notification_service.send(
-    user=current_user,
-    type="resultado_euromilhoes",
-    subject="Resultados de hoje",
-    body="Verificámos os teus jogos...",
-    data={"acertos": 3}
-)
-```
-
-### Canais
-| Canal | Estado | Notas |
-|---|---|---|
-| `TelegramChannel` | Implementado ✅ | Bot criado, token configurado no `.env` |
-| `EmailChannel` | Implementado ✅ | SendGrid, remetente verificado, API key no `.env` |
-| `WebPushChannel` | Futuro | Notificações browser |
-
----
-
-## Arquitectura de 2FA (decisão de design)
-
-O 2FA é opcional para cada utilizador e configurado na página de perfil.
-O utilizador pode ter múltiplos métodos activos em simultâneo e escolhe qual usar no momento do login.
-
-### Métodos implementados
-| Método | Estado | Descrição |
-|---|---|---|
-| Telegram | Implementado ✅ | Bot envia código de 6 dígitos, expira em 10 min |
-| Email | Implementado ✅ | SendGrid envia código de 6 dígitos, expira em 10 min |
-| TOTP | Implementado ✅ | Google/MS Authenticator, Authy — `pyotp` + `qrcode` |
-
-### Fluxo de login com 2FA
-1. Utilizador introduz username + password
-2. Se 0 métodos activos → acesso directo
-3. Se 1 método activo → código enviado/solicitado automaticamente
-4. Se 2+ métodos activos → página de escolha de método
-5. Utilizador introduz o código → acesso concedido
-
-### Fluxo de configuração TOTP
-1. Perfil → "Configurar autenticador"
-2. Secret gerado → QR code mostrado + chave manual para backup
-3. Utilizador digitaliza com o autenticador
-4. Introduz código de 6 dígitos para confirmar
-5. TOTP activado — aparece como opção no login
-
----
-
-## Arquitectura admin (decisão de design)
-
-A área admin é restrita a utilizadores com `is_admin=True`.
-O decorador `@admin_required` é aplicado a todas as rotas do blueprint `/admin`.
-O ícone 🛠️ na navbar só aparece para admins.
-No primeiro deploy, o admin é criado via script CLI após o registo normal.
-
-### Fluxo de primeiro deploy
-1. Deploy da app
-2. Criar conta via `/auth/registo`
-3. Correr `python scripts/adicionar_is_admin.py` (migração da BD)
-4. Correr `python scripts/promover_admin.py <username>`
-5. Fazer login — ícone 🛠️ aparece na navbar
-
-### Gestão de utilizadores via admin
-- Activar/desactivar conta
-- Promover/rebaixar admin
-- Apagar conta e dados associados
-- Não é possível afectar a própria conta (protecção no backend)
+**Para adicionar um novo módulo:**
+1. Criar `app/<modulo>/` com `__init__.py`, `models.py`, `routes.py`
+2. Registar o blueprint em `app/__init__.py`
+3. Adicionar card em `app/templates/dashboard.html`
+4. Adicionar função `tarefa_<modulo>(hoje)` em `scripts/pipe_tasks.py` se precisar de tarefa agendada
 
 ---
 
 ## Ponto onde estamos
 
-O PIPE está deployed e operacional em `https://felipejn.pythonanywhere.com`. O módulo Euromilhões está completo (jogos, gerador, frequências, resultados com consulta à API externa). O sistema de notificações está implementado (Telegram + Email). A autenticação está completa com 2FA via Telegram, Email e TOTP, e recuperação de password por email. A área admin está implementada com gestão de utilizadores. A scheduled task está configurada no PA. Não há pendências de infraestrutura — o próximo foco é o desenvolvimento de novos módulos.
-
----
-
-## Próximos passos (por ordem)
-
-### 1. Novos módulos PIPE
-A arquitectura com Flask Blueprints permite adicionar módulos independentes com a mesma identidade visual.
+Dois módulos completos: Euromilhões e Tarefas. Infraestrutura estável: auth com 2FA, notificações, área admin, scheduled task unificada. O próximo passo é fazer o deploy do módulo Tarefas e começar um terceiro módulo.
 
 ---
 
@@ -340,10 +260,11 @@ pillow==10.4.0
 ```
 
 ## Contexto técnico
-- Python com ortografia Portuguesa Europeia em todos os comentários e mensagens
+- Python com ortografia Portuguesa Europeia em todos os comentários e mensagens ao utilizador
 - Hosting: PythonAnywhere (plano free) — `https://felipejn.pythonanywhere.com`
 - Custo total: zero
 - Base de dados: SQLite
 - Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅) + recuperação de password por email ✅
 - Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes
 - Admin: área restrita com gestão de utilizadores, decorador `@admin_required`, script CLI de promoção
+- Scheduled task: `pipe_tasks.py` — script unificado, um módulo por função, isolamento de erros
