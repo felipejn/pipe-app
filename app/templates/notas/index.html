@@ -312,7 +312,6 @@ document.addEventListener('click', function (e) {
     // Ignorar cliques em botões de acção, paletes, checkboxes e formulário de criação
     if (e.target.closest('[data-nota-accao]')) return;
     if (e.target.closest('.nota-palete-cores')) return;
-    if (e.target.closest('.nota-checklist-item')) return;
     if (e.target.closest('#notaCriarCartao')) return;
     // Não navegar se o formulário de criação estiver aberto (deixar o guardar() actuar)
     const aberta = document.getElementById('notaCriarAberta');

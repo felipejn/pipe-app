@@ -3,7 +3,7 @@
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -25,17 +25,21 @@ pipe-app/
 │   │   └── css/pipe.css     # design system (tema escuro, âmbar/dourado)
 │   ├── templates/
 │   │   ├── base.html        # navbar sem links de módulos (navegação via dashboard)
-│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas
+│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas
 │   │   ├── auth/
 │   │   ├── euromilhoes/
 │   │   ├── settings/
 │   │   ├── admin/
 │   │   │   ├── dashboard.html
 │   │   │   └── utilizadores.html
-│   │   └── tarefas/         # NOVO
+│   │   ├── tarefas/
+│   │   │   ├── index.html
+│   │   │   ├── editar.html
+│   │   │   └── _tarefa.html
+│   │   └── notas/           # NOVO
 │   │       ├── index.html
 │   │       ├── editar.html
-│   │       └── _tarefa.html
+│   │       └── _cartao.html
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout, /auth/perfil, /auth/2fa/*
@@ -61,17 +65,21 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── decorators.py    # @admin_required
 │   │   └── routes.py        # /admin/
-│   └── tarefas/             # NOVO — Blueprint Tarefas
+│   ├── tarefas/             # Blueprint Tarefas
+│   │   ├── __init__.py
+│   │   ├── models.py        # Lista, Tarefa, TagTarefa
+│   │   ├── forms.py         # ListaForm, TarefaForm
+│   │   └── routes.py        # /tarefas/
+│   └── notas/               # NOVO — Blueprint Notas
 │       ├── __init__.py
-│       ├── models.py        # Lista, Tarefa, TagTarefa
-│       ├── forms.py         # ListaForm, TarefaForm
-│       └── routes.py        # /tarefas/
+│       ├── models.py        # Nota, ItemChecklist, EtiquetaNota
+│       └── routes.py        # /notas/
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
 │   ├── adicionar_is_admin.py
-│   ├── migrar_notificada_em.py  # NOVO — migração BD (notificada → notificada_em)
-│   ├── pipe_tasks.py            # NOVO — única scheduled task (substitui verificar_resultados.py)
+│   ├── migrar_notificada_em.py
+│   ├── pipe_tasks.py        # única scheduled task
 │   └── verificar_resultados.py  # mantido para referência histórica
 ├── instance/
 │   └── pipe.db              # SQLite (excluído do git)
@@ -96,29 +104,33 @@ pipe-app/
 - Rotas: listar jogos, registar, apagar, gerar combinação, resultados, frequências
 - Cálculo local do próximo sorteio (terça ou sexta)
 
-### Módulo Tarefas (`app/tarefas/`) — NOVO
+### Módulo Tarefas (`app/tarefas/`)
+- **Modelos:** `Lista`, `Tarefa` (com `notificada_em`), `TagTarefa`
+- **Rotas:** criar/editar/apagar listas e tarefas, toggle concluída, adição rápida
+- **Funcionalidades:** vista "Todas", busca em tempo real, filtros, secção de concluídas colapsável, modal de nova lista com selector de emoji
+
+### Módulo Notas (`app/notas/`) — NOVO
 - **Modelos:**
-  - `Lista` — listas personalizadas (nome, ícone emoji, ordem)
-  - `Tarefa` — prioridade (alta/média/baixa), data limite, notas, `notificada_em` (Date)
-  - `TagTarefa` — etiquetas reutilizáveis, many-to-many com Tarefa
+  - `Nota` — texto livre ou checklist, cor de fundo, fixada, arquivada
+  - `ItemChecklist` — itens de notas do tipo checklist (ordem, feito)
+  - `EtiquetaNota` — etiquetas reutilizáveis, many-to-many com Nota
 - **Rotas:**
-  - `GET /tarefas/` — página principal (`?lista=<id>|todas`, `?filtro=`, `?busca=`)
-  - `POST /tarefas/listas/criar` — criar lista
-  - `POST /tarefas/listas/<id>/apagar` — apagar lista e todas as suas tarefas
-  - `GET/POST /tarefas/nova` — criar tarefa com formulário completo (`?texto=` para pré-preenchimento)
-  - `GET/POST /tarefas/<id>/editar` — editar tarefa
-  - `POST /tarefas/<id>/apagar` — apagar tarefa
-  - `POST /tarefas/<id>/toggle` — alternar concluída/pendente (JSON, sem reload)
-  - `POST /tarefas/rapida` — adição rápida via AJAX (JSON)
+  - `GET /notas/` — grelha de cartões (`?busca=`, `?etiqueta=`, `?arquivo=1`)
+  - `POST /notas/criar` — criar nota via AJAX (JSON)
+  - `GET/POST /notas/<id>` — editar nota (página completa)
+  - `POST /notas/<id>/accao` — fixar, arquivar, cor, toggle_item (JSON)
+  - `POST /notas/<id>/apagar` — apagar nota definitivamente
 - **Funcionalidades:**
-  - Vista "Todas" — agrega tarefas de todas as listas
-  - Campo de busca por título e etiquetas
-  - Filtros: todas / hoje / esta semana / alta prioridade / concluídas
-  - Input de adição rápida com Enter; "+ Detalhes" passa o texto via query string
-  - Toggle concluída com feedback imediato no DOM sem reload de página
-  - Secção de concluídas colapsável
-  - Ordenação: pendentes primeiro → data limite → prioridade
-  - Modal de nova lista com selector de ícone emoji
+  - Grelha de cartões com criação inline sem mudar de página
+  - Suporte a texto livre e checklist
+  - 8 cores de fundo dentro do tema escuro
+  - Fixar no topo / arquivar (em vez de apagar)
+  - Etiquetas com sugestão automática na edição
+  - Busca em tempo real por título, corpo e etiquetas
+  - Toggle de itens de checklist directamente no cartão
+  - Navegação por clique em qualquer zona do cartão
+  - Sidebar com etiquetas e acesso ao arquivo
+  - Botão Arquivar/Recuperar consoante o estado da nota
 
 ### Área Admin (`app/admin/`)
 - Blueprint em `/admin`, decorador `@admin_required`
@@ -155,7 +167,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Componentes: navbar, cartões, formulários, botões, alertas, skeleton loader, toggles, modais
 - Componentes Euromilhões: bolas, barras de frequência, badges de resultado
 - Componentes Tarefas: sidebar de listas, items com barra de prioridade, check circular, campo de busca, badges, estado vazio
-- Layout responsivo (sidebar tarefas oculta em mobile)
+- Componentes Notas: grelha de cartões, cartão com hover/acções, palete de cores, caixa de criação inline, checklist, sidebar de etiquetas, página de edição
+- Layout responsivo (sidebar oculta em mobile)
 
 ### Testes realizados
 - Login e registo ✅
@@ -165,13 +178,16 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Recuperação de password por email ✅
 - Notificações Telegram e Email (manual) ✅
 - Área admin completa ✅
-- Módulo Tarefas — criação de listas e tarefas ✅
-- Módulo Tarefas — edição e remoção ✅
-- Módulo Tarefas — adição rápida ✅
-- Módulo Tarefas — vista "Todas" ✅
-- Módulo Tarefas — busca por título e etiqueta ✅
-- Módulo Tarefas — toggle concluída sem reload ✅
+- Módulo Tarefas completo ✅
 - `pipe_tasks.py` com módulo Tarefas ✅
+- Módulo Notas — criação inline (texto e checklist) ✅
+- Módulo Notas — cores de fundo ✅
+- Módulo Notas — fixar / arquivar / recuperar ✅
+- Módulo Notas — etiquetas ✅
+- Módulo Notas — busca em tempo real ✅
+- Módulo Notas — toggle checklist no cartão ✅
+- Módulo Notas — edição completa ✅
+- Módulo Notas — deployed no PythonAnywhere ✅
 
 ---
 
@@ -210,6 +226,7 @@ SENDGRID_FROM_EMAIL=...
 ### Migrações de BD executadas
 - `scripts/adicionar_is_admin.py` ✅
 - `scripts/migrar_notificada_em.py` ✅
+- Módulo Notas — tabelas criadas automaticamente por `db.create_all()` ✅
 
 ---
 
@@ -228,7 +245,7 @@ A navegação é feita pelos cards no dashboard.
 
 ## Ponto onde estamos
 
-Dois módulos completos e deployed: Euromilhões e Tarefas. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências. O próximo foco é o desenvolvimento de um terceiro módulo.
+Três módulos completos e deployed: Euromilhões, Tarefas e Notas. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
 
 ---
 
