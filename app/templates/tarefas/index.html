@@ -293,12 +293,106 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { fecharModalLista(); fecharModalTarefa(); }
 });
 
-// ── Campo de busca — submeter ao pressionar Enter ────────────────────
+// ── Busca em tempo real (Opção A — filtro no cliente) ────────────────
 const campoBusca = document.getElementById('campo-busca');
 if (campoBusca) {
+
+  // Impedir que o Enter recarregue a página
   campoBusca.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') document.getElementById('form-busca').submit();
+    if (e.key === 'Enter') e.preventDefault();
   });
+
+  // Debounce — aguarda 200ms após última tecla para não correr a cada keystroke
+  let debounceTimer;
+  campoBusca.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => filtrarTarefas(this.value.trim()), 200);
+  });
+}
+
+function filtrarTarefas(termo) {
+  const itens       = document.querySelectorAll('.tarefa-item');
+  const secaoPend   = document.getElementById('lista-pendentes');
+  const secaoConc   = document.getElementById('lista-concluidas');
+  const labelPend   = secaoPend  ? secaoPend.previousElementSibling  : null;
+  const labelConc   = secaoConc  ? secaoConc.previousElementSibling  : null;
+  const estadoVazio = document.querySelector('.estado-vazio');
+
+  const q = termo.toLowerCase();
+  let visiveis = 0;
+
+  itens.forEach(item => {
+    const texto = (item.dataset.busca || '').toLowerCase();
+    const match = !q || texto.includes(q);
+    item.style.display = match ? '' : 'none';
+    if (match) visiveis++;
+  });
+
+  // Actualizar labels das secções (Pendentes / Concluídas) com contagem
+  if (secaoPend) {
+    const n = [...secaoPend.querySelectorAll('.tarefa-item')]
+                .filter(i => i.style.display !== 'none').length;
+    if (labelPend) {
+      labelPend.childNodes[0].textContent = `Pendentes (${n}) `;
+      secaoPend.style.display = n === 0 ? 'none' : '';
+      labelPend.style.display = n === 0 ? 'none' : '';
+    }
+  }
+  if (secaoConc) {
+    const n = [...secaoConc.querySelectorAll('.tarefa-item')]
+                .filter(i => i.style.display !== 'none').length;
+    if (labelConc) {
+      // Preservar o botão "ocultar" que já existe no label
+      const btnColapsar = labelConc.querySelector('.btn-colapsar');
+      labelConc.childNodes[0].textContent = `Concluídas (${n}) `;
+      secaoConc.style.display = n === 0 ? 'none' : '';
+      labelConc.style.display = n === 0 ? 'none' : '';
+    }
+  }
+
+  // Mostrar/ocultar estado vazio
+  if (estadoVazio) {
+    estadoVazio.style.display = visiveis === 0 ? '' : 'none';
+  } else if (visiveis === 0 && q) {
+    // Criar mensagem de vazio dinâmica se não existir no DOM
+    let vazio = document.getElementById('busca-vazio-dinamico');
+    if (!vazio) {
+      vazio = document.createElement('div');
+      vazio.id = 'busca-vazio-dinamico';
+      vazio.className = 'estado-vazio';
+      vazio.innerHTML = '<div class="vazio-icone">🔍</div><p class="vazio-texto"></p>';
+      // Inserir após a última secção de tarefas
+      const conteudo = document.querySelector('.tarefas-conteudo');
+      const rodape   = conteudo ? conteudo.querySelector('.tarefas-rodape-lista') : null;
+      if (rodape) conteudo.insertBefore(vazio, rodape);
+      else if (conteudo) conteudo.appendChild(vazio);
+    }
+    vazio.querySelector('.vazio-texto').textContent =
+      `Nenhuma tarefa encontrada para "${termo}".`;
+    vazio.style.display = '';
+  } else {
+    const vazio = document.getElementById('busca-vazio-dinamico');
+    if (vazio) vazio.style.display = 'none';
+  }
+
+  // Actualizar botão de limpar pesquisa dinamicamente
+  let btnLimpar = document.querySelector('.busca-limpar');
+  if (q && !btnLimpar) {
+    btnLimpar = document.createElement('a');
+    btnLimpar.className = 'busca-limpar';
+    btnLimpar.title = 'Limpar pesquisa';
+    btnLimpar.textContent = '✕';
+    btnLimpar.href = '#';
+    btnLimpar.addEventListener('click', function(e) {
+      e.preventDefault();
+      campoBusca.value = '';
+      filtrarTarefas('');
+      campoBusca.focus();
+    });
+    document.querySelector('.busca-wrap').appendChild(btnLimpar);
+  } else if (!q && btnLimpar) {
+    btnLimpar.remove();
+  }
 }
 
 // ── Sincronizar texto do input rápido com link "+ Detalhes" ──────────

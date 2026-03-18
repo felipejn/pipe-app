@@ -1,6 +1,7 @@
 {# Partial: _tarefa.html — variável 't' (Tarefa) no contexto #}
 <div class="tarefa-item prioridade-{{ t.prioridade }} {% if t.concluida %}concluida{% endif %} {% if t.em_atraso() %}em-atraso{% endif %}"
-     id="tarefa-{{ t.id }}">
+     id="tarefa-{{ t.id }}"
+     data-busca="{{ t.texto | lower }} {{ t.tags | map(attribute='nome') | join(' ') | lower }}">
 
   {# Checkbox — clicável, resposta imediata sem reload #}
   <button class="check-circulo {% if t.concluida %}marcado{% endif %}"
