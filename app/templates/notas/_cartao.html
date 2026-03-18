@@ -1,0 +1,73 @@
+{# _cartao.html — cartão de uma nota na grelha #}
+<div class="nota-cartao {% if nota.fixada %}nota-fixada{% endif %}"
+     data-nota-id="{{ nota.id }}"
+     data-busca="{{ (nota.titulo or '') | lower }} {{ (nota.corpo or '') | lower }} {{ nota.etiquetas | map(attribute='nome') | join(' ') | lower }}"
+     data-href="{{ url_for('notas.editar', nota_id=nota.id) }}"
+     {% if nota.cor_css() %}style="background:{{ nota.cor_css() }}"{% endif %}>
+
+    {# Barra de acções (aparece no hover) #}
+    <div class="nota-acoes">
+        {% if not nota.arquivada %}
+        <button class="nota-acao-btn" data-nota-accao="fixar"
+                title="{% if nota.fixada %}Desafixar{% else %}Fixar{% endif %}">
+            {% if nota.fixada %}📌{% else %}📍{% endif %}
+        </button>
+        <button class="nota-acao-btn" data-nota-accao="cor" title="Cor de fundo">🎨</button>
+        {% endif %}
+        <button class="nota-acao-btn" data-nota-accao="arquivar"
+                title="{% if nota.arquivada %}Recuperar{% else %}Arquivar{% endif %}">
+            {% if nota.arquivada %}♻️{% else %}📦{% endif %}
+        </button>
+        <button class="nota-acao-btn nota-acao-apagar" data-nota-accao="apagar" title="Apagar">🗑️</button>
+    </div>
+
+    {# Palete de cores (oculta por defeito) #}
+    <div class="nota-palete-cores">
+        {% for nome_cor, val_cor in {
+            'padrao':'',
+            'vermelho':'#2d1515','laranja':'#2d1e10',
+            'amarelo':'#2a2210','verde':'#112a1a',
+            'azul':'#101e2d','roxo':'#1e1030','cinzento':'#1e2028'
+        }.items() %}
+        <button class="nota-cor-btn {% if not val_cor %}nota-cor-padrao{% endif %} {% if nota.cor == nome_cor %}activa{% endif %}"
+                data-nota-accao="escolher-cor" data-cor="{{ nome_cor }}"
+                {% if val_cor %}style="background:{{ val_cor }}"{% endif %}
+                title="{{ nome_cor }}">
+            {% if not val_cor %}✕{% endif %}
+        </button>
+        {% endfor %}
+    </div>
+
+    {# Conteúdo — clique no cartão navega via JS (data-href) #}
+    {% if nota.titulo %}
+    <div class="nota-titulo">{{ nota.titulo }}</div>
+    {% endif %}
+
+    {% if nota.tipo == 'checklist' %}
+    <ul class="nota-checklist-preview">
+        {% for item in nota.itens.limit(6) %}
+        <li class="nota-checklist-item">
+            <input type="checkbox" {% if item.feito %}checked{% endif %}
+                   data-item-id="{{ item.id }}"
+                   onclick="event.stopPropagation()">
+            <span class="item-texto {% if item.feito %}item-feito{% endif %}">{{ item.texto }}</span>
+        </li>
+        {% endfor %}
+        {% if nota.itens.count() > 6 %}
+        <li class="nota-mais-itens">+ {{ nota.itens.count() - 6 }} mais</li>
+        {% endif %}
+    </ul>
+    {% else %}
+    {% if nota.corpo %}
+    <div class="nota-corpo-preview">{{ nota.resumo() }}</div>
+    {% endif %}
+    {% endif %}
+
+    {% if nota.etiquetas %}
+    <div class="nota-etiquetas">
+        {% for et in nota.etiquetas %}
+        <span class="nota-etiqueta"># {{ et.nome }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block titulo %}{{ nota.titulo or 'Editar nota' }}{% endblock %}
+
+{% block conteudo %}
+<div class="notas-editar-pagina">
+    <form method="post" action="{{ url_for('notas.editar', nota_id=nota.id) }}"
+          id="formEditarNota">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="nota-editar-cartao"
+             id="notaEditarCartao"
+             {% if nota.cor_css() %}style="background:{{ nota.cor_css() }}"{% endif %}>
+
+            {# Barra superior #}
+            <div class="nota-editar-barra-topo">
+                <a href="{{ url_for('notas.index') }}" class="btn btn-secundario btn-sm">← Voltar</a>
+                <div class="nota-editar-acoes-topo">
+                    <button type="button" class="nota-acao-btn" id="btnFixar"
+                            data-nota-accao="fixar" data-nota-id="{{ nota.id }}"
+                            title="{% if nota.fixada %}Desafixar{% else %}Fixar{% endif %}">
+                        {% if nota.fixada %}📌{% else %}📍{% endif %}
+                    </button>
+                    <button type="button" class="nota-acao-btn" id="btnArquivar"
+                            data-nota-accao="arquivar" data-nota-id="{{ nota.id }}"
+                            title="{% if nota.arquivada %}Desarquivar{% else %}Arquivar{% endif %}">
+                        📦
+                    </button>
+                </div>
+            </div>
+
+            {# Título #}
+            <input type="text" name="titulo" class="nota-editar-titulo"
+                   placeholder="Título" value="{{ nota.titulo or '' }}" autocomplete="off">
+
+            {# Corpo — texto ou checklist #}
+            {% if nota.tipo == 'checklist' %}
+            <div class="nota-checklist-editar" id="checklistEditar">
+                {% set itens_lista = nota.itens.all() %}
+                {% for item in itens_lista %}
+                <div class="checklist-editar-item">
+                    <input type="checkbox" name="item_feito[]" value="{{ loop.index0 }}"
+                           {% if item.feito %}checked{% endif %}>
+                    <input type="text" name="item_texto[]" class="checklist-editar-input"
+                           value="{{ item.texto }}" placeholder="Item…">
+                    <button type="button" class="checklist-remover-item" title="Remover">×</button>
+                </div>
+                {% endfor %}
+                <div class="checklist-adicionar-area">
+                    <button type="button" class="btn btn-secundario btn-sm" id="btnAdicionarItem">
+                        + Adicionar item
+                    </button>
+                </div>
+            </div>
+            {% else %}
+            <textarea name="corpo" class="nota-editar-textarea"
+                      placeholder="Escreve aqui…" rows="10">{{ nota.corpo or '' }}</textarea>
+            {% endif %}
+
+            {# Rodapé — etiquetas + cores + guardar #}
+            <div class="nota-editar-rodape">
+
+                {# Selector de cor #}
+                <div class="nota-editar-cores">
+                    {% for nome_cor, val_cor in cores.items() %}
+                    <label class="nota-cor-label {% if nota.cor == nome_cor %}activa{% endif %}"
+                           title="{{ nome_cor }}">
+                        <input type="radio" name="cor" value="{{ nome_cor }}"
+                               {% if nota.cor == nome_cor %}checked{% endif %}
+                               class="nota-cor-radio">
+                        <span class="nota-cor-btn {% if not val_cor %}nota-cor-padrao{% endif %}"
+                              {% if val_cor %}style="background:{{ val_cor }}"{% endif %}>
+                            {% if not val_cor %}✕{% endif %}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                {# Campo de etiquetas #}
+                <div class="nota-editar-etiquetas-area">
+                    <label class="campo-label">Etiquetas</label>
+                    <input type="text" name="etiquetas" class="campo-texto nota-etiquetas-input"
+                           id="etiquetasInput"
+                           placeholder="trabalho, ideias, pessoal…"
+                           value="{{ nota.etiquetas|map(attribute='nome')|join(', ') }}"
+                           autocomplete="off">
+                    {% if etiquetas_todas %}
+                    <div class="nota-etiquetas-sugestoes" id="etiquetasSugestoes">
+                        {% for et in etiquetas_todas %}
+                        <span class="nota-etiqueta-sugestao" data-nome="{{ et.nome }}">{{ et.nome }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="nota-editar-botoes">
+                    <a href="{{ url_for('notas.index') }}" class="btn btn-secundario">Cancelar</a>
+                    <button type="submit" class="btn btn-primario">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// ── Cor de fundo em tempo real ──────────────────────────────────────────────
+document.querySelectorAll('.nota-cor-radio').forEach(radio => {
+    radio.addEventListener('change', function () {
+        const cartao = document.getElementById('notaEditarCartao');
+        const cores = {{ cores | tojson }};
+        const val = cores[this.value];
+        cartao.style.background = val || '';
+        document.querySelectorAll('.nota-cor-label').forEach(l => l.classList.remove('activa'));
+        this.closest('.nota-cor-label').classList.add('activa');
+    });
+});
+
+// ── Checklist — adicionar / remover itens ──────────────────────────────────
+const btnAdd = document.getElementById('btnAdicionarItem');
+if (btnAdd) {
+    btnAdd.addEventListener('click', function () {
+        const container = document.getElementById('checklistEditar');
+        const idx = container.querySelectorAll('.checklist-editar-item').length;
+        const div = document.createElement('div');
+        div.className = 'checklist-editar-item';
+        div.innerHTML = `
+            <input type="checkbox" name="item_feito[]" value="${idx}">
+            <input type="text" name="item_texto[]" class="checklist-editar-input" placeholder="Item…">
+            <button type="button" class="checklist-remover-item" title="Remover">×</button>`;
+        container.insertBefore(div, this.closest('.checklist-adicionar-area'));
+        div.querySelector('input[type="text"]').focus();
+    });
+}
+
+document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('checklist-remover-item')) {
+        e.target.closest('.checklist-editar-item').remove();
+    }
+});
+
+// ── Sugestões de etiquetas ─────────────────────────────────────────────────
+const etInput    = document.getElementById('etiquetasInput');
+const sugestoes  = document.getElementById('etiquetasSugestoes');
+
+if (etInput && sugestoes) {
+    document.querySelectorAll('.nota-etiqueta-sugestao').forEach(span => {
+        span.addEventListener('click', function () {
+            const nome   = this.dataset.nome;
+            const actual = etInput.value.split(',').map(s => s.trim()).filter(Boolean);
+            if (!actual.includes(nome)) {
+                actual.push(nome);
+                etInput.value = actual.join(', ');
+            }
+        });
+    });
+}
+
+// ── Acções (fixar / arquivar) no cabeçalho ─────────────────────────────────
+document.querySelectorAll('[data-nota-accao]').forEach(btn => {
+    btn.addEventListener('click', async function () {
+        const notaId = this.dataset.notaId;
+        const accao  = this.dataset.notaAccao;
+        const res = await fetch(`/notas/${notaId}/accao`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json',
+                       'X-CSRFToken': '{{ csrf_token() }}' },
+            body: JSON.stringify({ accao }),
+        });
+        if (res.ok) location.href = '{{ url_for("notas.index") }}';
+    });
+});
+</script>
+{% endblock %}

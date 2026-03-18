@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block titulo %}Notas{% endblock %}
+
+{% block conteudo %}
+<div class="notas-pagina">
+
+    {# ── Cabeçalho ───────────────────────────────────────── #}
+    <div class="notas-header">
+        <div class="notas-titulo-area">
+            <h1>{% if arquivo %}📦 Arquivo{% else %}📝 Notas{% endif %}</h1>
+            {% if arquivo %}
+                <a href="{{ url_for('notas.index') }}" class="btn btn-secundario btn-sm">← Voltar</a>
+            {% endif %}
+        </div>
+        <div class="notas-header-acoes">
+            <div class="busca-wrap">
+                <span class="busca-icone">🔍</span>
+                <input type="text" id="campo-busca" class="campo-busca"
+                       placeholder="Pesquisar notas…" value="{{ busca }}" autocomplete="off">
+            </div>
+        </div>
+    </div>
+
+    <div class="notas-layout">
+
+        {# ── Sidebar de etiquetas ─────────────────────────── #}
+        <aside class="notas-sidebar">
+            <div class="sidebar-titulo">Etiquetas</div>
+            <a href="{{ url_for('notas.index') }}"
+               class="lista-item {% if not etiqueta_activa and not arquivo %}activo{% endif %}">
+                🏷️ Todas
+            </a>
+            {% for et in etiquetas %}
+            <a href="{{ url_for('notas.index', etiqueta=et.nome) }}"
+               class="lista-item {% if etiqueta_activa == et.nome %}activo{% endif %}">
+                # {{ et.nome }}
+            </a>
+            {% endfor %}
+            <div class="sidebar-separador"></div>
+            <a href="{{ url_for('notas.index', arquivo=1) }}"
+               class="lista-item {% if arquivo %}activo{% endif %}">
+                📦 Arquivo
+            </a>
+        </aside>
+
+        {# ── Conteúdo principal ───────────────────────────── #}
+        <div class="notas-conteudo">
+
+            {# ── Caixa de criação rápida ──────────────────── #}
+            {% if not arquivo %}
+            <div class="nota-criar-container">
+                <div class="nota-criar-cartao" id="notaCriarCartao">
+                    <div class="nota-criar-fechada" id="notaCriarFechada">
+                        <input type="text" id="notaCriarTrigger" class="nota-criar-trigger"
+                               placeholder="Criar uma nota…" autocomplete="off">
+                        <div class="nota-criar-tipo-icons">
+                            <button class="btn-tipo-nota" data-tipo="checklist" title="Nova checklist">☑️</button>
+                        </div>
+                    </div>
+                    <div class="nota-criar-aberta" id="notaCriarAberta" style="display:none">
+                        <input type="text" id="notaCriarTitulo" class="nota-criar-titulo"
+                               placeholder="Título" autocomplete="off">
+                        <div id="notaCriarCorpo"></div>
+                        <div class="nota-criar-rodape">
+                            <div class="nota-criar-cores" id="notaCriarCores">
+                                {% for nome_cor, val_cor in {
+                                    'padrao':'',
+                                    'vermelho':'#2d1515','laranja':'#2d1e10',
+                                    'amarelo':'#2a2210','verde':'#112a1a',
+                                    'azul':'#101e2d','roxo':'#1e1030','cinzento':'#1e2028'
+                                }.items() %}
+                                <button class="nota-cor-btn {% if not val_cor %}nota-cor-padrao{% endif %}"
+                                        data-cor="{{ nome_cor }}"
+                                        {% if val_cor %}style="background:{{ val_cor }}"{% endif %}
+                                        title="{{ nome_cor }}">
+                                    {% if not val_cor %}✕{% endif %}
+                                </button>
+                                {% endfor %}
+                            </div>
+                            <button class="btn btn-secundario btn-sm" id="notaCriarCancelar">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# ── Notas fixadas ────────────────────────────── #}
+            {% if fixadas %}
+            <div class="notas-secao-titulo" id="labelFixadas">📌 Fixadas</div>
+            <div class="notas-grelha" id="grelhaFixadas">
+                {% for nota in fixadas %}
+                    {% include 'notas/_cartao.html' %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {# ── Restantes notas ──────────────────────────── #}
+            {% if restantes %}
+            {% if fixadas %}<div class="notas-secao-titulo" id="labelRestantes">Outras</div>{% endif %}
+            <div class="notas-grelha" id="grelhaRestantes">
+                {% for nota in restantes %}
+                    {% include 'notas/_cartao.html' %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {# ── Estado vazio (servidor) ──────────────────── #}
+            {% if not fixadas and not restantes %}
+            <div class="estado-vazio" id="estadoVazioServidor">
+                <div class="estado-vazio-icone">{% if arquivo %}📦{% elif busca %}🔍{% else %}📝{% endif %}</div>
+                <p>
+                    {% if busca %}Nenhuma nota encontrada para "{{ busca }}".
+                    {% elif arquivo %}O arquivo está vazio.
+                    {% else %}Ainda não tens notas. Cria a primeira!{% endif %}
+                </p>
+            </div>
+            {% endif %}
+
+        </div>{# fim notas-conteudo #}
+    </div>{# fim notas-layout #}
+</div>
+
+<script>
+// ── Criação rápida de nota ──────────────────────────────────────────────────
+(function () {
+    const cartao   = document.getElementById('notaCriarCartao');
+    const fechada  = document.getElementById('notaCriarFechada');
+    const aberta   = document.getElementById('notaCriarAberta');
+    const trigger  = document.getElementById('notaCriarTrigger');
+    const titulo   = document.getElementById('notaCriarTitulo');
+    const corpo    = document.getElementById('notaCriarCorpo');
+    const cancelar = document.getElementById('notaCriarCancelar');
+    if (!cartao) return;
+    let tipoActual = 'texto';
+    let corActual  = 'padrao';
+
+    function abrir(tipo) {
+        tipoActual = tipo || 'texto';
+        fechada.style.display = 'none';
+        aberta.style.display  = 'block';
+        renderCorpo();
+        titulo.focus();
+    }
+
+    function fechar() {
+        fechada.style.display = '';
+        aberta.style.display  = 'none';
+        titulo.value          = '';
+        corpo.innerHTML       = '';
+        tipoActual            = 'texto';
+        corActual             = 'padrao';
+        cartao.style.background = '';
+        document.querySelectorAll('#notaCriarCores .nota-cor-btn').forEach(b => b.classList.remove('activa'));
+    }
+
+    function renderCorpo() {
+        if (tipoActual === 'checklist') {
+            corpo.innerHTML = `
+                <div class="nota-checklist-criar" id="checklistCriar">
+                    <div class="checklist-item-novo">
+                        <input type="checkbox" disabled>
+                        <input type="text" class="checklist-item-input" placeholder="Adicionar item…" id="checklistPrimeiroItem">
+                    </div>
+                </div>`;
+            const primeiro = document.getElementById('checklistPrimeiroItem');
+            if (primeiro) {
+                primeiro.focus();
+                primeiro.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') { e.preventDefault(); adicionarItemChecklist(); }
+                });
+            }
+        } else {
+            corpo.innerHTML = `<textarea class="nota-criar-textarea" id="notaCriarTexto"
+                placeholder="Escreve aqui…" rows="3"></textarea>`;
+        }
+    }
+
+    function adicionarItemChecklist() {
+        const container = document.getElementById('checklistCriar');
+        if (!container) return;
+        const div = document.createElement('div');
+        div.className = 'checklist-item-novo';
+        div.innerHTML = `<input type="checkbox" disabled>
+            <input type="text" class="checklist-item-input" placeholder="Adicionar item…">`;
+        container.appendChild(div);
+        const input = div.querySelector('input[type="text"]');
+        input.focus();
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); adicionarItemChecklist(); }
+        });
+    }
+
+    async function guardar() {
+        const t = titulo.value.trim();
+        let payload = { tipo: tipoActual, titulo: t, cor: corActual };
+
+        if (tipoActual === 'checklist') {
+            const inputs = corpo.querySelectorAll('.checklist-item-input');
+            payload.itens = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+            if (!t && payload.itens.length === 0) { fechar(); return; }
+        } else {
+            const ta = document.getElementById('notaCriarTexto');
+            payload.corpo = ta ? ta.value.trim() : '';
+            if (!t && !payload.corpo) { fechar(); return; }
+        }
+
+        await fetch('{{ url_for("notas.criar") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json',
+                       'X-CSRFToken': '{{ csrf_token() }}' },
+            body: JSON.stringify(payload),
+        });
+        location.reload();
+    }
+
+    trigger.addEventListener('focus', () => abrir('texto'));
+    document.querySelectorAll('.btn-tipo-nota').forEach(btn => {
+        btn.addEventListener('click', () => abrir(btn.dataset.tipo));
+    });
+    cancelar.addEventListener('click', fechar);
+    document.querySelectorAll('#notaCriarCores .nota-cor-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            corActual = btn.dataset.cor;
+            cartao.style.background = btn.style.background || '';
+            document.querySelectorAll('#notaCriarCores .nota-cor-btn').forEach(b => b.classList.remove('activa'));
+            btn.classList.add('activa');
+        });
+    });
+    document.addEventListener('click', e => {
+        if (aberta.style.display !== 'none' && !cartao.contains(e.target)) guardar();
+    });
+})();
+
+// ── Busca em tempo real ─────────────────────────────────────────────────────
+const campoBusca = document.getElementById('campo-busca');
+if (campoBusca) {
+    campoBusca.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+
+    let debounceTimer;
+    campoBusca.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => filtrarNotas(this.value.trim()), 200);
+    });
+
+    // Se a página carregou com valor (vindo do servidor), aplicar filtro imediato
+    if (campoBusca.value.trim()) filtrarNotas(campoBusca.value.trim());
+}
+
+function filtrarNotas(termo) {
+    const q        = termo.toLowerCase();
+    const cartoes  = document.querySelectorAll('.nota-cartao');
+    let visiveis   = 0;
+
+    cartoes.forEach(c => {
+        const texto = (c.dataset.busca || '').toLowerCase();
+        const match = !q || texto.includes(q);
+        c.style.display = match ? '' : 'none';
+        if (match) visiveis++;
+    });
+
+    // Mostrar/ocultar labels de secção e grelhas vazias
+    ['grelhaFixadas', 'grelhaRestantes'].forEach(id => {
+        const grelha = document.getElementById(id);
+        if (!grelha) return;
+        const label = grelha.previousElementSibling;
+        const visivelNaGrelha = [...grelha.querySelectorAll('.nota-cartao')]
+                                    .some(c => c.style.display !== 'none');
+        grelha.style.display   = visivelNaGrelha ? '' : 'none';
+        if (label && label.classList.contains('notas-secao-titulo'))
+            label.style.display = visivelNaGrelha ? '' : 'none';
+    });
+
+    // Estado vazio dinâmico
+    let vazio = document.getElementById('busca-vazio-dinamico');
+    if (visiveis === 0 && q) {
+        if (!vazio) {
+            vazio = document.createElement('div');
+            vazio.id = 'busca-vazio-dinamico';
+            vazio.className = 'estado-vazio';
+            vazio.innerHTML = '<div class="estado-vazio-icone">🔍</div><p></p>';
+            document.querySelector('.notas-conteudo').appendChild(vazio);
+        }
+        vazio.querySelector('p').textContent = `Nenhuma nota encontrada para "${termo}".`;
+        vazio.style.display = '';
+    } else if (vazio) {
+        vazio.style.display = 'none';
+    }
+
+    // Botão limpar
+    const wrap = document.querySelector('.busca-wrap');
+    let btnLimpar = document.querySelector('.busca-limpar');
+    if (q && !btnLimpar) {
+        btnLimpar = document.createElement('a');
+        btnLimpar.className   = 'busca-limpar';
+        btnLimpar.title       = 'Limpar pesquisa';
+        btnLimpar.href = '#';
+        btnLimpar.textContent = '✕';
+        btnLimpar.addEventListener('click', () => {
+            campoBusca.value = '';
+            filtrarNotas('');
+            campoBusca.focus();
+        });
+        wrap.appendChild(btnLimpar);
+    } else if (!q && btnLimpar) {
+        btnLimpar.remove();
+    }
+}
+
+// ── Navegação por clique no cartão ────────────────────────────────────────
+document.addEventListener('click', function (e) {
+    // Ignorar cliques em botões de acção, paletes, checkboxes e formulário de criação
+    if (e.target.closest('[data-nota-accao]')) return;
+    if (e.target.closest('.nota-palete-cores')) return;
+    if (e.target.closest('.nota-checklist-item')) return;
+    if (e.target.closest('#notaCriarCartao')) return;
+    // Não navegar se o formulário de criação estiver aberto (deixar o guardar() actuar)
+    const aberta = document.getElementById('notaCriarAberta');
+    if (aberta && aberta.style.display !== 'none') return;
+    const cartao = e.target.closest('[data-href]');
+    if (cartao) location.href = cartao.dataset.href;
+});
+
+// ── Acções nos cartões (fixar, arquivar, apagar, cor) ──────────────────────
+document.addEventListener('click', async function (e) {
+    const btn = e.target.closest('[data-nota-accao]');
+    if (!btn) return;
+    // Ignorar botões de cor do formulário de criação (não têm [data-nota-id])
+    if (btn.closest('#notaCriarCartao')) return;
+    e.stopPropagation();
+
+    const notaId = btn.closest('[data-nota-id]')?.dataset.notaId;
+    if (!notaId) return;
+    const accao = btn.dataset.notaAccao;
+
+    if (accao === 'apagar') {
+        if (!confirm('Apagar esta nota definitivamente?')) return;
+        await fetch(`/notas/${notaId}/apagar`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
+        });
+        document.querySelector(`[data-nota-id="${notaId}"]`)?.remove();
+        return;
+    }
+
+    if (accao === 'cor') {
+        const cartao = btn.closest('[data-nota-id]');
+        cartao.querySelector('.nota-palete-cores')?.classList.toggle('visivel');
+        return;
+    }
+
+    if (accao === 'escolher-cor') {
+        await fetch(`/notas/${notaId}/accao`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+            body: JSON.stringify({ accao: 'cor', cor: btn.dataset.cor }),
+        });
+        location.reload();
+        return;
+    }
+
+    // fixar / arquivar
+    const res = await fetch(`/notas/${notaId}/accao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify({ accao }),
+    });
+    if (res.ok) location.reload();
+});
+
+// ── Toggle item checklist ──────────────────────────────────────────────────
+document.addEventListener('change', async function (e) {
+    const chk = e.target.closest('.nota-checklist-item input[type="checkbox"]');
+    if (!chk) return;
+    const itemId = chk.dataset.itemId;
+    const notaId = chk.closest('[data-nota-id]')?.dataset.notaId;
+    if (!itemId || !notaId) return;
+
+    await fetch(`/notas/${notaId}/accao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify({ accao: 'toggle_item', item_id: parseInt(itemId) }),
+    });
+    const label = chk.closest('.nota-checklist-item')?.querySelector('.item-texto');
+    if (label) label.classList.toggle('item-feito', chk.checked);
+});
+</script>
+{% endblock %}
