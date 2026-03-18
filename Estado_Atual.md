@@ -137,7 +137,7 @@ pipe-app/
 - `UserNotificationPreferences` na BD; página de definições em `/definicoes`
 
 ### Scheduled task — `scripts/pipe_tasks.py`
-Script unificado que corre 1x/dia no PA (23:00). Cada módulo é uma função independente.
+Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função independente.
 
 | Módulo | Quando actua | O que faz |
 |---|---|---|
@@ -169,9 +169,9 @@ Script unificado que corre 1x/dia no PA (23:00). Cada módulo é uma função in
 - Módulo Tarefas — edição e remoção ✅
 - Módulo Tarefas — adição rápida ✅
 - Módulo Tarefas — vista "Todas" ✅
-- Módulo Tarefas — busca por título e etiqueta (por testar no deploy)
-- Módulo Tarefas — toggle concluída sem reload (por testar no deploy)
-- `pipe_tasks.py` com módulo Tarefas (por testar no deploy após migração)
+- Módulo Tarefas — busca por título e etiqueta ✅
+- Módulo Tarefas — toggle concluída sem reload ✅
+- `pipe_tasks.py` com módulo Tarefas ✅
 
 ---
 
@@ -181,18 +181,7 @@ Script unificado que corre 1x/dia no PA (23:00). Cada módulo é uma função in
 - **App online** em `https://felipejn.pythonanywhere.com` ✅
 - **WSGI configurado** ✅
 - **Static files** configurados ✅
-- **Scheduled task** — ⚠️ actualizar para `pipe_tasks.py` (actualmente ainda aponta para `verificar_resultados.py`)
-
-### Próximo deploy (módulo Tarefas)
-```bash
-# PythonAnywhere — consola Bash
-cd ~/pipe-app
-git pull
-python scripts/migrar_notificada_em.py
-# Tab Web → Reload
-# Dashboard → Tasks → actualizar comando:
-# python /home/felipejn/pipe-app/scripts/pipe_tasks.py
-```
+- **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às 08:00 ✅
 
 ### Configuração WSGI
 ```python
@@ -220,7 +209,7 @@ SENDGRID_FROM_EMAIL=...
 
 ### Migrações de BD executadas
 - `scripts/adicionar_is_admin.py` ✅
-- `scripts/migrar_notificada_em.py` — executar no próximo deploy ⚠️
+- `scripts/migrar_notificada_em.py` ✅
 
 ---
 
@@ -239,7 +228,13 @@ A navegação é feita pelos cards no dashboard.
 
 ## Ponto onde estamos
 
-Dois módulos completos: Euromilhões e Tarefas. Infraestrutura estável: auth com 2FA, notificações, área admin, scheduled task unificada. O próximo passo é fazer o deploy do módulo Tarefas e começar um terceiro módulo.
+Dois módulos completos e deployed: Euromilhões e Tarefas. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências. O próximo foco é o desenvolvimento de um terceiro módulo.
+
+---
+
+## Próximos passos
+
+- Novos módulos PIPE (arquitectura pronta)
 
 ---
 
