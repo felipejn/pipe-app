@@ -1700,7 +1700,7 @@ input[type="date"] {
 .icone-btn:hover { border-color: var(--cor-primaria); }
 
 /* ── Formulário de edição ─────────────────────────── */
-.pagina-editar-tarefa { max-width: 600px; }
+.pagina-editar-tarefa { max-width: 600px; margin: 0 auto; }
 
 .editar-cabecalho {
     display: flex;
@@ -1811,4 +1811,72 @@ input[type="date"] {
     .tarefas-stats  { grid-template-columns: repeat(2, 1fr); }
     .campos-linha   { grid-template-columns: 1fr; }
     .tarefas-sidebar { display: none; }
+}
+
+/* ── Campo de busca ───────────────────────────────────── */
+.busca-form { margin-bottom: 1rem; }
+
+.busca-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.busca-icone {
+    position: absolute;
+    left: 0.7rem;
+    font-size: 12px;
+    pointer-events: none;
+    color: var(--cor-texto-suave);
+    line-height: 1;
+}
+
+.campo-busca {
+    width: 100%;
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto);
+    padding: 0.5rem 2.2rem 0.5rem 2rem;
+    font-size: 0.87rem;
+    font-family: var(--fonte);
+    outline: none;
+    transition: border-color 0.15s;
+    height: 36px;
+}
+
+.campo-busca:focus { border-color: var(--cor-primaria); }
+.campo-busca::placeholder { color: var(--cor-texto-suave); }
+
+.busca-limpar {
+    position: absolute;
+    right: 0.6rem;
+    color: var(--cor-texto-suave);
+    font-size: 0.85rem;
+    text-decoration: none;
+    padding: 2px 5px;
+    border-radius: 3px;
+    transition: color 0.15s;
+    line-height: 1;
+}
+
+.busca-limpar:hover { color: var(--cor-erro); text-decoration: none; }
+
+/* ── Fix check-circulo — ✓ sempre no DOM, controlado por opacidade ── */
+.check-circulo .check-visto {
+    opacity: 0;
+    transition: opacity 0.15s;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.check-circulo.marcado .check-visto { opacity: 1; }
+
+/* Animação subtil ao marcar */
+.tarefa-item.concluida .tarefa-texto {
+    text-decoration: line-through;
+    color: var(--cor-texto-suave);
+    transition: color 0.2s;
 }
