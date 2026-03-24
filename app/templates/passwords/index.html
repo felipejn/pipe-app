@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Passwords — PIPE{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo" style="max-width: 580px;">
+
+  <div class="cabecalho-pagina">
+    <h2>🔑 Gerador de Passwords</h2>
+    <p class="modulo-desc">Geração segura no servidor com <code style="background:var(--cor-superficie-2);padding:.1em .4em;border-radius:4px;font-size:.85em;">secrets</code></p>
+  </div>
+
+  <!-- Tabs de modo -->
+  <div class="filtro-botoes" style="margin-bottom:1.5rem;" role="tablist">
+    <button class="btn-filtro activo" data-modo="password" role="tab" aria-selected="true">Password</button>
+    <button class="btn-filtro" data-modo="passphrase" role="tab" aria-selected="false">Passphrase</button>
+    <button class="btn-filtro" data-modo="pin" role="tab" aria-selected="false">PIN</button>
+  </div>
+
+  <!-- Resultado -->
+  <div class="cartao" style="margin-bottom:1rem;">
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <span id="pw-valor"
+            style="flex:1;font-family:'Courier New',monospace;font-size:1.1rem;
+                   letter-spacing:.04em;color:var(--cor-texto);word-break:break-all;">—</span>
+      <button id="pw-copiar" class="btn btn-secundario" title="Copiar"
+              style="padding:.4rem .65rem;display:flex;align-items:center;gap:.35rem;flex-shrink:0;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span id="pw-copiar-txt">Copiar</span>
+      </button>
+    </div>
+
+    <!-- Barra de força -->
+    <div style="margin-top:1rem;display:flex;align-items:center;gap:.75rem;">
+      <div style="flex:1;height:5px;background:var(--cor-superficie-2);border-radius:3px;overflow:hidden;">
+        <div id="pw-forca-fill"
+             style="height:100%;width:0;border-radius:3px;transition:width .3s ease,background .3s ease;"></div>
+      </div>
+      <span id="pw-forca-label"
+            style="font-size:.8rem;color:var(--cor-texto-suave);white-space:nowrap;min-width:80px;text-align:right;">—</span>
+    </div>
+  </div>
+
+  <!-- Painel Password -->
+  <div class="cartao pw-painel" id="painel-password" style="margin-bottom:1rem;">
+    <div class="campo">
+      <label class="campo-label">Comprimento: <strong style="color:var(--cor-texto);" id="val-comprimento">18</strong></label>
+      <input type="range" id="sl-comprimento" min="8" max="64" value="18"
+             style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.5rem;">
+      <label class="opcao-check"><input type="checkbox" id="tog-maiusculas" checked> Maiúsculas (A–Z)</label>
+      <label class="opcao-check"><input type="checkbox" id="tog-minusculas" checked> Minúsculas (a–z)</label>
+      <label class="opcao-check"><input type="checkbox" id="tog-numeros" checked> Números (0–9)</label>
+      <label class="opcao-check"><input type="checkbox" id="tog-simbolos" checked> Símbolos (!@#$…)</label>
+      <label class="opcao-check"><input type="checkbox" id="tog-ambiguos"> Excluir ambíguos (0, O, l, 1)</label>
+    </div>
+  </div>
+
+  <!-- Painel Passphrase -->
+  <div class="cartao pw-painel" id="painel-passphrase" style="margin-bottom:1rem;display:none;">
+    <div class="campo">
+      <label class="campo-label">Número de palavras: <strong style="color:var(--cor-texto);" id="val-palavras">4</strong></label>
+      <input type="range" id="sl-palavras" min="3" max="10" value="4"
+             style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
+    </div>
+    <p style="font-size:.85rem;color:var(--cor-texto-suave);">
+      Separadas por hífen &mdash; ex:
+      <span style="color:var(--cor-primaria);">laranja-azulejo-montanha-feliz</span>
+    </p>
+  </div>
+
+  <!-- Painel PIN -->
+  <div class="cartao pw-painel" id="painel-pin" style="margin-bottom:1rem;display:none;">
+    <div class="campo">
+      <label class="campo-label">Comprimento: <strong style="color:var(--cor-texto);" id="val-pin">6</strong></label>
+      <input type="range" id="sl-pin" min="4" max="12" value="6"
+             style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
+    </div>
+    <p style="font-size:.85rem;color:var(--cor-texto-suave);">Apenas dígitos numéricos</p>
+  </div>
+
+  <button id="pw-gerar" class="btn btn-primario btn-bloco" style="font-size:1rem;padding:.7rem;">
+    Gerar
+  </button>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const elValor     = document.getElementById('pw-valor');
+  const elCopiar    = document.getElementById('pw-copiar');
+  const elCopiarTxt = document.getElementById('pw-copiar-txt');
+  const elGerar     = document.getElementById('pw-gerar');
+  const elForcaFill = document.getElementById('pw-forca-fill');
+  const elForcaLbl  = document.getElementById('pw-forca-label');
+
+  let modoActual = 'password';
+
+  // Tabs
+  document.querySelectorAll('[data-modo]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('[data-modo]').forEach(t => {
+        t.classList.remove('activo');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('activo');
+      tab.setAttribute('aria-selected', 'true');
+      modoActual = tab.dataset.modo;
+      document.querySelectorAll('.pw-painel').forEach(p => p.style.display = 'none');
+      document.getElementById('painel-' + modoActual).style.display = 'block';
+      gerar();
+    });
+  });
+
+  // Sliders
+  function bindSlider(sliderId, labelId) {
+    const sl = document.getElementById(sliderId);
+    const lb = document.getElementById(labelId);
+    sl.addEventListener('input', () => { lb.textContent = sl.value; gerar(); });
+  }
+  bindSlider('sl-comprimento', 'val-comprimento');
+  bindSlider('sl-palavras',    'val-palavras');
+  bindSlider('sl-pin',         'val-pin');
+
+  // Toggles
+  ['tog-maiusculas','tog-minusculas','tog-numeros','tog-simbolos','tog-ambiguos']
+    .forEach(id => document.getElementById(id).addEventListener('change', gerar));
+
+  // Copiar
+  elCopiar.addEventListener('click', () => {
+    const txt = elValor.textContent.trim();
+    if (!txt || txt === '—') return;
+    navigator.clipboard.writeText(txt).then(() => {
+      elCopiarTxt.textContent = 'Copiado!';
+      elCopiar.style.color = 'var(--cor-sucesso)';
+      elCopiar.style.borderColor = 'var(--cor-sucesso)';
+      setTimeout(() => {
+        elCopiarTxt.textContent = 'Copiar';
+        elCopiar.style.color = '';
+        elCopiar.style.borderColor = '';
+      }, 1500);
+    });
+  });
+
+  // Gerar
+  elGerar.addEventListener('click', gerar);
+
+  function gerar() {
+    elGerar.disabled = true;
+    elValor.textContent = '…';
+
+    let payload = { modo: modoActual };
+
+    if (modoActual === 'password') {
+      payload.comprimento      = parseInt(document.getElementById('sl-comprimento').value);
+      payload.maiusculas       = document.getElementById('tog-maiusculas').checked;
+      payload.minusculas       = document.getElementById('tog-minusculas').checked;
+      payload.numeros          = document.getElementById('tog-numeros').checked;
+      payload.simbolos         = document.getElementById('tog-simbolos').checked;
+      payload.excluir_ambiguos = document.getElementById('tog-ambiguos').checked;
+    } else if (modoActual === 'passphrase') {
+      payload.num_palavras = parseInt(document.getElementById('sl-palavras').value);
+    } else {
+      payload.comprimento = parseInt(document.getElementById('sl-pin').value);
+    }
+
+    fetch('{{ url_for("passwords.api_gerar") }}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token() }}'   // ← adicionar esta linha
+      },
+      body: JSON.stringify(payload),
+    })
+
+    .then(r => r.json())
+    .then(data => {
+      elValor.textContent = data.valor;
+      actualizarForca(data.forca_score, data.forca_label);
+    })
+    .catch(() => { elValor.textContent = 'Erro ao gerar'; })
+    .finally(() => { elGerar.disabled = false; });
+  }
+
+  const coresForca = ['', '#ef4444', '#f97316', '#fbbf24', '#84cc16', '#10b981'];
+  function actualizarForca(score, label) {
+    elForcaFill.style.width   = (score * 20) + '%';
+    elForcaFill.style.background = coresForca[score] || 'transparent';
+    elForcaLbl.textContent = label;
+  }
+
+  gerar();
+})();
+</script>
+{% endblock %}

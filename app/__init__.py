@@ -40,6 +40,9 @@ def create_app(config_name='default'):
     from app.notas import notas as notas_bp
     app.register_blueprint(notas_bp, url_prefix='/notas')
 
+    from app.passwords import bp as passwords_bp
+    app.register_blueprint(passwords_bp, url_prefix='/passwords')
+
     # Rota raiz — redireciona para dashboard
     from flask import redirect, url_for
     from flask_login import login_required
