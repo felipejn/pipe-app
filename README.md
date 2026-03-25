@@ -24,6 +24,21 @@ Gestor de tarefas pessoal com suporte a múltiplas listas.
 - Busca em tempo real por título e etiquetas
 - Notificação diária de tarefas com prazo ultrapassado
 
+### 📝 Notas
+Bloco de notas com suporte a texto livre e checklists.
+- Grelha de cartões com criação inline sem mudar de página
+- Suporte a texto livre e checklist com toggle directo no cartão
+- 8 cores de fundo dentro do tema escuro
+- Fixar no topo, arquivar e etiquetas com sugestão automática
+- Busca em tempo real por título, corpo e etiquetas
+
+### 🔑 Passwords
+Gerador de palavras-passe criptograficamente seguro. Sem base de dados — módulo completamente stateless.
+- **Password** — comprimento 8–64, toggles: maiúsculas, minúsculas, números, símbolos, excluir ambíguos
+- **Passphrase** — 3–10 palavras portuguesas separadas por hífen
+- **PIN** — 4–12 dígitos numéricos
+- Barra de força com 5 níveis calculados por entropia no backend
+
 ---
 
 ## Stack técnica
@@ -44,7 +59,7 @@ Gestor de tarefas pessoal com suporte a múltiplas listas.
 ## Funcionalidades transversais
 
 - **Autenticação** — registo, login, recuperação de password por email
-- **2FA opcional** — Telegram, Email ou TOTP (Google Authenticator / Authy)
+- **2FA opcional** — Telegram, Email ou TOTP (Google Authenticator / Authy) — múltiplos métodos em simultâneo
 - **Notificações** — arquitectura modular com canais independentes (Telegram + SendGrid)
 - **Área admin** — gestão de utilizadores, activar/desactivar contas
 - **Scheduled task** — script unificado `pipe_tasks.py` a correr diariamente às 08:00
@@ -82,7 +97,7 @@ pip install -r requirements.txt
 # Configurar variáveis de ambiente
 cp .env.example .env
 # Editar .env e preencher SECRET_KEY (obrigatório)
-# TELEGRAM_BOT_TOKEN e SENDGRID_API_KEY são opcionais para uso local
+# As restantes variáveis são opcionais para uso local
 
 # Criar a base de dados e o primeiro utilizador admin
 python scripts/criar_admin.py
@@ -112,6 +127,8 @@ pipe-app/
 │   ├── auth/           # Autenticação, 2FA, recuperação de password
 │   ├── euromilhoes/    # Módulo Euromilhões
 │   ├── tarefas/        # Módulo Tarefas
+│   ├── notas/          # Módulo Notas
+│   ├── passwords/      # Módulo Passwords (stateless)
 │   ├── notifications/  # Serviço central de notificações
 │   ├── admin/          # Área de administração
 │   ├── settings/       # Definições do utilizador
