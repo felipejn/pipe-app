@@ -43,6 +43,9 @@ def create_app(config_name='default'):
     from app.passwords import bp as passwords_bp
     app.register_blueprint(passwords_bp, url_prefix='/passwords')
 
+    from app.conversoes import bp as conversoes_bp
+    app.register_blueprint(conversoes_bp, url_prefix='/conversoes')
+
     # Rota raiz — redireciona para dashboard
     from flask import redirect, url_for
     from flask_login import login_required
@@ -58,6 +61,7 @@ def create_app(config_name='default'):
         from app.notifications.models import UserNotificationPreferences  # noqa: F401
         from app.tarefas.models import Lista, Tarefa, TagTarefa  # noqa: F401
         from app.notas.models import Nota, ItemChecklist, EtiquetaNota  # noqa: F401
+        from app.conversoes.models import Conversao  # noqa: F401
         db.create_all()
 
     return app

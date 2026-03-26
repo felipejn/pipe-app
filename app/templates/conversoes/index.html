@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% block titulo %}Conversões{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo">
+    <div class="cabecalho-pagina">
+        <h1>🔄 Conversões</h1>
+        <p class="subtitulo">Converte fotos HEIC do iPhone para JPG</p>
+    </div>
+
+    <!-- Dropzone -->
+    <div class="cartao" style="margin-bottom: 1.5rem;">
+        <div class="conversoes-dropzone" id="dropzone">
+            <div class="dropzone-icone">📁</div>
+            <p class="dropzone-texto">Arrasta ficheiros HEIC aqui</p>
+            <p class="dropzone-ou">ou</p>
+            <label for="input-ficheiros" class="btn btn-secundario">Procurar ficheiros</label>
+            <input type="file" id="input-ficheiros" accept=".heic,.HEIC" multiple hidden>
+            <p class="dropzone-info">Máximo 20 ficheiros · 10MB por ficheiro</p>
+        </div>
+    </div>
+
+    <!-- Lista de ficheiros selecionados -->
+    <div class="cartao" id="ficheiros-container" style="display: none; margin-bottom: 1.5rem;">
+        <h2>Ficheiros selecionados</h2>
+        <ul class="ficheiros-lista" id="ficheiros-lista"></ul>
+        <div class="ficheiros-rodape">
+            <span id="ficheiros-info" class="texto-suave"></span>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secundario" id="btn-limpar">Limpar</button>
+                <button class="btn btn-primario" id="btn-converter">Converter para JPG</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado de processamento -->
+    <div class="cartao conversoes-processando" id="processando" style="display: none; margin-bottom: 1.5rem;">
+        <div class="spinner"></div>
+        <p>A converter ficheiros...</p>
+    </div>
+
+    <!-- Erro -->
+    <div class="alerta alerta-erro" id="erro-container" style="display: none; margin-bottom: 1.5rem;">
+        <p id="erro-mensagem"></p>
+    </div>
+
+    <!-- Histórico -->
+    {% if historico %}
+    <div class="cartao">
+        <h2>Histórico recente</h2>
+        <div class="historico-grid">
+            {% for c in historico %}
+            <div class="historico-item">
+                <div class="historico-icone">🖼️</div>
+                <div class="historico-info">
+                    <span class="historico-data">{{ c.convertido_em.strftime('%d/%m/%Y %H:%M') }}</span>
+                    <span class="historico-detalhes">
+                        <span class="badge badge-info">{{ c.num_ficheiros }} ficheiro(s)</span>
+                        <span class="badge badge-sucesso">{{ "%.1f"|format(c.tamanho_total_kb / 1024) }} MB</span>
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.conversoes-dropzone {
+    border: 2px dashed var(--cor-borda);
+    border-radius: var(--raio);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.conversoes-dropzone:hover,
+.conversoes-dropzone.dropzone-activo {
+    border-color: var(--cor-primaria);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.dropzone-icone {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.dropzone-texto {
+    font-size: 1rem;
+    color: var(--cor-texto);
+    margin-bottom: 0.5rem;
+}
+
+.dropzone-ou {
+    font-size: 0.85rem;
+    color: var(--cor-texto-suave);
+    margin-bottom: 0.75rem;
+}
+
+.dropzone-info {
+    font-size: 0.78rem;
+    color: var(--cor-texto-suave);
+    margin-top: 1rem;
+}
+
+.ficheiros-lista {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.ficheiro-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--cor-superficie-2);
+    border-radius: var(--raio-sm);
+    border: 1px solid var(--cor-borda);
+}
+
+.ficheiro-nome {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--cor-texto);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ficheiro-tamanho {
+    font-size: 0.8rem;
+    color: var(--cor-texto-suave);
+    white-space: nowrap;
+}
+
+.ficheiro-remover {
+    background: none;
+    border: none;
+    color: var(--cor-texto-suave);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--raio-sm);
+    transition: all 0.15s;
+}
+
+.ficheiro-remover:hover {
+    color: var(--cor-erro);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.ficheiros-rodape {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 1rem;
+    border-top: 1px solid var(--cor-borda);
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.conversoes-processando {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+}
+
+.historico-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.historico-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--cor-superficie-2);
+    border-radius: var(--raio-sm);
+    border: 1px solid var(--cor-borda);
+}
+
+.historico-icone {
+    font-size: 1.25rem;
+}
+
+.historico-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.historico-data {
+    font-size: 0.85rem;
+    color: var(--cor-texto);
+}
+
+.historico-detalhes {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.badge-info {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-sucesso {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.texto-suave {
+    color: var(--cor-texto-suave);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+    .ficheiros-rodape {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .ficheiros-rodape > div {
+        justify-content: flex-end;
+    }
+}
+</style>
+
+<script>
+(function() {
+    const dropzone = document.getElementById('dropzone');
+    const inputFicheiros = document.getElementById('input-ficheiros');
+    const ficheirosContainer = document.getElementById('ficheiros-container');
+    const ficheirosLista = document.getElementById('ficheiros-lista');
+    const ficheirosInfo = document.getElementById('ficheiros-info');
+    const btnLimpar = document.getElementById('btn-limpar');
+    const btnConverter = document.getElementById('btn-converter');
+    const processando = document.getElementById('processando');
+    const erroContainer = document.getElementById('erro-container');
+    const erroMensagem = document.getElementById('erro-mensagem');
+
+    const MAX_FICHEIROS = 20;
+    const MAX_TAMANHO = 10 * 1024 * 1024;
+    let ficheirosSelecionados = [];
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dropzone-activo');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('dropzone-activo');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dropzone-activo');
+        processarFicheiros(e.dataTransfer.files);
+    });
+
+    dropzone.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'LABEL' && e.target.tagName !== 'BUTTON') {
+            inputFicheiros.click();
+        }
+    });
+
+    inputFicheiros.addEventListener('change', () => {
+        processarFicheiros(inputFicheiros.files);
+        inputFicheiros.value = '';
+    });
+
+    btnLimpar.addEventListener('click', () => {
+        ficheirosSelecionados = [];
+        actualizarLista();
+    });
+
+    btnConverter.addEventListener('click', converter);
+
+    function processarFicheiros(files) {
+        esconderErro();
+        const novosFicheiros = Array.from(files);
+
+        if (ficheirosSelecionados.length + novosFicheiros.length > MAX_FICHEIROS) {
+            mostrarErro(`Máximo de ${MAX_FICHEIROS} ficheiros por conversão`);
+            return;
+        }
+
+        for (const ficheiro of novosFicheiros) {
+            const nome = ficheiro.name.toLowerCase();
+            if (!nome.endsWith('.heic')) {
+                mostrarErro(`"${ficheiro.name}": apenas ficheiros .heic são suportados`);
+                return;
+            }
+            if (ficheiro.size > MAX_TAMANHO) {
+                const tamanhoMb = (ficheiro.size / (1024 * 1024)).toFixed(1);
+                mostrarErro(`"${ficheiro.name}": ${tamanhoMb}MB (máximo 10MB)`);
+                return;
+            }
+        }
+
+        ficheirosSelecionados = ficheirosSelecionados.concat(novosFicheiros);
+        actualizarLista();
+    }
+
+    function actualizarLista() {
+        if (ficheirosSelecionados.length === 0) {
+            ficheirosContainer.style.display = 'none';
+            return;
+        }
+
+        ficheirosContainer.style.display = 'block';
+        ficheirosLista.innerHTML = '';
+
+        let tamanhoTotal = 0;
+        ficheirosSelecionados.forEach((ficheiro, indice) => {
+            tamanhoTotal += ficheiro.size;
+            const li = document.createElement('li');
+            li.className = 'ficheiro-item';
+            li.innerHTML = `
+                <span class="ficheiro-nome">${ficheiro.name}</span>
+                <span class="ficheiro-tamanho">${formatarTamanho(ficheiro.size)}</span>
+                <button class="ficheiro-remover" data-indice="${indice}" title="Remover">✕</button>
+            `;
+            ficheirosLista.appendChild(li);
+        });
+
+        ficheirosLista.querySelectorAll('.ficheiro-remover').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const indice = parseInt(e.target.dataset.indice);
+                ficheirosSelecionados.splice(indice, 1);
+                actualizarLista();
+            });
+        });
+
+        ficheirosInfo.textContent = `${ficheirosSelecionados.length} ficheiro(s) · ${formatarTamanho(tamanhoTotal)}`;
+    }
+
+    function formatarTamanho(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    async function converter() {
+        if (ficheirosSelecionados.length === 0) return;
+
+        esconderErro();
+        btnConverter.disabled = true;
+        processando.style.display = 'flex';
+
+        const formData = new FormData();
+        ficheirosSelecionados.forEach(ficheiro => {
+            formData.append('ficheiros', ficheiro);
+        });
+
+        try {
+            const resposta = await fetch('/conversoes/api/converter', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: formData
+            });
+
+            if (!resposta.ok) {
+                const dados = await resposta.json();
+                throw new Error(dados.erro || 'Erro na conversão');
+            }
+
+            const blob = await resposta.blob();
+            const contentDisposition = resposta.headers.get('Content-Disposition');
+            let nomeFicheiro = 'conversao.jpg';
+
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (match && match[1]) {
+                    nomeFicheiro = match[1].replace(/['"]/g, '');
+                }
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nomeFicheiro;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            ficheirosSelecionados = [];
+            actualizarLista();
+            setTimeout(() => location.reload(), 500);
+
+        } catch (erro) {
+            mostrarErro(erro.message);
+        } finally {
+            btnConverter.disabled = false;
+            processando.style.display = 'none';
+        }
+    }
+
+    function mostrarErro(mensagem) {
+        erroMensagem.textContent = mensagem;
+        erroContainer.style.display = 'block';
+    }
+
+    function esconderErro() {
+        erroContainer.style.display = 'none';
+    }
+})();
+</script>
+{% endblock %}
