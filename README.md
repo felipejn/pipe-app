@@ -39,6 +39,13 @@ Gerador de palavras-passe criptograficamente seguro. Sem base de dados — módu
 - **PIN** — 4–12 dígitos numéricos
 - Barra de força com 5 níveis calculados por entropia no backend
 
+### 🔄 Conversões
+Conversor de fotos HEIC (iPhone) para JPG. Zero disco — tudo processado em memória.
+- Dropzone com drag & drop para selecionar múltiplos ficheiros
+- Validações: extensão .heic, limite 10MB/ficheiro, máximo 20 ficheiros por batch
+- 1 ficheiro → download JPG directo; 2+ ficheiros → download ZIP
+- Histórico das últimas 10 conversões com metadados
+
 ---
 
 ## Stack técnica
@@ -51,6 +58,7 @@ Gerador de palavras-passe criptograficamente seguro. Sem base de dados — módu
 | Formulários | Flask-WTF + WTForms |
 | Notificações | Telegram Bot API + SendGrid |
 | 2FA | TOTP (pyotp) + Telegram + Email |
+| Imagens | Pillow + pillow-heif |
 | Hosting | PythonAnywhere (plano free) |
 | Frontend | HTML/CSS/JS vanilla — sem frameworks |
 
@@ -129,6 +137,7 @@ pipe-app/
 │   ├── tarefas/        # Módulo Tarefas
 │   ├── notas/          # Módulo Notas
 │   ├── passwords/      # Módulo Passwords (stateless)
+│   ├── conversoes/     # Módulo Conversões HEIC → JPG
 │   ├── notifications/  # Serviço central de notificações
 │   ├── admin/          # Área de administração
 │   ├── settings/       # Definições do utilizador
