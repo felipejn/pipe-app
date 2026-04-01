@@ -3,7 +3,7 @@
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto, o módulo Conversões é o quinto. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -22,10 +22,13 @@ pipe-app/
 ├── app/
 │   ├── __init__.py          # create_app, app factory
 │   ├── static/
-│   │   └── css/pipe.css     # design system (tema escuro, âmbar/dourado)
+│   │   ├── css/pipe.css     # design system (tema escuro, âmbar/dourado)
+│   │   └── js/
+│   │       ├── pipe.js      # JS base (alertas)
+│   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
 │   ├── templates/
 │   │   ├── base.html        # navbar sem links de módulos (navegação via dashboard)
-│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas
+│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas + Passwords + Conversões
 │   │   ├── auth/
 │   │   ├── euromilhoes/
 │   │   ├── settings/
@@ -36,10 +39,14 @@ pipe-app/
 │   │   │   ├── index.html
 │   │   │   ├── editar.html
 │   │   │   └── _tarefa.html
-│   │   └── notas/           # NOVO
-│   │       ├── index.html
-│   │       ├── editar.html
-│   │       └── _cartao.html
+│   │   ├── notas/
+│   │   │   ├── index.html
+│   │   │   ├── editar.html
+│   │   │   └── _cartao.html
+│   │   ├── passwords/
+│   │   │   └── index.html
+│   │   └── conversoes/      # NOVO
+│   │       └── index.html
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout, /auth/perfil, /auth/2fa/*
@@ -70,10 +77,19 @@ pipe-app/
 │   │   ├── models.py        # Lista, Tarefa, TagTarefa
 │   │   ├── forms.py         # ListaForm, TarefaForm
 │   │   └── routes.py        # /tarefas/
-│   └── notas/               # NOVO — Blueprint Notas
+│   ├── notas/               # Blueprint Notas
+│   │   ├── __init__.py
+│   │   ├── models.py        # Nota, ItemChecklist, EtiquetaNota
+│   │   └── routes.py        # /notas/
+│   ├── passwords/           # Blueprint Passwords
+│   │   ├── __init__.py
+│   │   ├── wordlist.py      # lista PT ~200 palavras para passphrases
+│   │   ├── generator.py     # geração com secrets + cálculo de força por entropia
+│   │   └── routes.py        # /passwords/
+│   └── conversoes/          # NOVO — Blueprint Conversões
 │       ├── __init__.py
-│       ├── models.py        # Nota, ItemChecklist, EtiquetaNota
-│       └── routes.py        # /notas/
+│       ├── models.py        # Conversao (histórico de metadados)
+│       └── routes.py        # /conversoes/
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
@@ -109,7 +125,7 @@ pipe-app/
 - **Rotas:** criar/editar/apagar listas e tarefas, toggle concluída, adição rápida
 - **Funcionalidades:** vista "Todas", busca em tempo real, filtros, secção de concluídas colapsável, modal de nova lista com selector de emoji
 
-### Módulo Notas (`app/notas/`) — NOVO
+### Módulo Notas (`app/notas/`)
 - **Modelos:**
   - `Nota` — texto livre ou checklist, cor de fundo, fixada, arquivada
   - `ItemChecklist` — itens de notas do tipo checklist (ordem, feito)
@@ -131,6 +147,26 @@ pipe-app/
   - Navegação por clique em qualquer zona do cartão
   - Sidebar com etiquetas e acesso ao arquivo
   - Botão Arquivar/Recuperar consoante o estado da nota
+
+### Módulo Passwords (`app/passwords/`)
+- **Sem BD** — módulo totalmente stateless, sem modelos nem migrações
+- **Ficheiros:**
+  - `wordlist.py` — lista PT com ~200 palavras para geração de passphrases
+  - `generator.py` — geração criptograficamente segura com `secrets` + cálculo de força por entropia
+- **Rotas:**
+  - `GET /passwords/` — página do gerador
+  - `POST /passwords/api/gerar` — API JSON (requer `X-CSRFToken` no header)
+- **Modos:**
+  - **Password** — comprimento 8–64, toggles: maiúsculas, minúsculas, números, símbolos, excluir ambíguos
+  - **Passphrase** — 3–10 palavras PT separadas por hífen
+  - **PIN** — 4–12 dígitos numéricos
+- **Funcionalidades:**
+  - Tabs para alternar entre os três modos
+  - Barra de força com 5 níveis calculados por entropia no backend
+  - Botão Copiar com feedback visual ("Copiado!")
+  - Gera automaticamente ao carregar a página e ao mover sliders/toggles
+  - Frontend vanilla JS inline no template — sem ficheiros JS externos
+  - CSRF: token passado via `X-CSRFToken` no header do fetch (padrão do PIPE)
 
 ### Área Admin (`app/admin/`)
 - Blueprint em `/admin`, decorador `@admin_required`
@@ -168,7 +204,26 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Componentes Euromilhões: bolas, barras de frequência, badges de resultado
 - Componentes Tarefas: sidebar de listas, items com barra de prioridade, check circular, campo de busca, badges, estado vazio
 - Componentes Notas: grelha de cartões, cartão com hover/acções, palete de cores, caixa de criação inline, checklist, sidebar de etiquetas, página de edição
+- Módulo Passwords reutiliza exclusivamente classes existentes do design system — sem CSS adicional
+- Componentes Conversões: dropzone com borda tracejada, lista de ficheiros, badges de histórico
 - Layout responsivo (sidebar oculta em mobile)
+
+### Módulo Conversões (`app/conversoes/`) — NOVO
+- **Modelo:** `Conversao` — metadados de conversões (user_id, num_ficheiros, tamanho_total_kb, convertido_em)
+- **Sem ficheiros armazenados** — apenas metadados no histórico
+- **Dependência:** `pillow-heif` para leitura de ficheiros HEIC
+- **Rotas:**
+  - `GET /conversoes/` — página com dropzone + histórico das últimas 10 conversões
+  - `POST /conversoes/api/converter` — API de conversão (requer `X-CSRFToken` no header)
+- **Funcionalidades:**
+  - Dropzone com drag & drop e seleção de ficheiros
+  - Validações: extensão .heic, limite 10MB/ficheiro, máximo 20 ficheiros
+  - Validação de tamanho sem consumir stream (`file.seek(0,2)` / `file.tell()` / `file.seek(0)`)
+  - Conversão em memória: `pillow_heif` → PIL → JPEG (quality=85)
+  - 1 ficheiro → download JPG directo
+  - 2+ ficheiros → download ZIP em memória
+  - Zero disco — tudo em memória, compatível com PythonAnywhere free
+  - Histórico com cards e badges (número de ficheiros, tamanho total)
 
 ### Testes realizados
 - Login e registo ✅
@@ -188,6 +243,18 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Notas — toggle checklist no cartão ✅
 - Módulo Notas — edição completa ✅
 - Módulo Notas — deployed no PythonAnywhere ✅
+- Módulo Passwords — geração de password ✅
+- Módulo Passwords — geração de passphrase ✅
+- Módulo Passwords — geração de PIN ✅
+- Módulo Passwords — barra de força ✅
+- Módulo Passwords — botão copiar ✅
+- Módulo Passwords — sliders e toggles ✅
+- Módulo Passwords — deployed no PythonAnywhere ✅
+- Módulo Conversões — conversão HEIC → JPG ✅
+- Módulo Conversões — dropzone drag & drop ✅
+- Módulo Conversões — validações (extensão, tamanho, limite) ✅
+- Módulo Conversões — download JPG/ZIP ✅
+- Módulo Conversões — histórico ✅
 
 ---
 
@@ -227,6 +294,7 @@ SENDGRID_FROM_EMAIL=...
 - `scripts/adicionar_is_admin.py` ✅
 - `scripts/migrar_notificada_em.py` ✅
 - Módulo Notas — tabelas criadas automaticamente por `db.create_all()` ✅
+- Módulo Passwords — sem BD, sem migrações ✅
 
 ---
 
@@ -236,16 +304,20 @@ Cada módulo é um Flask Blueprint independente.
 A navegação é feita pelos cards no dashboard.
 
 **Para adicionar um novo módulo:**
-1. Criar `app/<modulo>/` com `__init__.py`, `models.py`, `routes.py`
+1. Criar `app/<modulo>/` com `__init__.py` e `routes.py` (+ `models.py` se precisar de BD)
 2. Registar o blueprint em `app/__init__.py`
 3. Adicionar card em `app/templates/dashboard.html`
 4. Adicionar função `tarefa_<modulo>(hoje)` em `scripts/pipe_tasks.py` se precisar de tarefa agendada
+
+**Padrão AJAX/fetch no PIPE:**
+- Passar sempre `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch
+- Backend usa `request.get_json()` — não usa `validate_on_submit()`
 
 ---
 
 ## Ponto onde estamos
 
-Três módulos completos e deployed: Euromilhões, Tarefas e Notas. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
+Cinco módulos completos e deployed: Euromilhões, Tarefas, Notas, Passwords e Conversões. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
 
 ---
 
@@ -269,6 +341,7 @@ email-validator==2.2.0
 pyotp==2.9.0
 qrcode==7.4.2
 pillow==10.4.0
+pillow-heif==0.21.0
 ```
 
 ## Contexto técnico
