@@ -54,7 +54,8 @@ def index():
     listas = Lista.query.filter_by(user_id=current_user.id).order_by(Lista.ordem, Lista.data_criacao).all()
 
     # "todas" é uma vista especial — não corresponde a uma Lista real
-    lista_param = request.args.get('lista', '')
+    # Por defeito (sem parâmetro) abre em "todas"
+    lista_param = request.args.get('lista', 'todas')
     mostrar_todas = (lista_param == 'todas')
 
     lista_activa = None
@@ -63,7 +64,8 @@ def index():
         if lista_id:
             lista_activa = Lista.query.filter_by(id=lista_id, user_id=current_user.id).first()
         if not lista_activa and listas:
-            lista_activa = listas[0]
+            # Fallback para "todas" se o id não for válido
+            mostrar_todas = True
 
     filtro = request.args.get('filtro', 'todas')
     busca  = request.args.get('busca', '').strip()

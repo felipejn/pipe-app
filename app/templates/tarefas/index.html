@@ -31,6 +31,20 @@
     </div>
   </div>
 
+  {# ── Selector de lista para mobile (visível apenas em ecrãs pequenos) #}
+  <div class="tarefas-lista-selector-mobile">
+    <select onchange="if(this.value) window.location.href=this.value" class="campo-texto">
+      <option value="{{ url_for('tarefas.index', lista='todas') }}"
+              {% if mostrar_todas %}selected{% endif %}>🗂 Todas ({{ stats.pendentes }})</option>
+      {% for lista in listas %}
+      <option value="{{ url_for('tarefas.index', lista=lista.id) }}"
+              {% if not mostrar_todas and lista_activa and lista.id == lista_activa.id %}selected{% endif %}>
+        {{ lista.icone }} {{ lista.nome }} ({{ lista.pendentes() }})
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
   {# ── Grelha: sidebar + conteúdo ────────────────────────── #}
   <div class="tarefas-grelha">
 
@@ -272,6 +286,21 @@
 {% endblock %}
 
 {% block scripts_extra %}
+<style>
+/* Selector de lista para mobile — oculto em desktop */
+.tarefas-lista-selector-mobile {
+  display: none;
+  padding: 0 0 0.75rem 0;
+}
+.tarefas-lista-selector-mobile select {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .tarefas-lista-selector-mobile {
+    display: block;
+  }
+}
+</style>
 <script>
 const LISTA_ACTIVA_ID = {{ lista_activa.id if lista_activa else 'null' }};
 const CSRF_TOKEN = '{{ csrf_token() }}';
