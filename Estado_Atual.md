@@ -3,7 +3,7 @@
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto, o módulo Conversões é o quinto. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -28,7 +28,7 @@ pipe-app/
 │   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
 │   ├── templates/
 │   │   ├── base.html        # navbar sem links de módulos (navegação via dashboard)
-│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas + Passwords + Conversões
+│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas + Passwords
 │   │   ├── auth/
 │   │   ├── euromilhoes/
 │   │   ├── settings/
@@ -43,9 +43,7 @@ pipe-app/
 │   │   │   ├── index.html
 │   │   │   ├── editar.html
 │   │   │   └── _cartao.html
-│   │   ├── passwords/
-│   │   │   └── index.html
-│   │   └── conversoes/      # NOVO
+│   │   └── passwords/
 │   │       └── index.html
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
@@ -81,15 +79,11 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # Nota, ItemChecklist, EtiquetaNota
 │   │   └── routes.py        # /notas/
-│   ├── passwords/           # Blueprint Passwords
-│   │   ├── __init__.py
-│   │   ├── wordlist.py      # lista PT ~200 palavras para passphrases
-│   │   ├── generator.py     # geração com secrets + cálculo de força por entropia
-│   │   └── routes.py        # /passwords/
-│   └── conversoes/          # NOVO — Blueprint Conversões
+│   └── passwords/           # Blueprint Passwords
 │       ├── __init__.py
-│       ├── models.py        # Conversao (histórico de metadados)
-│       └── routes.py        # /conversoes/
+│       ├── wordlist.py      # lista PT ~200 palavras para passphrases
+│       ├── generator.py     # geração com secrets + cálculo de força por entropia
+│       └── routes.py        # /passwords/
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
@@ -124,6 +118,8 @@ pipe-app/
 - **Modelos:** `Lista`, `Tarefa` (com `notificada_em`), `TagTarefa`
 - **Rotas:** criar/editar/apagar listas e tarefas, toggle concluída, adição rápida
 - **Funcionalidades:** vista "Todas", busca em tempo real, filtros, secção de concluídas colapsável, modal de nova lista com selector de emoji
+- **Comportamento ao abrir:** vista "Todas" por defeito (`lista='todas'`) — parâmetro `lista` tem default `'todas'` em `routes.py`
+- **Mobile:** selector `<select>` acima da grelha, visível apenas em ecrãs ≤ 640px; em desktop a sidebar continua a funcionar normalmente
 
 ### Módulo Notas (`app/notas/`)
 - **Modelos:**
@@ -202,28 +198,10 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Tema escuro, acentos âmbar/dourado
 - Componentes: navbar, cartões, formulários, botões, alertas, skeleton loader, toggles, modais
 - Componentes Euromilhões: bolas, barras de frequência, badges de resultado
-- Componentes Tarefas: sidebar de listas, items com barra de prioridade, check circular, campo de busca, badges, estado vazio
+- Componentes Tarefas: sidebar de listas, items com barra de prioridade, check circular, campo de busca, badges, estado vazio; selector mobile de listas (CSS inline no template)
 - Componentes Notas: grelha de cartões, cartão com hover/acções, palete de cores, caixa de criação inline, checklist, sidebar de etiquetas, página de edição
 - Módulo Passwords reutiliza exclusivamente classes existentes do design system — sem CSS adicional
-- Componentes Conversões: dropzone com borda tracejada, lista de ficheiros, badges de histórico
 - Layout responsivo (sidebar oculta em mobile)
-
-### Módulo Conversões (`app/conversoes/`) — NOVO
-- **Modelo:** `Conversao` — metadados de conversões (user_id, num_ficheiros, tamanho_total_kb, convertido_em)
-- **Sem ficheiros armazenados** — apenas metadados no histórico
-- **Dependência:** `pillow-heif` para leitura de ficheiros HEIC
-- **Rotas:**
-  - `GET /conversoes/` — página com dropzone + histórico das últimas 10 conversões
-  - `POST /conversoes/api/converter` — API de conversão (requer `X-CSRFToken` no header)
-- **Funcionalidades:**
-  - Dropzone com drag & drop e seleção de ficheiros
-  - Validações: extensão .heic, limite 10MB/ficheiro, máximo 20 ficheiros
-  - Validação de tamanho sem consumir stream (`file.seek(0,2)` / `file.tell()` / `file.seek(0)`)
-  - Conversão em memória: `pillow_heif` → PIL → JPEG (quality=85)
-  - 1 ficheiro → download JPG directo
-  - 2+ ficheiros → download ZIP em memória
-  - Zero disco — tudo em memória, compatível com PythonAnywhere free
-  - Histórico com cards e badges (número de ficheiros, tamanho total)
 
 ### Testes realizados
 - Login e registo ✅
@@ -235,6 +213,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Área admin completa ✅
 - Módulo Tarefas completo ✅
 - `pipe_tasks.py` com módulo Tarefas ✅
+- Módulo Tarefas — vista "Todas" por defeito ao abrir ✅
+- Módulo Tarefas — selector mobile de listas ✅
 - Módulo Notas — criação inline (texto e checklist) ✅
 - Módulo Notas — cores de fundo ✅
 - Módulo Notas — fixar / arquivar / recuperar ✅
@@ -250,11 +230,6 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Passwords — botão copiar ✅
 - Módulo Passwords — sliders e toggles ✅
 - Módulo Passwords — deployed no PythonAnywhere ✅
-- Módulo Conversões — conversão HEIC → JPG ✅
-- Módulo Conversões — dropzone drag & drop ✅
-- Módulo Conversões — validações (extensão, tamanho, limite) ✅
-- Módulo Conversões — download JPG/ZIP ✅
-- Módulo Conversões — histórico ✅
 
 ---
 
@@ -317,7 +292,7 @@ A navegação é feita pelos cards no dashboard.
 
 ## Ponto onde estamos
 
-Cinco módulos completos e deployed: Euromilhões, Tarefas, Notas, Passwords e Conversões. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
+Quatro módulos completos e deployed: Euromilhões, Tarefas, Notas e Passwords. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
 
 ---
 
@@ -341,7 +316,6 @@ email-validator==2.2.0
 pyotp==2.9.0
 qrcode==7.4.2
 pillow==10.4.0
-pillow-heif==0.21.0
 ```
 
 ## Contexto técnico
