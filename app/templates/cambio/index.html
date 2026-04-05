@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Câmbio — PIPE{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo" style="max-width: 520px;">
+
+  <div class="cabecalho-pagina">
+    <h2>💱 Conversão de Moedas</h2>
+    <p class="modulo-desc">Cotações em tempo real via <a href="https://www.frankfurter.app/" target="_blank" rel="noopener" style="color:var(--cor-primaria);">Frankfurter API</a></p>
+  </div>
+
+  <!-- Resultado -->
+  <div class="cartao" style="margin-bottom:1rem;">
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+      <span id="camb-resultado"
+            style="flex:1;font-size:1.4rem;font-weight:700;color:var(--cor-primaria);min-height:2rem;line-height:2rem;">
+        —
+      </span>
+      <button id="camb-copiar" class="btn btn-secundario" title="Copiar"
+              style="padding:.4rem .65rem;display:flex;align-items:center;gap:.35rem;flex-shrink:0;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span id="camb-copiar-txt">Copiar</span>
+      </button>
+    </div>
+    <p id="camb-taxa"
+       style="margin:.75rem 0 0 0;font-size:.85rem;color:var(--cor-texto-suave);">
+    </p>
+  </div>
+
+  <!-- Controles -->
+  <div class="cartao" style="margin-bottom:1rem;">
+    <div class="campo">
+      <label class="campo-label">Valor</label>
+      <input type="number" id="camb-valor" class="input" value="1" min="0" step="any"
+             style="font-size:1.1rem;padding:.6rem .75rem;">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+      <div class="campo">
+        <label class="campo-label">De</label>
+        <select id="camb-origem" class="input">{% for cod, nome in moedas.items() %}
+          <option value="{{ cod }}"{% if cod == 'EUR' %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="campo">
+        <label class="campo-label">Para</label>
+        <select id="camb-destino" class="input">{% for cod, nome in moedas.items() %}
+          <option value="{{ cod }}"{% if cod == 'BRL' %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button id="camb-btn" class="btn btn-primario btn-bloco" style="font-size:1rem;padding:.7rem;">
+    Converter
+  </button>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const elValor     = document.getElementById('camb-valor');
+  const elOrigem    = document.getElementById('camb-origem');
+  const elDestino   = document.getElementById('camb-destino');
+  const elBtn       = document.getElementById('camb-btn');
+  const elResultado = document.getElementById('camb-resultado');
+  const elTaxa      = document.getElementById('camb-taxa');
+  const elCopiar    = document.getElementById('camb-copiar');
+  const elCopiarTxt = document.getElementById('camb-copiar-txt');
+
+  function converter() {
+    elBtn.disabled = true;
+    elResultado.textContent = '…';
+    elTaxa.textContent = '';
+
+    const payload = {
+      origem: elOrigem.value,
+      destino: elDestino.value,
+      valor: parseFloat(elValor.value) || 0,
+    };
+
+    fetch('{{ url_for("cambio.api_convert") }}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token() }}'
+      },
+      body: JSON.stringify(payload),
+    })
+    .then(r => {
+      if (!r.ok) throw new Error('Erro na API');
+      return r.json();
+    })
+    .then(data => {
+      const formatado = new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(data.resultado);
+
+      elResultado.textContent = formatado;
+      elTaxa.textContent = '1 ' + data.origem + ' = ' + data.taxa + ' ' + data.destino;
+    })
+    .catch(() => {
+      elResultado.textContent = 'Indisponível';
+      elTaxa.textContent = 'Não foi possível obter as cotações.';
+    })
+    .finally(() => { elBtn.disabled = false; });
+  }
+
+  // Copiar resultado
+  elCopiar.addEventListener('click', () => {
+    const txt = elResultado.textContent.trim();
+    if (!txt || txt === '—') return;
+    navigator.clipboard.writeText(txt).then(() => {
+      elCopiarTxt.textContent = 'Copiado!';
+      elCopiar.style.color = 'var(--cor-sucesso)';
+      elCopiar.style.borderColor = 'var(--cor-sucesso)';
+      setTimeout(() => {
+        elCopiarTxt.textContent = 'Copiar';
+        elCopiar.style.color = '';
+        elCopiar.style.borderColor = '';
+      }, 1500);
+    });
+  });
+
+  // Eventos
+  elBtn.addEventListener('click', converter);
+  elDestino.addEventListener('change', converter);
+  elOrigem.addEventListener('change', converter);
+  elValor.addEventListener('keyup', (e) => { if (e.key === 'Enter') converter(); });
+
+  converter();
+})();
+</script>
+{% endblock %}

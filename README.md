@@ -39,12 +39,20 @@ Gerador de palavras-passe criptograficamente seguro. Sem base de dados — módu
 - **PIN** — 4–12 dígitos numéricos
 - Barra de força com 5 níveis calculados por entropia no backend
 
-### 🔄 Conversões
+### 🔄 Conversão HEIC → JPG
 Conversor de fotos HEIC (iPhone) para JPG. Zero disco — tudo processado em memória.
 - Dropzone com drag & drop para selecionar múltiplos ficheiros
 - Validações: extensão .heic, limite 10MB/ficheiro, máximo 20 ficheiros por batch
 - 1 ficheiro → download JPG directo; 2+ ficheiros → download ZIP
 - Histórico das últimas 10 conversões com metadados
+
+### 💱 Câmbio
+Conversão de moedas com cotações em tempo real. Sem base de dados — módulo stateless.
+- Default EUR → BRL, com selects para qualquer par de moedas
+- 8 moedas: EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
+- Cotações via ExchangeRate-API (gratuita, sem chave API)
+- Resultado com taxa de câmbio e botão copiar
+- Na whitelist do PythonAnywhere, compatível com plano free
 
 ---
 
@@ -138,6 +146,7 @@ pipe-app/
 │   ├── notas/          # Módulo Notas
 │   ├── passwords/      # Módulo Passwords (stateless)
 │   ├── conversoes/     # Módulo Conversões HEIC → JPG
+│   ├── cambio/         # Módulo Câmbio (stateless)
 │   ├── notifications/  # Serviço central de notificações
 │   ├── admin/          # Área de administração
 │   ├── settings/       # Definições do utilizador

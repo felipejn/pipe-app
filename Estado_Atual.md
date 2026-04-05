@@ -28,7 +28,7 @@ pipe-app/
 │   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
 │   ├── templates/
 │   │   ├── base.html        # navbar sem links de módulos (navegação via dashboard)
-│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas + Passwords
+│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas + Passwords + Câmbio
 │   │   ├── auth/
 │   │   ├── euromilhoes/
 │   │   ├── settings/
@@ -44,6 +44,8 @@ pipe-app/
 │   │   │   ├── editar.html
 │   │   │   └── _cartao.html
 │   │   └── passwords/
+│   │       └── index.html
+│   │   └── cambio/
 │   │       └── index.html
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
@@ -79,11 +81,14 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # Nota, ItemChecklist, EtiquetaNota
 │   │   └── routes.py        # /notas/
-│   └── passwords/           # Blueprint Passwords
+│   ├── passwords/           # Blueprint Passwords
+│   │   ├── __init__.py
+│   │   ├── wordlist.py      # lista PT ~200 palavras para passphrases
+│   │   ├── generator.py     # geração com secrets + cálculo de força por entropia
+│   │   └── routes.py        # /passwords/
+│   └── cambio/              # Blueprint Câmbio
 │       ├── __init__.py
-│       ├── wordlist.py      # lista PT ~200 palavras para passphrases
-│       ├── generator.py     # geração com secrets + cálculo de força por entropia
-│       └── routes.py        # /passwords/
+│       └── routes.py        # /cambio/ — stateless, API ExchangeRate
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
@@ -164,6 +169,20 @@ pipe-app/
   - Frontend vanilla JS inline no template — sem ficheiros JS externos
   - CSRF: token passado via `X-CSRFToken` no header do fetch (padrão do PIPE)
 
+### Módulo Câmbio (`app/cambio/`)
+- **Sem BD** — módulo stateless, sem modelos ni migrações
+- **Rotas:**
+  - `GET /cambio/` — página de conversão
+  - `POST /cambio/api/convert` — API JSON (requer `X-CSRFToken` no header)
+- **API externa:** `api.exchangerate-api.com` (v4 gratuita, na whitelist do PythonAnywhere)
+- **Moedas:** EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
+- **Funcionalidades:**
+  - Default EUR → BRL, selects configáveis para qualquer par
+  - Resultado formatado com taxa de câmbio
+  - Botão Copiar com feedback visual
+  - Conversão automática ao trocar moedas ou carregar o botão
+  - Frontend vanilla JS inline no template — sem ficheiros JS externos
+
 ### Área Admin (`app/admin/`)
 - Blueprint em `/admin`, decorador `@admin_required`
 - Ícone 🛠️ na navbar visível apenas para admins
@@ -230,6 +249,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Passwords — botão copiar ✅
 - Módulo Passwords — sliders e toggles ✅
 - Módulo Passwords — deployed no PythonAnywhere ✅
+- Módulo Câmbio — conversão EUR → BRL ✅
+- Módulo Câmbio — deployed no PythonAnywhere ✅
 
 ---
 
