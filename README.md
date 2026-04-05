@@ -51,8 +51,8 @@ Conversão de ficheiros e imagens. Zero disco — tudo processado em memória.
 Conversão de moedas com cotações em tempo real. Sem base de dados — módulo stateless.
 - Default EUR → BRL, com selects para qualquer par de moedas
 - 8 moedas: EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
-- Cotações via ExchangeRate-API (gratuita, sem chave API)
-- Resultado com taxa de câmbio e botão copiar
+- Cotações via Wise API v3 (com fallback para ExchangeRate-API)
+- Resultado com taxa de câmbio (inclui taxas reais quando disponível via Wise) e botão copiar
 - Na whitelist do PythonAnywhere, compatível com plano free
 
 ### 🎨 Cores Flutter

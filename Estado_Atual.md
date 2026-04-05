@@ -181,11 +181,11 @@ pipe-app/
 - **Rotas:**
   - `GET /cambio/` — página de conversão
   - `POST /cambio/api/convert` — API JSON (requer `X-CSRFToken` no header)
-- **API externa:** `api.exchangerate-api.com` (v4 gratuita, na whitelist do PythonAnywhere)
+- **API externa:** Wise API v3 (com fallback para ExchangeRate-API)
 - **Moedas:** EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
 - **Funcionalidades:**
   - Default EUR → BRL, selects configáveis para qualquer par
-  - Resultado formatado com taxa de câmbio
+  - Resultado formatado com taxa de câmbio (inclui taxas reais quando disponível via Wise)
   - Botão Copiar com feedback visual
   - Conversão automática ao trocar moedas ou carregar o botão
   - Frontend vanilla JS inline no template — sem ficheiros JS externos
