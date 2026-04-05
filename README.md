@@ -39,11 +39,12 @@ Gerador de palavras-passe criptograficamente seguro. Sem base de dados — módu
 - **PIN** — 4–12 dígitos numéricos
 - Barra de força com 5 níveis calculados por entropia no backend
 
-### 🔄 Conversão HEIC → JPG
-Conversor de fotos HEIC (iPhone) para JPG. Zero disco — tudo processado em memória.
-- Dropzone com drag & drop para selecionar múltiplos ficheiros
-- Validações: extensão .heic, limite 10MB/ficheiro, máximo 20 ficheiros por batch
-- 1 ficheiro → download JPG directo; 2+ ficheiros → download ZIP
+### 🔄 Conversões
+Conversão de ficheiros e imagens. Zero disco — tudo processado em memória.
+- **HEIC → JPG** — converter fotos do iPhone com drag & drop
+- **PNG/JPG → ICO** — gerar ícones com tamanho selecionável (16–256px)
+- Validações: extensão suportada, limite 10MB/ficheiro, máximo 20 ficheiros
+- 1 ficheiro → download directo; 2+ ficheiros → download ZIP
 - Histórico das últimas 10 conversões com metadados
 
 ### 💱 Câmbio

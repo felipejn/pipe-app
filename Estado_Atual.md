@@ -47,6 +47,10 @@ pipe-app/
 │   │       └── index.html
 │   │   └── cambio/
 │   │       └── index.html
+│   └── conversoes/
+│       ├── __init__.py
+│       ├── models.py        # modelo Conversao (histórico, sem ficheiros)
+│       └── routes.py        # /conversoes/ — HEIC→JPG + PNG/JPG→ICO
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout, /auth/perfil, /auth/2fa/*
@@ -183,6 +187,22 @@ pipe-app/
   - Conversão automática ao trocar moedas ou carregar o botão
   - Frontend vanilla JS inline no template — sem ficheiros JS externos
 
+### Módulo Conversões (`app/conversoes/`)
+- **Modelos:**
+  - `Conversao` — metadados no histórico (sem ficheiros armazenados)
+- **Rotas:**
+  - `GET /conversoes/` — dropzone + histórico recente
+  - `POST /conversoes/api/converter` — conversão (FormData com `ficheiros`, opção `tipo` e `tamanho`)
+- **Conversões:**
+  - **HEIC → JPG** — usa `pillow_heif`, dropzone drag & drop, validações: extensão .heic, 10MB/ficheiro, máx 20
+  - **PNG/JPG → ICO** — usa Pillow `resize` com `Image.LANCZOS`, tamanhos: 16, 32, 48, 64, 128, 256px
+- **Funcionalidades:**
+  - Seletor de tipo via tabs no frontend
+  - 1 ficheiro → download direto; 2+ ficheiros → download ZIP
+  - Lista de ficheiros selecionados com remoção individual
+  - Histórico das últimas 10 conversões com data, contagem e tamanho
+  - Zero disco — tudo processado em memória
+
 ### Área Admin (`app/admin/`)
 - Blueprint em `/admin`, decorador `@admin_required`
 - Ícone 🛠️ na navbar visível apenas para admins
@@ -251,6 +271,9 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Passwords — deployed no PythonAnywhere ✅
 - Módulo Câmbio — conversão EUR → BRL ✅
 - Módulo Câmbio — deployed no PythonAnywhere ✅
+- Módulo Conversões — HEIC → JPG (dropzone, validações, histórico) ✅
+- Módulo Conversões — PNG/JPG → ICO (seletor de tamanho, tabs) ✅
+- Módulo Conversões — deployed no PythonAnywhere ✅
 
 ---
 
