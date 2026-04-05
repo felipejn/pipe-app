@@ -105,7 +105,16 @@
       }).format(data.resultado);
 
       elResultado.textContent = formatado;
-      elTaxa.textContent = '1 ' + data.origem + ' = ' + data.taxa + ' ' + data.destino;
+      let info = '1 ' + data.origem + ' = ' + data.taxa + ' ' + data.destino;
+      if (data.fonte) {
+        info += ' · ' + data.fonte;
+        if (data.data) {
+          let d = new Date(data.data);
+          info += ' · ' + d.toLocaleDateString('pt-PT', {day:'2-digit', month:'2-digit', year:'numeric'}) +
+                         ' ' + d.toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'});
+        }
+      }
+      elTaxa.textContent = info;
     })
     .catch(() => {
       elResultado.textContent = 'Indisponível';

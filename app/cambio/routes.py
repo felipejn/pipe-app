@@ -1,8 +1,11 @@
+import requests
 from flask import render_template, request, jsonify
 from flask_login import login_required
 from app.cambio import bp
-import requests
 
+
+# Wise API - funciona sem token autenticado
+WISE_BASE_URL = 'https://api.wise.com/v3/quotes'
 
 MOEDAS = {
     'EUR': 'Euro (€)',
@@ -16,13 +19,53 @@ MOEDAS = {
 }
 
 
-def _obter_cotacoes():
-    """Obtem taxa de cambio via ExchangeRate-API (gratuita, sem chave API)."""
+def _obter_todas_taxas(moeda_base='EUR'):
+    """Obtem taxas em lote via Wise API (sem token)."""
     try:
-        resp = requests.get('https://api.exchangerate-api.com/v4/latest/EUR', timeout=10)
-        resp.raise_for_status()
-        dados = resp.json()
-        return dados.get('rates', {})
+        taxas = {}
+        moeda_codes = list(MOEDAS.keys())
+        for code in moeda_codes:
+            if code == moeda_base:
+                continue
+            resp = requests.post(
+                WISE_BASE_URL,
+                headers={'Content-Type': 'application/json'},
+                json={'sourceCurrency': moeda_base, 'targetCurrency': code, 'sourceAmount': 10000},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                dados = resp.json()
+                taxas[code] = dados.get('rate')
+        return taxas or None
+    except Exception:
+        return None
+
+
+def _obter_taxa_directa(origem, destino, valor=1):
+    """Obtem taxa directa de uma conversao especifica via Wise API."""
+    try:
+        # sourceAmount em centimos (ex: 1.50 -> 150)
+        source_cents = round(valor * 100, 0)
+        resp = requests.post(
+            WISE_BASE_URL,
+            headers={'Content-Type': 'application/json'},
+            json={
+                'sourceCurrency': origem,
+                'targetCurrency': destino,
+                'sourceAmount': source_cents,
+            },
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            dados = resp.json()
+            return {
+                'rate': dados.get('rate'),
+                'target_amount': dados.get('targetAmount'),
+                'source_currency': dados.get('sourceCurrency'),
+                'target_currency': dados.get('targetCurrency'),
+                'rate_timestamp': dados.get('rateTimestamp'),
+            }
+        return None
     except Exception:
         return None
 
@@ -41,22 +84,20 @@ def api_convert():
     moeda_destino = dados.get('destino', 'BRL')
     valor = float(dados.get('valor', 1))
 
-    taxas = _obter_cotacoes()
-    if not taxas:
-        return jsonify({'erro': 'Erro ao obter cotações'}), 503
+    resultado_wise = _obter_taxa_directa(moeda_origem, moeda_destino, valor)
 
-    # API Frankfurter usa EUR como base: taxas[x] = quantas unidades de X por 1 EUR
-    taxa_origem = 1.0 if moeda_origem == 'EUR' else taxas.get(moeda_origem, 1)
-    taxa_destino = taxas.get(moeda_destino, 1)
+    if not resultado_wise:
+        return jsonify({'erro': 'Erro ao obter cotações da Wise'}), 503
 
-    # 1 unidade de origem = (taxa_destino / taxa_origem) unidades de destino
-    taxa_directa = round(taxa_destino / taxa_origem, 6)
-    resultado = round(valor * taxa_directa, 2)
+    taxa = resultado_wise['rate']
+    resultado = resultado_wise['target_amount']
 
     return jsonify({
         'origem': moeda_origem,
         'destino': moeda_destino,
         'valor': valor,
-        'resultado': resultado,
-        'taxa': round(taxa_directa, 4),
+        'resultado': round(resultado, 2),
+        'taxa': round(taxa, 4),
+        'fonte': 'Wise',
+        'data': resultado_wise.get('rate_timestamp', ''),
     })
