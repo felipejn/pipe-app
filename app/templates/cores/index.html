@@ -1,0 +1,379 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Cores Flutter — PIPE{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo" style="max-width: 620px;">
+
+  <div class="cabecalho-pagina">
+    <h2>🎨 Cores Flutter</h2>
+    <p class="modulo-desc">Seleciona ou insere uma cor e obtem o codigo para Flutter</p>
+  </div>
+
+  <!-- Tabs bidirecionais -->
+  <div class="filtro-botoes" style="margin-bottom:1.5rem;" role="tablist">
+    <button class="btn-filtro activo" data-aba="cor-para-flutter" role="tab" aria-selected="true">Cor → Flutter</button>
+    <button class="btn-filtro" data-aba="flutter-para-cor" role="tab" aria-selected="false">Flutter → Cor</button>
+  </div>
+
+  <!-- ====== COR → FLUTTER ====== -->
+  <div id="painel-cor-para-flutter">
+
+    <!-- Color Picker + Preview -->
+    <div class="cartao" style="margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <div>
+          <label class="campo-label" style="margin-bottom:.5rem;display:block;">Selecionar cor</label>
+          <input type="color" id="color-picker" value="#2196F3"
+                 style="width:64px;height:64px;border:2px solid var(--cor-borda);border-radius:var(--raio);cursor:pointer;background:none;padding:2px;">
+        </div>
+        <div style="flex:1;">
+          <div id="preview-cor"
+               style="width:100%;height:64px;border-radius:var(--raio-sm);border:2px solid var(--cor-borda);background:#2196F3;"></div>
+          <p id="preview-hex" style="text-align:center;margin:.5rem 0 0 0;font-family:monospace;font-size:1.1rem;color:var(--cor-primaria);">#2196F3</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formato de entrada -->
+    <div class="filtro-botoes" style="margin-bottom:1rem;" role="tablist" id="seletor-formato">
+      <button class="btn-filtro activo" data-fmt="hex" role="tab">HEX</button>
+      <button class="btn-filtro" data-fmt="rgb" role="tab">RGB</button>
+      <button class="btn-filtro" data-fmt="hsl" role="tab">HSL</button>
+      <button class="btn-filtro" data-fmt="cmyk" role="tab">CMYK</button>
+    </div>
+
+    <!-- Paineis de inputs por formato -->
+    <div class="cartao" style="margin-bottom:1rem;">
+      <div class="painel-fmt" id="fmt-hex">
+        <div class="campo">
+          <label class="campo-label">Valor HEX</label>
+          <input type="text" id="input-hex" class="input" value="#2196F3"
+                 style="font-family:monospace;font-size:1.1rem;text-transform:uppercase;"
+                 placeholder="#RRGGBB ou #AARRGGBB">
+        </div>
+      </div>
+      <div class="painel-fmt" id="fmt-rgb" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
+          <div class="campo"><label class="campo-label">R</label>
+            <input type="number" id="input-r" class="input" value="33" min="0" max="255">
+          </div>
+          <div class="campo"><label class="campo-label">G</label>
+            <input type="number" id="input-g" class="input" value="150" min="0" max="255">
+          </div>
+          <div class="campo"><label class="campo-label">B</label>
+            <input type="number" id="input-b" class="input" value="243" min="0" max="255">
+          </div>
+        </div>
+        <div class="campo" style="margin-top:.75rem;">
+          <label class="campo-label">Opacidade (0-255): <strong id="val-a">255</strong></label>
+          <input type="range" id="sl-opacity" min="0" max="255" value="255"
+                 style="width:100%;accent-color:var(--cor-primaria);">
+        </div>
+      </div>
+      <div class="painel-fmt" id="fmt-hsl" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
+          <div class="campo"><label class="campo-label">H (0-360)</label>
+            <input type="number" id="input-h" class="input" value="207" min="0" max="360">
+          </div>
+          <div class="campo"><label class="campo-label">S (0-100)</label>
+            <input type="number" id="input-s" class="input" value="90" min="0" max="100">
+          </div>
+          <div class="campo"><label class="campo-label">L (0-100)</label>
+            <input type="number" id="input-l" class="input" value="54" min="0" max="100">
+          </div>
+        </div>
+      </div>
+      <div class="painel-fmt" id="fmt-cmyk" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;">
+          <div class="campo"><label class="campo-label">C</label>
+            <input type="number" id="input-c" class="input" value="86" min="0" max="100">
+          </div>
+          <div class="campo"><label class="campo-label">M</label>
+            <input type="number" id="input-m" class="input" value="38" min="0" max="100">
+          </div>
+          <div class="campo"><label class="campo-label">Y</label>
+            <input type="number" id="input-y" class="input" value="0" min="0" max="100">
+          </div>
+          <div class="campo"><label class="campo-label">K</label>
+            <input type="number" id="input-k" class="input" value="5" min="0" max="100">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn-gerar" class="btn btn-primario btn-bloco" style="font-size:1rem;padding:.7rem;margin-bottom:1rem;">
+      Gerar codigo Flutter
+    </button>
+  </div>
+
+  <!-- ====== FLUTTER → COR ====== -->
+  <div id="painel-flutter-para-cor" style="display:none;">
+    <div class="cartao" style="margin-bottom:1rem;">
+      <div class="campo">
+        <label class="campo-label">Cola o codigo Flutter aqui</label>
+        <input type="text" id="input-flutter" class="input"
+               style="font-family:monospace;font-size:1rem;"
+               placeholder="Color(0xFF2196F3)">
+      </div>
+    </div>
+    <button id="btn-parse" class="btn btn-primario btn-bloco" style="font-size:1rem;padding:.7rem;margin-bottom:1rem;">
+      Converter
+    </button>
+    <div id="resultado-flutter-cor" style="display:none;">
+      <div class="cartao" style="margin-bottom:1rem;">
+        <div id="preview-reverso"
+             style="width:100%;height:64px;border-radius:var(--raio-sm);border:2px solid var(--cor-borda);"></div>
+        <p id="hex-reverso" style="text-align:center;margin:.5rem 0 0 0;font-family:monospace;font-size:1.1rem;color:var(--cor-primaria);"></p>
+      </div>
+      <div id="equivalentes-reversos" class="cartao"></div>
+    </div>
+  </div>
+
+  <!-- Resultado outputs -->
+  <div id="resultado-container" style="display:none;">
+    <div class="cartao">
+      <h3 style="margin:0 0 1rem 0;">Codigo Flutter</h3>
+      <div id="output-lista"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const picker      = document.getElementById('color-picker');
+  const preview     = document.getElementById('preview-cor');
+  const previewHex  = document.getElementById('preview-hex');
+  const btnGerar    = document.getElementById('btn-gerar');
+  const btnParse    = document.getElementById('btn-parse');
+  const resultadoCt = document.getElementById('resultado-container');
+  const outputLista = document.getElementById('output-lista');
+
+  let formatoActual = 'hex';
+
+  // Tabs bidirecionais
+  document.querySelectorAll('[data-aba]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-aba]').forEach(b => {
+        b.classList.remove('activo');
+        b.setAttribute('aria-selected', 'false');
+      });
+      btn.classList.add('activo');
+      btn.setAttribute('aria-selected', 'true');
+      const aba = btn.dataset.aba;
+      document.getElementById('painel-cor-para-flutter').style.display = aba === 'cor-para-flutter' ? 'block' : 'none';
+      document.getElementById('painel-flutter-para-cor').style.display = aba === 'flutter-para-cor' ? 'block' : 'none';
+      resultadoCt.style.display = 'none';
+      document.getElementById('resultado-flutter-cor').style.display = 'none';
+    });
+  });
+
+  // Tabs de formato
+  document.querySelectorAll('#seletor-formato [data-fmt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#seletor-formato [data-fmt]').forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+      formatoActual = btn.dataset.fmt;
+      document.querySelectorAll('.painel-fmt').forEach(p => p.style.display = 'none');
+      document.getElementById('fmt-' + formatoActual).style.display = 'block';
+    });
+  });
+
+  // Color picker -> preview
+  picker.addEventListener('input', () => {
+    const cor = picker.value;
+    preview.style.background = cor;
+    previewHex.textContent = cor.toUpperCase();
+    document.getElementById('input-hex').value = cor.toUpperCase();
+    // update RGB fields
+    const r = parseInt(cor.substr(1, 2), 16);
+    const g = parseInt(cor.substr(3, 2), 16);
+    const b = parseInt(cor.substr(5, 2), 16);
+    document.getElementById('input-r').value = r;
+    document.getElementById('input-g').value = g;
+    document.getElementById('input-b').value = b;
+  });
+
+  // Opacidade
+  const slOpacity = document.getElementById('sl-opacity');
+  const valA = document.getElementById('val-a');
+  slOpacity.addEventListener('input', () => { valA.textContent = slOpacity.value; });
+
+  // Copiar
+  function copiarParaClipboard(btn, texto) {
+    const span = btn.querySelector('.copiar-txt') || btn.querySelector('[data-copiar-span]');
+    navigator.clipboard.writeText(texto).then(() => {
+      const el = btn.querySelector('.copiar-label');
+      if (el) {
+        el.textContent = 'Copiado!';
+        btn.style.color = 'var(--cor-sucesso)';
+        btn.style.borderColor = 'var(--cor-sucesso)';
+        setTimeout(() => {
+          el.textContent = 'Copiar';
+          btn.style.color = '';
+          btn.style.borderColor = '';
+        }, 1500);
+      }
+    });
+  }
+
+  // Exibir resultados
+  function exibirResultados(data) {
+    const itens = [
+      { label: 'Color(hex)', valor: data.color_hex },
+      { label: 'Color.fromRGBO()', valor: data.color_rgb },
+      { label: 'Color.fromARGB()', valor: data.color_argb },
+      { label: 'HSLColor.fromAHSL()', valor: data.color_hsl },
+      { label: 'HSVColor.fromAHSV()', valor: data.color_hsv },
+      { label: 'HEX', valor: data.hex },
+      { label: 'HEX ARGB', valor: data.hex_argb },
+      { label: 'CSS', valor: data.css },
+    ];
+    if (data.material) {
+      itens.push({ label: 'Material Swatch', valor: data.material });
+    }
+
+    outputLista.innerHTML = '';
+    itens.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'output-item';
+      div.innerHTML = `
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <span style="font-size:.8rem;color:var(--cor-texto-suave);min-width:130px;">${item.label}</span>
+          <span style="flex:1;font-family:monospace;font-size:.85rem;color:var(--cor-texto);word-break:break-all;min-width:0;">${item.valor}</span>
+          <button class="btn btn-secundario btn-copiar" style="padding:.25rem .5rem;font-size:.75rem;flex-shrink:0;">
+            <span class="copiar-label">Copiar</span>
+          </button>
+        </div>
+      `;
+      outputLista.appendChild(div);
+      div.querySelector('.btn-copiar').addEventListener('click', (e) => {
+        copiarParaClipboard(e.target.closest('.btn-copiar'), item.valor);
+      });
+    });
+    resultadoCt.style.display = 'block';
+  }
+
+  // Gerar (Cor -> Flutter)
+  btnGerar.addEventListener('click', gerar);
+
+  function gerar() {
+    let payload = { formato: formatoActual };
+
+    if (formatoActual === 'hex') {
+      payload.valor = document.getElementById('input-hex').value;
+    } else if (formatoActual === 'rgb') {
+      payload.r = parseInt(document.getElementById('input-r').value) || 0;
+      payload.g = parseInt(document.getElementById('input-g').value) || 0;
+      payload.b = parseInt(document.getElementById('input-b').value) || 0;
+      payload.a = parseInt(slOpacity.value) || 255;
+    } else if (formatoActual === 'hsl') {
+      payload.h = parseFloat(document.getElementById('input-h').value) || 0;
+      payload.s = parseFloat(document.getElementById('input-s').value) || 0;
+      payload.l = parseFloat(document.getElementById('input-l').value) || 0;
+    } else if (formatoActual === 'cmyk') {
+      payload.c = parseFloat(document.getElementById('input-c').value) || 0;
+      payload.m = parseFloat(document.getElementById('input-m').value) || 0;
+      payload.y = parseFloat(document.getElementById('input-y').value) || 0;
+      payload.k = parseFloat(document.getElementById('input-k').value) || 0;
+    }
+
+    btnGerar.disabled = true;
+    fetch('{{ url_for("cores.api_convert") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+      body: JSON.stringify(payload),
+    })
+    .then(r => {
+      if (!r.ok) return r.json().then(d => { throw new Error(d.erro || 'Erro'); });
+      return r.json();
+    })
+    .then(data => exibirResultados(data))
+    .catch(err => {
+      outputLista.innerHTML = '<div class="alerta alerta-erro">' + err.message + '</div>';
+      resultadoCt.style.display = 'block';
+    })
+    .finally(() => { btnGerar.disabled = false; });
+  }
+
+  // Flutter -> Cor
+  btnParse.addEventListener('click', parsear);
+
+  function parsear() {
+    const codigo = document.getElementById('input-flutter').value.trim();
+    if (!codigo) return;
+
+    btnParse.disabled = true;
+    fetch('{{ url_for("cores.api_convert") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+      body: JSON.stringify({ modo: 'flutter_para_cor', codigo: codigo }),
+    })
+    .then(r => {
+      if (!r.ok) return r.json().then(d => { throw new Error(d.erro || 'Erro'); });
+      return r.json();
+    })
+    .then(data => {
+      const hex = data.hex || data.cor_flutter.hex;
+      const ft = data.cor_flutter || data;
+      document.getElementById('preview-reverso').style.background = hex;
+      document.getElementById('hex-reverso').textContent = hex.toUpperCase();
+
+      const eq = document.getElementById('equivalentes-reversos');
+      const itens = [
+        { label: 'HEX', valor: ft.hex },
+        { label: 'HEX ARGB', valor: ft.hex_argb },
+        { label: 'Color(hex)', valor: ft.color_hex },
+        { label: 'Color.fromRGBO()', valor: ft.color_rgb },
+        { label: 'Color.fromARGB()', valor: ft.color_argb },
+        { label: 'CSS', valor: ft.css },
+      ];
+      eq.innerHTML = '<h3 style="margin:0 0 1rem 0;">Equivalentes</h3>';
+      itens.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'output-item';
+        div.innerHTML = `
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+            <span style="font-size:.8rem;color:var(--cor-texto-suave);min-width:130px;">${item.label}</span>
+            <span style="flex:1;font-family:monospace;font-size:.85rem;color:var(--cor-texto);word-break:break-all;min-width:0;">${item.valor}</span>
+            <button class="btn btn-secundario btn-copiar" style="padding:.25rem .5rem;font-size:.75rem;flex-shrink:0;">
+              <span class="copiar-label">Copiar</span>
+            </button>
+          </div>
+        `;
+        eq.appendChild(div);
+        div.querySelector('.btn-copiar').addEventListener('click', (e) => {
+          copiarParaClipboard(e.target.closest('.btn-copiar'), item.valor);
+        });
+      });
+
+      document.getElementById('resultado-flutter-cor').style.display = 'block';
+    })
+    .catch(err => {
+      eq.innerHTML = '<div class="alerta alerta-erro">' + err.message + '</div>';
+      document.getElementById('resultado-flutter-cor').style.display = 'block';
+    })
+    .finally(() => { btnParse.disabled = false; });
+  }
+
+  // Gerar automaticamente ao carregar
+  gerar();
+})();
+</script>
+
+<style>
+.output-item {
+  padding: .75rem .5rem;
+  border-bottom: 1px solid var(--cor-borda);
+}
+.output-item:last-child {
+  border-bottom: none;
+}
+.output-item .btn-copiar {
+  transition: all .15s;
+}
+</style>
+{% endblock %}

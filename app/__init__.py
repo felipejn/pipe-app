@@ -49,6 +49,9 @@ def create_app(config_name='default'):
     from app.cambio import bp as cambio_bp
     app.register_blueprint(cambio_bp, url_prefix='/cambio')
 
+    from app.cores import bp as cores_bp
+    app.register_blueprint(cores_bp, url_prefix='/cores')
+
     # Rota raiz — redireciona para dashboard
     from flask import redirect, url_for
     from flask_login import login_required

@@ -55,6 +55,13 @@ Conversão de moedas com cotações em tempo real. Sem base de dados — módulo
 - Resultado com taxa de câmbio e botão copiar
 - Na whitelist do PythonAnywhere, compatível com plano free
 
+### 🎨 Cores Flutter
+Conversor de cores para código Flutter. Sem base de dados — módulo stateless.
+- Color picker visual + input manual em HEX, RGB, HSL ou CMYK
+- Gera todos os equivalentes Flutter: `Color(0x..)`, `fromRGB`, `fromARGB`, `HSLColor`, `HSVColor`, Material swatch mais próximo
+- Modo bidirecional: cola código Flutter → vê a cor e o HEX
+- Botão copiar em cada linha de código
+
 ---
 
 ## Stack técnica
@@ -148,6 +155,7 @@ pipe-app/
 │   ├── passwords/      # Módulo Passwords (stateless)
 │   ├── conversoes/     # Módulo Conversões HEIC → JPG
 │   ├── cambio/         # Módulo Câmbio (stateless)
+│   ├── cores/          # Módulo Cores Flutter (stateless)
 │   ├── notifications/  # Serviço central de notificações
 │   ├── admin/          # Área de administração
 │   ├── settings/       # Definições do utilizador

@@ -90,9 +90,12 @@ pipe-app/
 │   │   ├── wordlist.py      # lista PT ~200 palavras para passphrases
 │   │   ├── generator.py     # geração com secrets + cálculo de força por entropia
 │   │   └── routes.py        # /passwords/
-│   └── cambio/              # Blueprint Câmbio
+│   ├── cambio/              # Blueprint Câmbio
+│   │   ├── __init__.py
+│   │   └── routes.py        # /cambio/ — stateless, API ExchangeRate
+│   └── cores/               # Blueprint Cores Flutter
 │       ├── __init__.py
-│       └── routes.py        # /cambio/ — stateless, API ExchangeRate
+│       └── routes.py        # /cores/ — stateless, HEX/RGB/HSL/CMYK para Flutter
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
@@ -187,6 +190,18 @@ pipe-app/
   - Conversão automática ao trocar moedas ou carregar o botão
   - Frontend vanilla JS inline no template — sem ficheiros JS externos
 
+### Módulo Cores (`app/cores/`)
+- **Sem BD** — módulo stateless, sem modelos nem migrações
+- **Rotas:**
+  - `GET /cores/` — página com color picker e tabs
+  - `POST /cores/api/convert` — API JSON (requer `X-CSRFToken` no header)
+- **Funcionalidades:**
+  - **Cor → Flutter**: color picker visual + input em HEX, RGB, HSL ou CMYK
+  - **Flutter → Cor**: cola código Flutter (`Color(0x..)`) → mostra cor e equivalentes
+  - Gera todos os equivalentes: `Color(0x..)`, `Color.fromRGBO`, `Color.fromARGB`, `HSLColor.fromAHSL`, `HSVColor.fromAHSV`, swatch Material mais próximo, CSS
+  - Botão Copiar em cada linha de código
+  - Preview visual da cor em tempo real
+
 ### Módulo Conversões (`app/conversoes/`)
 - **Modelos:**
   - `Conversao` — metadados no histórico (sem ficheiros armazenados)
@@ -274,6 +289,9 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Conversões — HEIC → JPG (dropzone, validações, histórico) ✅
 - Módulo Conversões — PNG/JPG → ICO (seletor de tamanho, tabs) ✅
 - Módulo Conversões — deployed no PythonAnywhere ✅
+- Módulo Cores — color picker, HEX/RGB/HSL/CMYK → Flutter ✅
+- Módulo Cores — Flutter → Cor ✅
+- Módulo Cores — deployed no PythonAnywhere ✅
 
 ---
 
