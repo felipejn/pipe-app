@@ -5,18 +5,33 @@
 <div class="pagina-conteudo">
     <div class="cabecalho-pagina">
         <h1>🔄 Conversões</h1>
-        <p class="subtitulo">Converte fotos HEIC do iPhone para JPG</p>
+        <p class="subtitulo">Converte fotos HEIC para JPG ou PNG/JPG para ICO</p>
+    </div>
+
+    <!-- Seletor de tipo de conversão -->
+    <div class="filtro-botoes" id="seletor-tipo" style="margin-bottom:1.5rem;" role="tablist">
+        <button class="btn-filtro activo" data-tipo="heic" role="tab" aria-selected="true">HEIC → JPG</button>
+        <button class="btn-filtro" data-tipo="ico" role="tab" aria-selected="false">PNG/JPG → ICO</button>
+    </div>
+
+    <!-- Opções do ícone (só aparece quando tipo=ico) -->
+    <div class="cartao" id="opciones-ico" style="display:none;margin-bottom:1rem;">
+        <div class="campo">
+            <label class="campo-label">Tamanho do ícone: <strong style="color:var(--cor-texto);" id="val-tamanho-ico">64</strong>px</label>
+            <input type="range" id="sl-tamanho-ico" min="0" max="5" value="3"
+                   style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.5rem;">
+        </div>
     </div>
 
     <!-- Dropzone -->
     <div class="cartao" style="margin-bottom: 1.5rem;">
         <div class="conversoes-dropzone" id="dropzone">
-            <div class="dropzone-icone">📁</div>
-            <p class="dropzone-texto">Arrasta ficheiros HEIC aqui</p>
+            <div class="dropzone-icone" id="dropzone-icone">📁</div>
+            <p class="dropzone-texto" id="dropzone-texto">Arrasta ficheiros HEIC aqui</p>
             <p class="dropzone-ou">ou</p>
             <label for="input-ficheiros" class="btn btn-secundario">Procurar ficheiros</label>
             <input type="file" id="input-ficheiros" accept=".heic,.HEIC" multiple hidden>
-            <p class="dropzone-info">Máximo 20 ficheiros · 10MB por ficheiro</p>
+            <p class="dropzone-info" id="dropzone-info">Máximo 20 ficheiros · 10MB por ficheiro</p>
         </div>
     </div>
 
@@ -233,7 +248,7 @@
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .ficheiros-rodape > div {
         justify-content: flex-end;
     }
@@ -256,6 +271,58 @@
     const MAX_FICHEIROS = 20;
     const MAX_TAMANHO = 10 * 1024 * 1024;
     let ficheirosSelecionados = [];
+    let tipoActual = 'heic';
+
+    const ICOS = { 16: 16, 32: 32, 48: 48, 64: 64, 128: 128, 256: 256 };
+    const ICO_VALORES = [16, 32, 48, 64, 128, 256];
+
+    // Seletor de tipo
+    document.querySelectorAll('#seletor-tipo [data-tipo]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#seletor-tipo [data-tipo]').forEach(b => {
+                b.classList.remove('activo');
+                b.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.add('activo');
+            btn.setAttribute('aria-selected', 'true');
+            tipoActual = btn.dataset.tipo;
+            actualizarUI();
+            ficheirosSelecionados = [];
+            actualizarLista();
+            esconderErro();
+        });
+    });
+
+    // Slider tamanho ICO
+    const slTamanhoIco = document.getElementById('sl-tamanho-ico');
+    const valTamanhoIco = document.getElementById('val-tamanho-ico');
+    slTamanhoIco.addEventListener('input', () => {
+        const idx = parseInt(slTamanhoIco.value);
+        valTamanhoIco.textContent = ICO_VALORES[idx];
+    });
+
+    function actualizarUI() {
+        const dropIcon = document.getElementById('dropzone-icone');
+        const dropText = document.getElementById('dropzone-texto');
+        const dropInfo = document.getElementById('dropzone-info');
+        const icoOpts = document.getElementById('opciones-ico');
+
+        if (tipoActual === 'ico') {
+            dropIcon.textContent = '🎨';
+            dropText.textContent = 'Arrasta ficheiros PNG ou JPG aqui';
+            dropInfo.textContent = 'Máximo 20 ficheiros · 10MB por ficheiro';
+            icoOpts.style.display = 'block';
+            inputFicheiros.accept = '.png,.jpg,.jpeg,.PNG,.JPG,.JPEG';
+            btnConverter.textContent = 'Converter para ICO';
+        } else {
+            dropIcon.textContent = '📁';
+            dropText.textContent = 'Arrasta ficheiros HEIC aqui';
+            dropInfo.textContent = 'Máximo 20 ficheiros · 10MB por ficheiro';
+            icoOpts.style.display = 'none';
+            inputFicheiros.accept = '.heic,.HEIC';
+            btnConverter.textContent = 'Converter para JPG';
+        }
+    }
 
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -299,10 +366,15 @@
             return;
         }
 
+        const extsHeic = ['.heic'];
+        const extsImg = ['.png', '.jpg', '.jpeg'];
+        const exts = tipoActual === 'ico' ? extsImg : extsHeic;
+        const label = tipoActual === 'ico' ? '.png, .jpg, .jpeg' : '.heic';
+
         for (const ficheiro of novosFicheiros) {
             const nome = ficheiro.name.toLowerCase();
-            if (!nome.endsWith('.heic')) {
-                mostrarErro(`"${ficheiro.name}": apenas ficheiros .heic são suportados`);
+            if (!exts.some(ext => nome.endsWith(ext))) {
+                mostrarErro(`"${ficheiro.name}": apenas ficheiros ${label} são suportados`);
                 return;
             }
             if (ficheiro.size > MAX_TAMANHO) {
@@ -366,6 +438,11 @@
         ficheirosSelecionados.forEach(ficheiro => {
             formData.append('ficheiros', ficheiro);
         });
+        formData.append('tipo', tipoActual);
+        if (tipoActual === 'ico') {
+            const idx = parseInt(slTamanhoIco.value);
+            formData.append('tamanho', ICO_VALORES[idx]);
+        }
 
         try {
             const resposta = await fetch('/conversoes/api/converter', {
@@ -381,7 +458,7 @@
 
             const blob = await resposta.blob();
             const contentDisposition = resposta.headers.get('Content-Disposition');
-            let nomeFicheiro = 'conversao.jpg';
+            let nomeFicheiro = 'conversao.ico';
 
             if (contentDisposition) {
                 const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);

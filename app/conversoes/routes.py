@@ -18,18 +18,24 @@ pillow_heif.register_heif_opener()
 MAX_FICHEIROS = 20
 MAX_TAMANHO_MB = 10
 MAX_TAMANHO_BYTES = MAX_TAMANHO_MB * 1024 * 1024
-EXTENSOES_VALIDAS = {'.heic'}
-MIMETYPES_VALIDOS = {'image/heic', 'image/heif'}
+EXTENSOES_HEIC = {'.heic'}
+MIMETYPES_HEIC = {'image/heic', 'image/heif'}
+EXTENSOES_IMG = {'.png', '.jpg', '.jpeg'}
 
 
-def validar_ficheiro(file):
-    """Valida extensão, mimetype e tamanho de um ficheiro HEIC."""
+def validar_ficheiro(file, tipo):
+    """Valida extensão e tamanho de um ficheiro."""
     erros = []
 
     # Validar nome/extensão
     nome = file.filename.lower() if file.filename else ''
-    if not any(nome.endswith(ext) for ext in EXTENSOES_VALIDAS):
-        erros.append(f'"{file.filename}": extensão não suportada (apenas .heic)')
+    if tipo == 'ico':
+        if not any(nome.endswith(ext) for ext in EXTENSOES_IMG):
+            exts = ', '.join(EXTENSOES_IMG)
+            erros.append(f'"{file.filename}": extensão não suportada (apenas {exts})')
+    else:
+        if not any(nome.endswith(ext) for ext in EXTENSOES_HEIC):
+            erros.append(f'"{file.filename}": extensão não suportada (apenas .heic)')
 
     # Validar tamanho sem consumir o stream
     posicao_atual = file.tell()
@@ -46,51 +52,60 @@ def validar_ficheiro(file):
 
 def converter_heic_para_jpg(file):
     """Converte um ficheiro HEIC para JPG em memória. Retorna BytesIO."""
-    # Ler conteúdo do ficheiro
     conteudo = file.read()
-
-    # Abrir com Pillow (gracias ao pillow_heif opener)
     imagem = Image.open(io.BytesIO(conteudo))
-
-    # Converter para RGB (HEIC pode ter espaços de cor diferentes)
     imagem_rgb = imagem.convert('RGB')
-
-    # Guardar como JPEG em memória
     output = io.BytesIO()
     imagem_rgb.save(output, format='JPEG', quality=85)
     output.seek(0)
-
     return output
 
 
-def obter_nome_jpg(nome_original):
-    """Converte nome.heic para nome.jpg."""
-    if nome_original and nome_original.lower().endswith('.heic'):
-        return nome_original[:-5] + '.jpg'
-    return nome_original + '.jpg'
+def converter_img_para_ico(file, tamanho=64):
+    """Converte PNG/JPG para ICO em memória. Retorna BytesIO."""
+    conteudo = file.read()
+    imagem = Image.open(io.BytesIO(conteudo))
+    imagem = imagem.convert('RGBA')
+    imagem_red = imagem.resize((tamanho, tamanho), Image.LANCZOS)
+    output = io.BytesIO()
+    imagem_red.save(output, format='ICO', sizes=[(tamanho, tamanho)])
+    output.seek(0)
+    return output
+
+
+def obter_nome_saida(nome_original, ext_saida):
+    """Obtem nome do ficheiro de saída."""
+    base = nome_original.rsplit('.', 1)[0] if nome_original and '.' in nome_original else nome_original
+    return f'{base}{ext_saida}'
 
 
 @bp.route('/')
 @login_required
 def index():
     """Página principal do módulo Conversões."""
-    # Obter últimas 10 conversões do utilizador
     historico = Conversao.query.filter_by(user_id=current_user.id) \
         .order_by(Conversao.convertido_em.desc()) \
         .limit(10).all()
-
     return render_template('conversoes/index.html', historico=historico)
 
 
 @bp.route('/api/converter', methods=['POST'])
 @login_required
 def api_converter():
-    """API para converter ficheiros HEIC para JPG."""
-    # Verificar se há ficheiros no request
+    """API para converter ficheiros."""
     if 'ficheiros' not in request.files:
         return jsonify({'erro': 'Nenhum ficheiro enviado'}), 400
 
     ficheiros = request.files.getlist('ficheiros')
+    tipo = request.form.get('tipo', 'heic')  # 'heic' ou 'ico'
+
+    ICO_TAMANHOS_VALIDOS = [16, 32, 48, 64, 128, 256]
+    try:
+        tamanho_ico = int(request.form.get('tamanho', 64))
+        if tamanho_ico not in ICO_TAMANHOS_VALIDOS:
+            tamanho_ico = 64
+    except (ValueError, TypeError):
+        tamanho_ico = 64
 
     # Verificar se há ficheiros selecionados
     if not ficheiros or all(f.filename == '' for f in ficheiros):
@@ -103,7 +118,7 @@ def api_converter():
     # Validar cada ficheiro
     todos_erros = []
     for ficheiro in ficheiros:
-        erros = validar_ficheiro(ficheiro)
+        erros = validar_ficheiro(ficheiro, tipo)
         todos_erros.extend(erros)
 
     if todos_erros:
@@ -115,19 +130,21 @@ def api_converter():
 
     try:
         for ficheiro in ficheiros:
-            # Reset stream para início antes de converter
             ficheiro.seek(0)
 
-            jpg_bytes = converter_heic_para_jpg(ficheiro)
-            nome_jpg = obter_nome_jpg(ficheiro.filename)
+            if tipo == 'ico':
+                bytes_saida = converter_img_para_ico(ficheiro, tamanho_ico)
+                nome_saida = obter_nome_saida(ficheiro.filename, '.ico')
+            else:
+                bytes_saida = converter_heic_para_jpg(ficheiro)
+                nome_saida = obter_nome_saida(ficheiro.filename, '.jpg')
 
             ficheiros_convertidos.append({
-                'nome': nome_jpg,
-                'dados': jpg_bytes
+                'nome': nome_saida,
+                'dados': bytes_saida
             })
 
-            # Calcular tamanho total
-            tamanho_total += len(jpg_bytes.getvalue())
+            tamanho_total += len(bytes_saida.getvalue())
     except Exception as e:
         return jsonify({'erro': f'Erro na conversão: {str(e)}'}), 500
 
@@ -144,11 +161,11 @@ def api_converter():
 
     # Preparar resposta
     if len(ficheiros_convertidos) == 1:
-        # 1 ficheiro → enviar JPG directo
         ficheiro = ficheiros_convertidos[0]
+        mimetype_saida = 'image/x-icon' if tipo == 'ico' else 'image/jpeg'
         return send_file(
             ficheiro['dados'],
-            mimetype='image/jpeg',
+            mimetype=mimetype_saida,
             as_attachment=True,
             download_name=ficheiro['nome']
         )
@@ -162,7 +179,8 @@ def api_converter():
         zip_buffer.seek(0)
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        nome_zip = f'conversao_heic_{timestamp}.zip'
+        prefixo = 'conversao_ico' if tipo == 'ico' else 'conversao_heic'
+        nome_zip = f'{prefixo}_{timestamp}.zip'
 
         return send_file(
             zip_buffer,
