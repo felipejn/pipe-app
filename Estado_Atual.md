@@ -177,17 +177,21 @@ pipe-app/
   - CSRF: token passado via `X-CSRFToken` no header do fetch (padrão do PIPE)
 
 ### Módulo Câmbio (`app/cambio/`)
-- **Sem BD** — módulo stateless, sem modelos ni migrações
+- **Sem BD** — módulo stateless, sem modelos nem migrações
 - **Rotas:**
   - `GET /cambio/` — página de conversão
   - `POST /cambio/api/convert` — API JSON (requer `X-CSRFToken` no header)
-- **API externa:** Wise API v3 (com fallback para ExchangeRate-API)
+- **API externa:** Wise API v3 (`/v3/quotes`) com fallback para ExchangeRate-API
+  - Seleciona opção de pagamento DEBIT (corresponde ao valor apresentado no site da Wise)
+  - Extrai fees detalhados: `fee.total`, `price.items` (fee pagamento, comissão Wise, IOF tax)
 - **Moedas:** EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
 - **Funcionalidades:**
   - Default EUR → BRL, selects configáveis para qualquer par
-  - Resultado formatado com taxa de câmbio (inclui taxas reais quando disponível via Wise)
+  - Resultado formatado com `Intl.NumberFormat` por moeda (locale + currency corretos)
+  - Botão de inverter moedas entre os selects (troca origem/destino e reconverte automaticamente)
+  - Secção de taxas Wise exibida quando disponível: total das fees + discriminação individual
+  - Conversão automática ao trocar moedas, inverter moedas ou carregar o botão
   - Botão Copiar com feedback visual
-  - Conversão automática ao trocar moedas ou carregar o botão
   - Frontend vanilla JS inline no template — sem ficheiros JS externos
 
 ### Módulo Cores (`app/cores/`)
@@ -325,6 +329,7 @@ SECRET_KEY=<gerado com secrets.token_hex(32)>
 TELEGRAM_BOT_TOKEN=...
 SENDGRID_API_KEY=...
 SENDGRID_FROM_EMAIL=...
+WISE_API_KEY=...
 ```
 
 ### Migrações de BD executadas
@@ -354,7 +359,7 @@ A navegação é feita pelos cards no dashboard.
 
 ## Ponto onde estamos
 
-Quatro módulos completos e deployed: Euromilhões, Tarefas, Notas e Passwords. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
+Sete módulos completos e deployed: Euromilhões, Tarefas, Notas, Passwords, Câmbio, Conversões e Cores. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
 
 ---
 

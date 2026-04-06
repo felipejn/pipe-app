@@ -45,8 +45,27 @@ def _obter_taxa(origem, destino, valor):
         debit = next((o for o in opcoes_activas if o.get('payIn') == 'DEBIT'), None)
         melhor = debit if debit else opcoes_activas[0]
         target_amount = melhor.get('targetAmount', 0)
+        fee_data = melhor.get('fee', {})
+        price_data = melhor.get('price', {})
+        fees_items = price_data.get('items', [])
         taxa_efectiva = target_amount / valor if valor else 0
-        return round(target_amount, 2), round(taxa_efectiva, 4), 'Wise', dados.get('rateTimestamp')
+        return {
+            'resultado': round(target_amount, 2),
+            'taxa': round(taxa_efectiva, 4),
+            'fonte': 'Wise',
+            'data': dados.get('rateTimestamp'),
+            'total_fees': fee_data.get('total'),
+            'rate': dados.get('rate'),
+            'fees': [
+                {
+                    'label': f.get('label', ''),
+                    'amount': f['value']['amount'],
+                    'currency': f['value']['currency'],
+                }
+                for f in fees_items
+                if f.get('value', {}).get('amount', 0) > 0
+            ],
+        }
     except Exception:
         pass
 
@@ -56,9 +75,17 @@ def _obter_taxa(origem, destino, valor):
         taxas = rates_resp.json().get('rates', {})
         taxa = taxas.get(destino, 1)
         resultado = round(valor * taxa, 2)
-        return resultado, round(taxa, 4), 'ExchangeRate-API', None
+        return {
+            'resultado': resultado,
+            'taxa': round(taxa, 4),
+            'fonte': 'ExchangeRate-API',
+            'data': None,
+            'total_fees': None,
+            'rate': None,
+            'fees': [],
+        }
     except Exception:
-        return None, None, None, None
+        return None
 
 
 @bp.route('/')
@@ -75,7 +102,7 @@ def api_convert():
     moeda_destino = dados.get('destino', 'BRL')
     valor = float(dados.get('valor', 1))
 
-    resultado, taxa, fonte, data = _obter_taxa(moeda_origem, moeda_destino, valor)
+    resultado = _obter_taxa(moeda_origem, moeda_destino, valor)
 
     if resultado is None:
         return jsonify({'erro': 'Erro ao obter cotações'}), 503
@@ -84,8 +111,11 @@ def api_convert():
         'origem': moeda_origem,
         'destino': moeda_destino,
         'valor': valor,
-        'resultado': round(resultado, 2),
-        'taxa': round(taxa, 4) if taxa else None,
-        'fonte': fonte,
-        'data': data,
+        'resultado': resultado['resultado'],
+        'taxa': resultado['taxa'],
+        'fonte': resultado['fonte'],
+        'data': resultado['data'],
+        'total_fees': resultado['total_fees'],
+        'rate': resultado['rate'],
+        'fees': resultado['fees'],
     })
