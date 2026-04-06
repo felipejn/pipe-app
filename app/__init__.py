@@ -62,6 +62,14 @@ def create_app(config_name='default'):
     # Limiter inicializado após blueprints — necessário para decoradores funcionarem
     limiter.init_app(app)
 
+    # Security headers
+    @app.after_request
+    def security_headers(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        return response
+
     # Rota raiz — redireciona para dashboard
     from flask import redirect, url_for
     from flask_login import login_required

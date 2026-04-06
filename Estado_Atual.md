@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto
+# PIPE — Estado Actual do Projecto — v1.0
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -21,6 +21,7 @@ O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o 
 pipe-app/
 ├── app/
 │   ├── __init__.py          # create_app, app factory
+│   ├── extensions.py        # Limiter (Flask-Limiter, X-Forwarded-For para PA)
 │   ├── static/
 │   │   ├── css/pipe.css     # design system (tema escuro, âmbar/dourado)
 │   │   └── js/
@@ -261,6 +262,18 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Passwords reutiliza exclusivamente classes existentes do design system — sem CSS adicional
 - Layout responsivo (sidebar oculta em mobile)
 
+### Segurança
+
+| Medida | Implementação | Ficheiro |
+|---|---|---|
+| CSRF | Flask-WTF CSRFProtect em todos os formulários | `app/__init__.py` |
+| Rate limiting | Flask-Limiter nas rotas críticas — login (10/min), registo (5/h), recuperação (5/h), 2FA (10/min) | `app/auth/routes.py`, `app/extensions.py` |
+| Logging de login falhado | `app.logger.warning` com username e IP do utilizador | `app/auth/routes.py` |
+| Security headers | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` | `app/__init__.py` |
+| Password hashing | Werkzeug `generate_password_hash` / `check_password_hash` | `app/auth/models.py` |
+| Controlo de acesso | `@login_required` e `@admin_required` | rotas protegidas |
+| Configuração IP PA | `X-Forwarded-For` no Limiter para proxy reverso do PythonAnywhere | `app/extensions.py` |
+
 ### Testes realizados
 - Login e registo ✅
 - Dashboard com cards de módulos ✅
@@ -286,16 +299,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Passwords — geração de PIN ✅
 - Módulo Passwords — barra de força ✅
 - Módulo Passwords — botão copiar ✅
-- Módulo Passwords — sliders e toggles ✅
 - Módulo Passwords — deployed no PythonAnywhere ✅
 - Módulo Câmbio — conversão EUR → BRL ✅
-- Módulo Câmbio — deployed no PythonAnywhere ✅
-- Módulo Conversões — HEIC → JPG (dropzone, validações, histórico) ✅
-- Módulo Conversões — PNG/JPG → ICO (seletor de tamanho, tabs) ✅
-- Módulo Conversões — deployed no PythonAnywhere ✅
-- Módulo Cores — color picker, HEX/RGB/HSL/CMYK → Flutter ✅
-- Módulo Cores — Flutter → Cor ✅
-- Módulo Cores — deployed no PythonAnywhere ✅
 
 ---
 
@@ -359,13 +364,13 @@ A navegação é feita pelos cards no dashboard.
 
 ## Ponto onde estamos
 
-Sete módulos completos e deployed: Euromilhões, Tarefas, Notas, Passwords, Câmbio, Conversões e Cores. Infraestrutura estável: auth com 2FA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sem pendências.
+**Versão v1.0** — sete módulos completos e deployed. Infraestrutura madura: auth com 2FA multi-método, rate limiting, logging de segurança, security headers, sessões permanentes para PWA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Auditoria de segurança coberta: CSRF, brute force protection, clickjacking protection, MIME sniffing protection, login event logging. Sem pendências.
 
 ---
 
 ## Próximos passos
 
-- Novos módulos PIPE (arquitectura pronta)
+- Novos módulos PIPE (arquitectura pronta) — versão 1.x
 
 ---
 
@@ -383,6 +388,7 @@ email-validator==2.2.0
 pyotp==2.9.0
 qrcode==7.4.2
 pillow==10.4.0
+Flask-Limiter==3.8.0
 ```
 
 ## Contexto técnico
@@ -394,3 +400,6 @@ pillow==10.4.0
 - Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes
 - Admin: área restrita com gestão de utilizadores, decorador `@admin_required`, script CLI de promoção
 - Scheduled task: `pipe_tasks.py` — script unificado, um módulo por função, isolamento de erros
+- Rate limiting: Flask-Limiter com `X-Forwarded-For` para PythonAnywhere — protege rotas críticas (login, registo, recuperação de password, 2FA) contra brute force
+- Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` — via `@app.after_request` em `create_app()`
+- Login event logging: tentativas falhadas registadas com username e IP via `app.logger.warning`
