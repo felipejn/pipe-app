@@ -76,6 +76,7 @@ Conversor de cores para código Flutter. Sem base de dados — módulo stateless
 | 2FA | TOTP (pyotp) + Telegram + Email |
 | Imagens | Pillow + pillow-heif |
 | Hosting | PythonAnywhere (plano free) |
+| Rate limiting | Flask-Limiter |
 | Frontend | HTML/CSS/JS vanilla — sem frameworks |
 
 ---
@@ -84,6 +85,7 @@ Conversor de cores para código Flutter. Sem base de dados — módulo stateless
 
 - **Autenticação** — registo, login, recuperação de password por email
 - **2FA opcional** — Telegram, Email ou TOTP (Google Authenticator / Authy) — múltiplos métodos em simultâneo
+- **Rate limiting** — protecção contra brute force nas rotas de autenticação (Flask-Limiter)
 - **Notificações** — arquitectura modular com canais independentes (Telegram + SendGrid)
 - **Área admin** — gestão de utilizadores, activar/desactivar contas
 - **Scheduled task** — script unificado `pipe_tasks.py` a correr diariamente às 08:00
