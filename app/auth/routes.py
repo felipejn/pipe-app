@@ -391,7 +391,9 @@ def recuperar_password():
 
 @auth.app_errorhandler(RateLimitExceeded)
 def handle_rate_limit(e):
+    form = LoginForm()
     return render_template('auth/login.html',
+        form=form,
         erro_limite="Demasiadas tentativas. Aguarda um momento antes de tentar novamente."
     ), 429
 
