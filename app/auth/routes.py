@@ -17,9 +17,11 @@ from app.auth.forms import (
     PedirResetForm, ResetPasswordForm
 )
 from app.auth.models import User
+from app.extensions import limiter
 from app.notifications.channels.telegram import TelegramChannel
 from app.notifications.channels.email import EmailChannel
 from flask import current_app
+from flask_limiter.errors import RateLimitExceeded
 
 
 # ── Helpers de envio ───────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ def _enviar_codigo_email(user):
 # ── Login ──────────────────────────────────────────────────────────────────
 
 @auth.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute", methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -157,6 +160,7 @@ def enviar_2fa(metodo):
 # ── Verificação 2FA ────────────────────────────────────────────────────────
 
 @auth.route('/2fa/verificar', methods=['GET', 'POST'])
+@limiter.limit("10 per minute", methods=["POST"])
 def verificar_2fa():
     user_id = session.get('2fa_user_id')
     if not user_id:
@@ -219,6 +223,7 @@ def reenviar_codigo():
 # ── Registo ────────────────────────────────────────────────────────────────
 
 @auth.route('/registo', methods=['GET', 'POST'])
+@limiter.limit("5 per hour", methods=["POST"])
 def registo():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -343,6 +348,7 @@ def desactivar_totp():
 # ── Recuperação de password ────────────────────────────────────────────────
 
 @auth.route('/recuperar-password', methods=['GET', 'POST'])
+@limiter.limit("5 per hour", methods=["POST"])
 def recuperar_password():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -379,6 +385,15 @@ def recuperar_password():
         mensagem = 'Se o email existir na plataforma, receberás um link em breve.'
 
     return render_template('auth/recuperar_password.html', form=form, mensagem=mensagem)
+
+
+# ── Handler de erro rate limiting ──────────────────────────────────────────
+
+@auth.app_errorhandler(RateLimitExceeded)
+def handle_rate_limit(e):
+    return render_template('auth/login.html',
+        erro_limite="Demasiadas tentativas. Aguarda um momento antes de tentar novamente."
+    ), 429
 
 
 @auth.route('/reset-password/<token>', methods=['GET', 'POST'])

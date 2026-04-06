@@ -9,6 +9,10 @@
             <p>Plataforma Inteligente Pessoal e Expansível</p>
         </div>
 
+        {% if erro_limite %}
+        <div class="alerta alerta-erro">{{ erro_limite }}</div>
+        {% endif %}
+
         <form method="POST" action="{{ url_for('auth.login') }}">
             {{ form.hidden_tag() }}
             <div class="campo">
