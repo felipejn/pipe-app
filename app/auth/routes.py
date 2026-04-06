@@ -428,21 +428,3 @@ def logout():
     logout_user()
     flash('Sessão terminada.', 'info')
     return redirect(url_for('auth.login'))
-
-
-# ── Diagnóstico temporário ─────────────────────────────────────────────────
-
-# ROTA TEMPORÁRIA — remover após validação do rate limiting no PythonAnywhere
-@auth.route('/debug-ip')
-def debug_ip():
-    from flask import request
-    remote = request.remote_addr
-    forwarded = request.headers.get('X-Forwarded-For', 'ausente')
-    return (
-        f"<pre>"
-        f"REMOTE_ADDR:      {remote}\n"
-        f"X-Forwarded-For:  {forwarded}\n"
-        f"</pre>"
-        f"<p>Se X-Forwarded-For mostrar o teu IP real, a configuração do Limiter está correcta.</p>"
-        f"<p><strong>Lembrar: remover esta rota antes do commit final.</strong></p>"
-    )
