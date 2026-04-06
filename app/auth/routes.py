@@ -79,7 +79,8 @@ def login():
 
             if len(metodos) == 0:
                 # Sem 2FA — login directo
-                login_user(user, remember=form.lembrar.data)
+                login_user(user, remember=True)
+                session.permanent = True
                 user.ultimo_login = datetime.utcnow()
                 db.session.commit()
                 proximo = request.args.get('next')
@@ -177,14 +178,14 @@ def verificar_2fa():
             if valido:
                 user.limpar_codigo()
 
-        if valido:
-            user.ultimo_login = datetime.utcnow()
-            db.session.commit()
-            lembrar = session.pop('2fa_lembrar', False)
-            session.pop('2fa_user_id', None)
-            session.pop('2fa_metodo', None)
-            login_user(user, remember=lembrar)
-            return redirect(url_for('dashboard'))
+            if valido:
+                user.ultimo_login = datetime.utcnow()
+                db.session.commit()
+                session.pop('2fa_user_id', None)
+                session.pop('2fa_metodo', None)
+                login_user(user, remember=True)
+                session.permanent = True
+                return redirect(url_for('dashboard'))
         flash('Código incorrecto ou expirado.', 'erro')
 
     return render_template('auth/verificar_2fa.html', form=form, metodo=metodo, user=user)

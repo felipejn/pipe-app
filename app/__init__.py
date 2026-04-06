@@ -1,3 +1,4 @@
+from datetime import timedelta
 from flask import Flask, app
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -15,6 +16,11 @@ login_manager.login_message_category = 'info'
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # Configurações de sessão para PWA
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = True
 
     # Inicializar extensões
     db.init_app(app)
