@@ -69,6 +69,13 @@ Assistente pessoal com inteligência artificial que consulta dados reais dos mó
 - Resumos gerais da conta
 - Boas-vindas automáticas e histórico persistente na sessão
 
+### 🔐 Sistema de Convites
+Gestão de acesso restrito por convite.
+- Registo apenas com link de convite válido (7 dias de validade)
+- Admin gera convites por email (SendGrid) ou link copiável
+- Cada convite é único (um único registo)
+- Revogação manual de convites não utilizados
+
 ---
 
 ## Stack técnica

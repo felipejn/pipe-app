@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block titulo %}Convites — Admin{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-admin">
+
+    <div class="pagina-cabecalho">
+        <h1>🔑 Gestão de Convites</h1>
+        <p class="subtitulo">Gerir convites para criação de conta</p>
+    </div>
+
+    {# ── Gerar convite ────────────────────────────────────── #}
+    <div class="cartao definicoes-secao">
+        <div class="secao-cabecalho">
+            <div class="secao-titulo">
+                <span class="secao-icone">✨</span>
+                <div>
+                    <h2>Gerar novo convite</h2>
+                    <p class="secao-descricao">Cria um convite por email ou link (válido 7 dias)</p>
+                </div>
+            </div>
+        </div>
+        <div class="secao-corpo">
+            <div class="form-convite">
+                <input type="email" id="email-convite" class="input" placeholder="email@exemplo.com">
+                <div class="form-convite-opcoes">
+                    <label class="label-checkbox">
+                        <input type="checkbox" id="envio-email"> Enviar por email
+                    </label>
+                </div>
+                <button id="btn-gerar" class="btn btn-primario">Gerar convite</button>
+            </div>
+            <div id="resultado-convite" class="resultado-convite" style="display:none"></div>
+        </div>
+    </div>
+
+    {# ── Lista de convites ────────────────────────────────── #}
+    <div class="cartao definicoes-secao">
+        <div class="secao-cabecalho">
+            <div class="secao-titulo">
+                <span class="secao-icone">📋</span>
+                <div>
+                    <h2>Convites gerados</h2>
+                    <p class="secao-descricao">{{ convites|length }} convites</p>
+                </div>
+            </div>
+        </div>
+        <div class="secao-corpo">
+            {% if convites %}
+            <table class="admin-tabela">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Criado em</th>
+                        <th>Expira em</th>
+                        <th>Estado</th>
+                        <th>Acções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in convites %}
+                    <tr>
+                        <td>{{ c.email }}</td>
+                        <td>{{ c.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ c.expira_em.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            {% if c.usado %}
+                                <span class="badge badge-inactivo">utilizado</span>
+                            {% elif c.esta_valido() %}
+                                <span class="badge badge-activo">activo</span>
+                            {% else %}
+                                <span class="badge badge-expirado">expirado</span>
+                            {% endif %}
+                        </td>
+                        <td class="acoes-celula">
+                            {% if not c.usado and c.esta_valido() %}
+                            <form method="POST"
+                                  action="{{ url_for('admin.revogar_convite', convite_id=c.id) }}"
+                                  style="display:inline"
+                                  onsubmit="return confirm('Revogar convite para {{ c.email }}?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit"
+                                        class="btn-acao btn-acao-apagar"
+                                        title="Revogar">
+                                    🗑️
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="texto-subtil">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="texto-subtil" style="text-align:center; padding:1rem;">Nenhum convite gerado.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+// Delegar clique no botão fechar do resultado
+document.getElementById('resultado-convite').addEventListener('click', function(e) {
+    if (e.target.classList.contains('btn-fechar')) {
+        this.style.display = 'none';
+    }
+});
+
+document.getElementById('btn-gerar').addEventListener('click', function() {
+    const email = document.getElementById('email-convite').value.trim();
+    const enviarEmail = document.getElementById('envio-email').checked;
+    const resultado = document.getElementById('resultado-convite');
+    const btn = document.getElementById('btn-gerar');
+    const emailInput = document.getElementById('email-convite');
+
+    if (!email || !email.includes('@')) {
+        resultado.style.display = 'block';
+        resultado.innerHTML = '<span class="erro-campo">Introduz um email válido.</span>';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'A gerar...';
+
+    fetch('{{ url_for("admin.gerar_convite") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ email: email, enviar_email: enviarEmail })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Gerar convite';
+
+        if (data.erro) {
+            resultado.style.display = 'block';
+            resultado.innerHTML = '<span class="erro-campo">' + data.erro + '</span>';
+            return;
+        }
+
+        // Limpar input
+        emailInput.value = '';
+
+        if (data.email_enviado) {
+            resultado.style.display = 'block';
+            resultado.innerHTML = '<span class="sucesso-msg">Convite enviado para ' + email + '.</span>' +
+                '<button class="btn btn-secundario btn-fechar" style="margin-top:0.5rem">Fechar</button>';
+        } else {
+            resultado.style.display = 'block';
+            resultado.innerHTML = '<div class="link-convite-container">' +
+                '<p class="sucesso-msg">Convite gerado. Clica abaixo para copiar o link:</p>' +
+                '<input type="text" class="input-link" value="' + data.link + '" readonly>' +
+                '<button class="btn btn-secundario btn-copiar" onclick="navigator.clipboard.writeText(\'' + data.link + '\');this.textContent=\'Copiado!\';setTimeout(()=>this.closest(\'button\').textContent=\'Copiar\',2000)">Copiar</button>' +
+                '</div>';
+        }
+    })
+    .catch(erro => {
+        btn.disabled = false;
+        btn.textContent = 'Gerar convite';
+        resultado.style.display = 'block';
+        resultado.innerHTML = '<span class="erro-campo">Erro ao gerar convite. Tenta novamente.</span>';
+    });
+});
+</script>
+<style>
+.form-convite {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+.form-convite .input {
+    flex: 1;
+    min-width: 200px;
+}
+.form-convite-opcoes {
+    display: flex;
+    align-items: center;
+}
+.label-checkbox {
+    font-size: 0.85rem;
+    color: var(--cor-texto);
+    cursor: pointer;
+}
+.link-convite-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+.input-link {
+    flex: 1;
+    min-width: 200px;
+    background: rgba(255,255,255,0.05);
+    color: var(--cor-texto);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+.sucesso-msg {
+    color: var(--cor-texto);
+    font-size: 0.88rem;
+    margin-bottom: 0.5rem;
+}
+.badge-expirado {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+}
+</style>
+{% endblock %}

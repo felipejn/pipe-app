@@ -16,7 +16,7 @@ from app.auth.forms import (
     VerificarCodigoForm, ConfigurarDoisFAForm, ConfirmarTOTPForm,
     PedirResetForm, ResetPasswordForm
 )
-from app.auth.models import User
+from app.auth.models import User, Convite
 from app.extensions import limiter
 from app.notifications.channels.telegram import TelegramChannel
 from app.notifications.channels.email import EmailChannel
@@ -224,22 +224,58 @@ def reenviar_codigo():
 
 # ── Registo ────────────────────────────────────────────────────────────────
 
-@auth.route('/registo', methods=['GET', 'POST'])
-@limiter.limit("5 per hour", methods=["POST"])
+@auth.route('/registo')
 def registo():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    flash('O registo requer um convite.', 'info')
+    return redirect(url_for('auth.login'))
 
+
+# ── Registo com convite ────────────────────────────────────────────────────
+
+@auth.route('/registo/<token>', methods=['GET', 'POST'])
+@limiter.limit("5 per hour", methods=["POST"])
+def registo_com_convite(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+    convite = Convite.query.filter_by(token=token).first()
+
+    if not convite:
+        flash('Convite inválido.', 'erro')
+        return redirect(url_for('auth.login'))
+
+    if convite.usado:
+        flash('Este convite já foi utilizado.', 'erro')
+        return redirect(url_for('auth.login'))
+
+    if not convite.esta_valido():
+        flash('Este convite expirou.', 'erro')
+        return redirect(url_for('auth.login'))
+
+    # Formulário com email pré-preenchido
     form = RegistoForm()
+    if request.method == 'GET':
+        form.email.data = convite.email
+
     if form.validate_on_submit():
-        user = User(username=form.username.data, email=form.email.data)
+        if form.email.data.lower() != convite.email.strip().lower():
+            flash('O email deve corresponder ao do convite.', 'erro')
+            return render_template('auth/registo_token.html', form=form, convite=convite)
+
+        user = User(username=form.username.data, email=form.email.data.lower().strip())
         user.set_password(form.password.data)
         db.session.add(user)
+
+        convite.usado = True
+        convite.usado_em = datetime.utcnow()
         db.session.commit()
+
         flash('Conta criada com sucesso. Podes iniciar sessão.', 'sucesso')
         return redirect(url_for('auth.login'))
 
-    return render_template('auth/registo.html', form=form)
+    return render_template('auth/registo_token.html', form=form, convite=convite)
 
 
 # ── Perfil ─────────────────────────────────────────────────────────────────

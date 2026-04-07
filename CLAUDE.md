@@ -21,7 +21,7 @@
 ## Módulos existentes
 | Blueprint | Rota | State |
 |---|---|---|
-| `auth` | `/auth/*` | Com BD (User, 2FA, TOTP) |
+| `auth` | `/auth/*` | Com BD (User, 2FA, TOTP, Convite) |
 | `euromilhoes` | `/euromilhoes/` | Com BD (Jogo) |
 | `tarefas` | `/tarefas/` | Com BD (Lista, Tarefa, TagTarefa) |
 | `notas` | `/notas/` | Com BD (Nota, ItemChecklist, EtiquetaNota) |

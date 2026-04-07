@@ -92,6 +92,23 @@ class User(UserMixin, db.Model):
         return f'<User {self.username}>'
 
 
+class Convite(db.Model):
+    __tablename__ = 'convites'
+
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), nullable=False)
+    criado_por = db.Column(db.Integer, db.ForeignKey('utilizadores.id'), nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    expira_em = db.Column(db.DateTime, nullable=False)
+    usado = db.Column(db.Boolean, default=False)
+    usado_em = db.Column(db.DateTime, nullable=True)
+
+    def esta_valido(self):
+        """Verifica se o convite não foi usado e não expirou."""
+        return not self.usado and datetime.utcnow() < self.expira_em
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))

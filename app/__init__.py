@@ -89,6 +89,7 @@ def create_app(config_name='default'):
         from app.tarefas.models import Lista, Tarefa, TagTarefa  # noqa: F401
         from app.notas.models import Nota, ItemChecklist, EtiquetaNota  # noqa: F401
         from app.conversoes.models import Conversao  # noqa: F401
+        from app.auth.models import Convite  # noqa: F401
         db.create_all()
 
     return app
