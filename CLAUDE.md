@@ -21,7 +21,7 @@
 ## Módulos existentes
 | Blueprint | Rota | State |
 |---|---|---|
-| `auth` | `/auth/*` | Com BD (User, 2FA, TOTP, Convite) |
+| `auth` | `/auth/*` | Com BD (User, 2FA, TOTP, Convite) — registo por convite only |
 | `euromilhoes` | `/euromilhoes/` | Com BD (Jogo) |
 | `tarefas` | `/tarefas/` | Com BD (Lista, Tarefa, TagTarefa) |
 | `notas` | `/notas/` | Com BD (Nota, ItemChecklist, EtiquetaNota) |
@@ -54,7 +54,7 @@ Flask 3.0, SQLAlchemy, Flask-Login, Flask-WTF, Werkzeug, Flask-Limiter, Pillow, 
 `scripts/pipe_tasks.py` — corre 1x/dia às 08:00 no PythonAnywhere
 
 ## Assistente IA (WIP)
-Módulo de chat com IA via OpenRouter, com tool use para consultar dados reais dos módulos do PIPE. Card no dashboard com badge "IA" e destaque visual.
+Módulo de chat com IA via OpenRouter, com tool use para consultar dados reais dos módulos do PIPE. Card no dashboard com badge "IA" e destaque visual. **Nota:** Conexão com API pode ser instável — requer melhorias em retry/fallback.
 
 ### Arquitectura
 - **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo default via `OPENROUTER_MODEL` env var (default: `qwen/qwen3.6-plus:free`). Auth por `OPENROUTER_API_KEY`. Retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback entre modelos.

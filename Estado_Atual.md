@@ -389,13 +389,24 @@ A navegação é feita pelos cards no dashboard.
 
 ## Ponto onde estamos
 
-**Versão v1.0** — sete módulos completos e deployed. Infraestrutura madura: auth com 2FA multi-método, rate limiting, logging de segurança, security headers, sessões permanentes para PWA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Auditoria de segurança coberta: CSRF, brute force protection, clickjacking protection, MIME sniffing protection, login event logging. Sem pendências.
+**Versão v1.0** — sete módulos completos e deployed. Infraestrutura madura: auth com 2FA multi-método, rate limiting, logging de segurança, security headers, sessões permanentes para PWA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sistema de convites implementado e testado (registo restrito por link de 7 dias, uso único). Auditoria de segurança coberta: CSRF, brute force protection, clickjacking protection, MIME sniffing protection, login event logging.
+
+**Pendências conhecidas:**
+- **Assistente IA**: conexão com API falha frequentemente (necessário melhorar retry/fallback)
+- **Melhorias em módulos existentes**: lista de tarefas (exportação?), notas (ordenar etiquetas manualmente?), etc. — por especificar
+- **Chat interno**: plano documentado mas não implementado (adiado por decisão)
 
 ---
 
 ## Próximos passos
 
-- Novos módulos PIPE (arquitectura pronta) — versão 1.x
+- **Assistente IA**: estabilizar conexão com API (melhorar retry/fallback, monitorizar rate limits)
+- **Melhorias nos módulos existentes**: 
+  - Tarefas: exportação de lista?
+  - Notas: ordenação manual de etiquetas?
+  - Dashboard:.activity feed?
+- Revisitar **Chat Interno** apenas quando houver necessidade real de comunicação entre utilizadores
+- Novos módulos com valor prático (arquitectura pronta) — versão 1.x
 
 ---
 

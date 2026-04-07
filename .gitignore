@@ -8,3 +8,7 @@ __pycache__/
 venv/
 *.db
 .DS_Store
+
+# Claude Code local config (sensitive)
+.claude/
+.openclaude-profile.json
