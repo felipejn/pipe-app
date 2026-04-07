@@ -62,6 +62,13 @@ Conversor de cores para código Flutter. Sem base de dados — módulo stateless
 - Modo bidirecional: cola código Flutter → vê a cor e o HEX
 - Botão copiar em cada linha de código
 
+### 🤖 Assistente IA
+Assistente pessoal com inteligência artificial que consulta dados reais dos módulos via linguagem natural. Sem base de dados — módulo stateless.
+- Chat com balões coloridos (utilizador e assistente)
+- Consulta tarefas, notas e jogos de Euromilhões em tempo real
+- Resumos gerais da conta
+- Boas-vindas automáticas e histórico persistente na sessão
+
 ---
 
 ## Stack técnica
@@ -161,6 +168,7 @@ pipe-app/
 │   ├── conversoes/     # Módulo Conversões HEIC → JPG
 │   ├── cambio/         # Módulo Câmbio (stateless)
 │   ├── cores/          # Módulo Cores Flutter (stateless)
+│   ├── assistente/     # Módulo Assistente IA (stateless)
 │   ├── notifications/  # Serviço central de notificações
 │   ├── admin/          # Área de administração
 │   ├── settings/       # Definições do utilizador

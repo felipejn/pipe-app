@@ -2386,3 +2386,48 @@ input[type="date"] {
     .nota-criar-cartao { max-width: 100%; }
 }
 
+/* ── Dashboard badge NOVO ─────────────────────────────── */
+.badge-novo {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: var(--cor-primaria);
+    color: var(--cor-fundo);
+    letter-spacing: 0.06em;
+    vertical-align: middle;
+    margin-left: 0.35rem;
+}
+
+.cartao-novo {
+    border-color: var(--cor-primaria);
+    box-shadow: 0 0 15px rgba(var(--cor-destaque-rgb), 0.15);
+}
+
+/* ── Chat — balões de mensagens ───────────────────────── */
+.chat-bubble {
+    padding: 0.65rem 1rem;
+    border-radius: 1rem;
+    max-width: 80%;
+    margin-bottom: 0;
+    line-height: 1.55;
+    font-size: 0.95rem;
+    border: 1px solid transparent;
+    word-wrap: break-word;
+}
+
+.chat-bubble--user {
+    align-self: flex-end;
+    background: var(--cor-primaria);
+    color: var(--cor-fundo);
+    border: none;
+}
+
+.chat-bubble--assistant {
+    align-self: flex-start;
+    background: #2a2f47;
+    color: var(--cor-texto);
+    border-color: #3a4060;
+}
+

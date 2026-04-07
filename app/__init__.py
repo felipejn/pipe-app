@@ -59,6 +59,9 @@ def create_app(config_name='default'):
     from app.cores import bp as cores_bp
     app.register_blueprint(cores_bp, url_prefix='/cores')
 
+    from app.assistente import assistente as assistente_bp
+    app.register_blueprint(assistente_bp)
+
     # Limiter inicializado após blueprints — necessário para decoradores funcionarem
     limiter.init_app(app)
 

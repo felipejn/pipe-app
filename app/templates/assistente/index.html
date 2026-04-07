@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block titulo %}Assistente{% endblock %}
+
+{% block conteudo %}
+<div class="modulo-cabecalho">
+    <h1>Assistente PIPE</h1>
+    <p class="modulo-desc">Conversa com o teu assistente pessoal. Usa linguagem natural para consultar tarefas, notas e jogos.</p>
+</div>
+
+<div class="modulo-nav">
+    <button id="btn-nova-conversa" class="btn btn-secundario" title="Limpar histórico de conversa">Nova conversa</button>
+    {# Limpa historico e recarrega a pagina #}
+</div>
+
+{# Área de mensagens — usa cartao como base, scrollbar via estilo inline #}
+<div class="cartao" id="chat-area" style="max-height: 60vh; overflow-y: auto; margin-bottom: 1rem;">
+    <div id="chat-mensagens" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {# Estado vazio #}
+        <div class="estado-vazio" id="chat-vazio" style="margin: 2rem 0;">
+            <div class="estado-vazio-icone">💬</div>
+            <p class="vazio-texto">Inicia uma conversa com o teu assistente PIPE.</p>
+        </div>
+    </div>
+</div>
+
+{# Área de input #}
+<div class="cartao" style="display: flex; gap: 0.75rem; align-items: flex-end;">
+    <textarea id="chat-input"
+              class="campo-textarea"
+              style="flex: 1; resize: none; min-height: 40px; max-height: 150px;"
+              placeholder="Escreve uma mensagem…"
+              rows="1"></textarea>
+    <button class="btn btn-primario" id="btn-enviar" style="white-space: nowrap;">Enviar</button>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+(function () {
+    var mensagensDiv = document.getElementById('chat-mensagens');
+    var vazioState   = document.getElementById('chat-vazio');
+    var chatArea     = document.getElementById('chat-area');
+    var input        = document.getElementById('chat-input');
+    var btnEnviar    = document.getElementById('btn-enviar');
+    var bloqueado    = false;
+
+    // ── Helpers ──────────────────────────────────────────
+    function escaparHtml(texto) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(texto));
+        return d.innerHTML;
+    }
+
+    function mostrarVazio(visivel) {
+        vazioState.style.display = visivel ? '' : 'none';
+    }
+
+    function autoScroll() {
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function setBloqueado(estado) {
+        bloqueado = estado;
+        input.disabled = estado;
+        btnEnviar.disabled = estado;
+        btnEnviar.textContent = estado ? '...' : 'Enviar';
+    }
+
+    // ── Renderizar mensagens ─────────────────────────────
+    function adicionarMensagem(texto, tipo) {
+        mostrarVazio(false);
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'chat-bubble chat-bubble--' + (tipo === 'utilizador' ? 'user' : 'assistant');
+
+        wrapper.innerHTML = escaparHtml(texto).replace(/\n/g, '<br>');
+
+        mensagensDiv.appendChild(wrapper);
+        autoScroll();
+    }
+
+    function adicionarIndicador() {
+        var bubble = document.createElement('div');
+        bubble.className = 'chat-bubble chat-bubble--assistant';
+        bubble.id = 'chat-a-escrever';
+        bubble.innerHTML = '<span class="spinner"></span> A escrever...';
+        mensagensDiv.appendChild(bubble);
+        autoScroll();
+    }
+
+    function removerIndicador() {
+        var el = document.getElementById('chat-a-escrever');
+        if (el) el.remove();
+    }
+
+    function adicionarMensagemErro(texto) {
+        mostrarVazio(false);
+        var wrapper = document.createElement('div');
+        wrapper.style.alignSelf = 'center';
+
+        var msg = document.createElement('div');
+        msg.className = 'alerta alerta-erro';
+        msg.style.maxWidth = '80%';
+        msg.textContent = texto;
+
+        wrapper.appendChild(msg);
+        mensagensDiv.appendChild(wrapper);
+        autoScroll();
+    }
+
+    // ── Enviar mensagem ──────────────────────────────────
+    function enviar() {
+        var texto = input.value.trim();
+        if (!texto || bloqueado) return;
+
+        input.value = '';
+        input.style.height = 'auto';
+        adicionarMensagem(texto, 'utilizador');
+        setBloqueado(true);
+        adicionarIndicador();
+
+        fetch('/assistente/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ mensagem: texto })
+        })
+        .then(function (r) {
+            return r.json().then(function (d) {
+                return { ok: r.ok, dados: d };
+            });
+        })
+        .then(function (res) {
+            removerIndicador();
+            setBloqueado(false);
+            if (res.ok && res.dados.resposta) {
+                adicionarMensagem(res.dados.resposta, 'assistente');
+            } else {
+                var erro = res.dados.erro || 'Erro de comunicação. Tenta novamente.';
+                adicionarMensagemErro('Erro: ' + erro);
+            }
+        })
+        .catch(function () {
+            removerIndicador();
+            setBloqueado(false);
+            adicionarMensagemErro('Erro de ligação. Verifica a tua rede.');
+        });
+
+        input.focus();
+    }
+
+    // ── Mensagem de boas-vindas ─────────────────────────
+    function boasVindas() {
+        mostrarVazio(false);
+        var boas = 'Olá, {{ current_user.username }}! Sou o teu assistente PIPE.\n\n' +
+            'Posso ajudar-te com:\n' +
+            'Consultar as tuas tarefas e prazos\n' +
+            'Ler as tuas notas\n' +
+            'Ver os teus jogos do Euromilhões\n' +
+            'Dar-te um resumo geral da tua conta\n\n' +
+            'Em que posso ajudar?';
+        adicionarMensagem(boas, 'assistente');
+    }
+
+    setTimeout(boasVindas, 800);
+
+    // ── Eventos ──────────────────────────────────────────
+    btnEnviar.addEventListener('click', enviar);
+
+    // ── Nova conversa ────────────────────────────────────
+    var btnNova = document.getElementById('btn-nova-conversa');
+    if (btnNova) {
+        btnNova.addEventListener('click', function () {
+            fetch('/assistente/api/limpar', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+            }).then(function () {
+                window.location.reload();
+            });
+        });
+    }
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            enviar();
+        }
+    });
+
+    input.addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+    });
+})();
+</script>
+{% endblock %}

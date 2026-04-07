@@ -234,6 +234,16 @@ pipe-app/
 - **Dashboard** — cards de módulos. Adicionar novos módulos aqui.
 - Links de módulos removidos da navbar — não escala com muitos módulos
 
+### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
+- **Sem BD** — módulo stateless, histórico de conversa em Flask session
+- **Ficheiros:**
+  - `cliente.py` — chamada HTTP a OpenRouter API com retry (3 tentativas com backoff 2s/5s/10s) e fallback entre modelos
+  - `contexto.py` — orquestração de tool use; histórico limitado a 20 mensagens (10 trocas); system prompt em PT-PT com regras explícitas de leitura apenas
+  - `ferramentas.py` — tool use com 4 funções: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`; todas filtram por `user_id` (obrigatório, injetado pelo caller)
+  - `routes.py` — rotas: `GET /assistente`, `POST /assistente/api/chat` (30/min), `POST /assistente/api/limpar` (10/min)
+- **Frontend:** balões de chat com cores distintas (utilizador = âmbar, assistente = azul-acinzentado), boas-vindas automáticas com delay de 800ms
+- **Variáveis de ambiente:** `OPENROUTER_API_KEY` (obrigatória), `OPENROUTER_MODEL` (opcional, default `qwen/qwen3.6-plus:free`)
+
 ### Sistema de notificações (`app/notifications/`)
 - Serviço central `NotificationService` — `notification_service.send(user, type, subject, body, data)`
 - `TelegramChannel` ✅ e `EmailChannel` ✅ (SendGrid)
