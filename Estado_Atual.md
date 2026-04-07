@@ -34,8 +34,13 @@ pipe-app/
 │   │   ├── euromilhoes/
 │   │   ├── settings/
 │   │   ├── admin/
-│   │   │   ├── dashboard.html
-│   │   │   └── utilizadores.html
+│   │   │   ├── __init__.py
+│   │   │   ├── decorators.py    # @admin_required
+│   │   │   ├── routes.py        # /admin/ — incluindo gestão de convites
+│   │   │   └── templates/
+│   │   │       ├── dashboard.html
+│   │   │       ├── utilizadores.html
+│   │   │       └── convites.html   # gestão de convites (AJAX)
 │   │   ├── tarefas/
 │   │   │   ├── index.html
 │   │   │   ├── editar.html
@@ -54,9 +59,9 @@ pipe-app/
 │       └── routes.py        # /conversoes/ — HEIC→JPG + PNG/JPG→ICO
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
-│   │   ├── routes.py        # /auth/login, /auth/registo, /auth/logout, /auth/perfil, /auth/2fa/*
+│   │   ├── routes.py        # /auth/login, /auth/registo (bloqueado), /auth/registo/<token>, /auth/logout, /auth/perfil, /auth/2fa/*
 │   │   ├── forms.py
-│   │   └── models.py        # modelo User (inclui is_admin)
+│   │   └── models.py        # modelo User (inclui is_admin) + Convite
 │   ├── euromilhoes/         # Blueprint Euromilhões
 │   │   ├── __init__.py
 │   │   ├── routes.py
@@ -115,11 +120,14 @@ pipe-app/
 ### Módulo Auth (`app/auth/`)
 - Modelo `User` com password em hash (Werkzeug)
 - Campo `is_admin` — Boolean, default=False
+- Novo modelo `Convite` — sistema de registo por convite (único, 7 dias de validade)
 - Formulários: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`, `PedirResetForm`, `ResetPasswordForm`
-- Rotas: `/auth/login`, `/auth/registo`, `/auth/logout`, `/auth/perfil`
+- Rotas: `/auth/login`, `/auth/registo` (bloqueado — requer convite), `/auth/registo/<token>` (criação de conta via link de convite), `/auth/logout`, `/auth/perfil`
 - Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
 - Rotas TOTP: `/auth/2fa/totp/configurar`, `/auth/2fa/totp/desactivar`
 - Rotas recuperação de password: `/auth/recuperar-password`, `/auth/reset-password/<token>`
+- Templates: `login.html`, `registo_token.html` (registo com convite), `perfil.html`, e 2FA
+- **Registo aberto desativado** — apenas entrada por convite gerado por admin
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
 - Modelo `Jogo` (SQLite)
@@ -227,6 +235,12 @@ pipe-app/
 - Blueprint em `/admin`, decorador `@admin_required`
 - Ícone 🛠️ na navbar visível apenas para admins
 - Dashboard com estatísticas, lista de utilizadores, toggle activo/admin, apagar utilizador
+- **Gestão de Convites** — nova funcionalidade:
+  - `GET /admin/convites` — lista todos os convites (activos, usados, expirados)
+  - `POST /admin/convites/gerar` — gera convite único (token criptográfico) com email, 7 dias de validade; pode enviar por email (SendGrid) ou gerar link para copiar
+  - `POST /admin/convites/<id>/revogar` — revoga convite não utilizado
+- Template `admin/convites.html` com formulário AJAX e tabela de estado
+- Reutiliza `EmailChannel` (SendGrid) para envio automático
 - Protecção: não é possível afectar a própria conta
 
 ### Navegação
@@ -292,6 +306,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Recuperação de password por email ✅
 - Notificações Telegram e Email (manual) ✅
 - Área admin completa ✅
+- **Sistema de Convites** ✅ — geração de link, envio por email (SendGrid), registo por token, validação de 7 dias, uso único
 - Módulo Tarefas completo ✅
 - `pipe_tasks.py` com módulo Tarefas ✅
 - Módulo Tarefas — vista "Todas" por defeito ao abrir ✅
