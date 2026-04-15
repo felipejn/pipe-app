@@ -8,72 +8,25 @@
         <p class="subtitulo">Bem-vindo ao PIPE</p>
     </div>
 
+    {% if modulos_ativos %}
     <div class="modulos-grid">
-        <a href="{{ url_for('euromilhoes.index') }}" class="cartao-modulo">
-            <div class="modulo-icone">🎯</div>
+        {% for modulo in modulos_ativos %}
+        <a href="{{ url_for(modulo.url_endpoint) }}" class="cartao-modulo">
+            <div class="modulo-icone">{{ modulo.icone }}</div>
             <div class="modulo-info">
-                <h2>Euromilhões</h2>
-                <p>Regista jogos, verifica resultados e analisa frequências</p>
+                <h2>{{ modulo.nome }}</h2>
+                <p>{{ modulo.descricao }}</p>
             </div>
             <span class="modulo-seta">→</span>
         </a>
-        <a href="{{ url_for('tarefas.index') }}" class="cartao-modulo">
-            <div class="modulo-icone">✅</div>
-            <div class="modulo-info">
-                <h2>Tarefas</h2>
-                <p>Gere as tuas listas e acompanha prazos</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
-        <a href="{{ url_for('notas.index') }}" class="cartao-modulo">
-            <div class="modulo-icone">📝</div>
-            <div class="modulo-info">
-                <h2>Notas</h2>
-                <p>Captura ideias, listas e pensamentos rapidamente</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
-        <a href="{{ url_for('passwords.index') }}" class="cartao-modulo">
-            <div class="modulo-icone">🔑</div>
-            <div class="modulo-info">
-                <h2>Passwords</h2>
-                <p>Gerar passwords, passphrases e PINs seguros</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
-        <a href="{{ url_for('conversoes.index') }}" class="cartao-modulo">
-            <div class="modulo-icone">🔄</div>
-            <div class="modulo-info">
-                <h2>Conversões</h2>
-                <p>Converter ficheiros e imagens (HEIC, PNG, ICO…)</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
-        <a href="{{ url_for('cambio.index') }}" class="cartao-modulo">
-            <div class="modulo-icone">💱</div>
-            <div class="modulo-info">
-                <h2>Câmbio</h2>
-                <p>Conversão de moedas com cotações em tempo real</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
-        <a href="{{ url_for('cores.index') }}" class="cartao-modulo">
-            <div class="modulo-icone">🎨</div>
-            <div class="modulo-info">
-                <h2>Cores Flutter</h2>
-                <p>Converter cores para código Flutter</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
-        <a href="{{ url_for('assistente.index') }}" class="cartao-modulo cartao-novo">
-            <div class="modulo-icone">🤖</div>
-            <div class="modulo-info">
-                <h2>Assistente <span class="badge-novo">IA</span></h2>
-                <p>Consulta tarefas, notas e jogos em linguagem natural</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
-        {# Adicionar novos módulos aqui #}
+        {% endfor %}
     </div>
+    {% else %}
+    <div class="estado-vazio">
+        <div class="estado-vazio-icone">🧩</div>
+        <p class="estado-vazio-mensagem">Ainda não tens módulos activos.</p>
+        <a href="{{ url_for('modulos.loja') }}" class="btn btn-primario">Ir para a Loja de Módulos</a>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -1,7 +1,7 @@
 from datetime import timedelta
 from flask import Flask, app
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
 from app.extensions import limiter
 from config import config
@@ -62,6 +62,9 @@ def create_app(config_name='default'):
     from app.assistente import assistente as assistente_bp
     app.register_blueprint(assistente_bp)
 
+    from app.modulos import modulos_bp
+    app.register_blueprint(modulos_bp)
+
     # Limiter inicializado após blueprints — necessário para decoradores funcionarem
     limiter.init_app(app)
 
@@ -81,7 +84,23 @@ def create_app(config_name='default'):
     @login_required
     def dashboard():
         from flask import render_template
-        return render_template('dashboard.html')
+        from app.modulos.models import get_modulos_ativos
+        from app.modulos.config import MODULOS_DISPONIVEIS
+        
+        modulos_ativos_slugs = get_modulos_ativos(current_user.id)
+        modulos_ativos = []
+        for slug in modulos_ativos_slugs:
+            if slug in MODULOS_DISPONIVEIS:
+                info = MODULOS_DISPONIVEIS[slug]
+                modulos_ativos.append({
+                    'slug': slug,
+                    'nome': info['nome'],
+                    'icone': info['icone'],
+                    'url_endpoint': info['url_endpoint'],
+                    'descricao': info['descricao']
+                })
+        
+        return render_template('dashboard.html', modulos_ativos=modulos_ativos, MODULOS_DISPONIVEIS=MODULOS_DISPONIVEIS)
 
     # Criar tabelas se não existirem
     with app.app_context():

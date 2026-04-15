@@ -1,9 +1,9 @@
-# PIPE — Estado Actual do Projecto — v1.0
+# PIPE — Estado Actual do Projecto — v1.1
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. A arquitectura suporta adição de novos módulos com a mesma identidade visual. O módulo Loja de Módulos é o sistema de personalização, permitindo a cada utilizador activar/desactivar módulos independentemente.
 
 ---
 
@@ -53,6 +53,8 @@ pipe-app/
 │   │       └── index.html
 │   │   └── cambio/
 │   │       └── index.html
+│   │   └── modulos/
+│   │       └── loja.html
 │   └── conversoes/
 │       ├── __init__.py
 │       ├── models.py        # modelo Conversao (histórico, sem ficheiros)
@@ -102,6 +104,17 @@ pipe-app/
 │   └── cores/               # Blueprint Cores Flutter
 │       ├── __init__.py
 │       └── routes.py        # /cores/ — stateless, HEX/RGB/HSL/CMYK para Flutter
+│   ├── modulos/             # Blueprint Loja de Módulos
+│   │   ├── __init__.py
+│   │   ├── config.py        # MODULOS_DISPONIVEIS
+│   │   ├── models.py        # UserModulo
+│   │   └── routes.py        # /modulos/loja, /modulos/api/toggle
+│   ├── assistente/          # Blueprint Assistente IA
+│   │   ├── __init__.py
+│   │   ├── cliente.py       # OpenRouter API
+│   │   ├── contexto.py      # tool use orchestration
+│   │   ├── ferramentas.py   # tool functions
+│   │   └── routes.py        # /assistente
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
@@ -141,6 +154,15 @@ pipe-app/
 - **Funcionalidades:** vista "Todas", busca em tempo real, filtros, secção de concluídas colapsável, modal de nova lista com selector de emoji
 - **Comportamento ao abrir:** vista "Todas" por defeito (`lista='todas'`) — parâmetro `lista` tem default `'todas'` em `routes.py`
 - **Mobile:** selector `<select>` acima da grelha, visível apenas em ecrãs ≤ 640px; em desktop a sidebar continua a funcionar normalmente
+
+### Módulo Loja de Módulos (`app/modulos/`)
+- Sem BD própria — usa tabela `UserModulo` (`user_id` + `modulo_slug` + `ativo`)
+- `config.py` — dicionário `MODULOS_DISPONIVEIS` com 8 módulos (`slug`, `nome`, `icone`, `url_endpoint`, `descricao`)
+- `models.py` — modelo `UserModulo` (PK composta) + helper `get_modulos_ativos(user_id)`
+- `routes.py` — `GET /modulos/loja`, `POST /modulos/api/toggle` (AJAX + CSRF)
+- Ícone 🛒 na navbar acessível a todos os utilizadores autenticados
+- Zero módulos activos por defeito — dashboard mostra estado vazio com link para a loja
+- Cards com toggle switch + label 'Instalar'/'Instalado' com feedback visual
 
 ### Módulo Notas (`app/notas/`)
 - **Modelos:**
@@ -301,6 +323,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 ### Testes realizados
 - Login e registo ✅
 - Dashboard com cards de módulos ✅
+- Módulo Loja de Módulos — activar/desactivar módulos ✅
+- Dashboard dinâmico — estado vazio + cards por módulos activos ✅
 - Módulo Euromilhões completo ✅
 - 2FA Telegram, Email, TOTP ✅
 - Recuperação de password por email ✅
@@ -366,6 +390,7 @@ WISE_API_KEY=...
 - `scripts/adicionar_is_admin.py` ✅
 - `scripts/migrar_notificada_em.py` ✅
 - Módulo Notas — tabelas criadas automaticamente por `db.create_all()` ✅
+- Módulo Loja — tabela `user_modulos` criada por `db.create_all()` ✅
 - Módulo Passwords — sem BD, sem migrações ✅
 
 ---
@@ -389,7 +414,7 @@ A navegação é feita pelos cards no dashboard.
 
 ## Ponto onde estamos
 
-**Versão v1.0** — sete módulos completos e deployed. Infraestrutura madura: auth com 2FA multi-método, rate limiting, logging de segurança, security headers, sessões permanentes para PWA, notificações Telegram + Email, área admin, scheduled task unificada a correr às 08:00. Sistema de convites implementado e testado (registo restrito por link de 7 dias, uso único). Auditoria de segurança coberta: CSRF, brute force protection, clickjacking protection, MIME sniffing protection, login event logging.
+**Versão v1.1** — sete módulos completos e deployed. Infraestrutura madura: auth com 2FA multi-método, rate limiting, logging de segurança, security headers, sessões permanentes para PWA, notificações Telegram + Email, área admin, sistema de loja de módulos para personalização por utilizador, scheduled task unificada a correr às 08:00. Sistema de convites implementado e testado (registo restrito por link de 7 dias, uso único). Auditoria de segurança coberta: CSRF, brute force protection, clickjacking protection, MIME sniffing protection, login event logging.
 
 **Pendências conhecidas:**
 - **Assistente IA**: conexão com API falha frequentemente (necessário melhorar retry/fallback)

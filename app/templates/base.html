@@ -33,6 +33,8 @@
            class="btn-logout {% if request.blueprint == 'admin' %}activo{% endif %}"
            title="Administração">🛠️</a>
         {% endif %}
+        <a href="{{ url_for('modulos.loja') }}"
+           class="btn-logout {% if request.blueprint == 'modulos' %}activo{% endif %}" title="Loja de Módulos">🛒</a>
         <a href="{{ url_for('settings.index') }}"
            class="btn-logout {% if request.blueprint == 'settings' %}activo{% endif %}">⚙️</a>
         <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>

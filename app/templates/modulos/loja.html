@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block titulo %}Loja de Módulos{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-modulos">
+
+    <div class="pagina-cabecalho">
+        <h1>Loja de Módulos</h1>
+        <p class="subtitulo">Activa os módulos que queres usar</p>
+    </div>
+
+    <div class="modulos-grid">
+        {% for slug, info in modulos.items() %}
+        <div class="cartao-modulo" data-slug="{{ slug }}">
+            <div class="modulo-icone">{{ info.icone }}</div>
+            <div class="modulo-info">
+                <h2>{{ info.nome }}</h2>
+                <p>{{ info.descricao }}</p>
+            </div>
+            <label class="toggle">
+                <input type="checkbox" class="modulo-toggle" data-slug="{{ slug }}" {% if slug in modulos_ativos %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+            </label>
+            <div class="modulo-status" data-slug="{{ slug }}" style="margin-top: 8px; font-size: 0.875rem; font-weight: 500; {% if slug in modulos_ativos %}color: #10b981;{% else %}color: #f59e0b;{% endif %}">
+                {% if slug in modulos_ativos %}Instalado{% else %}Instalar{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggles = document.querySelectorAll('.modulo-toggle');
+    const CSRF_TOKEN = '{{ csrf_token() }}';
+    const USER_ID = {{ current_user.id }};
+
+    toggles.forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const slug = this.dataset.slug;
+            const ativo = this.checked;
+
+            fetch('{{ url_for("modulos.toggle") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': CSRF_TOKEN,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    modulo_slug: slug,
+                    user_id: USER_ID,
+                    ativo: ativo
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao actualizar módulo');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Módulo actualizado:', data);
+                // Update status label
+                const statusDiv = document.querySelector(`.modulo-status[data-slug="${slug}"]`);
+                if (ativo) {
+                    statusDiv.textContent = 'Instalado';
+                    statusDiv.style.color = '#10b981';
+                } else {
+                    statusDiv.textContent = 'Instalar';
+                    statusDiv.style.color = '#f59e0b';
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao actualizar módulo. Tenta novamente.');
+                toggle.checked = !ativo;
+                // Revert status label
+                const statusDiv = document.querySelector(`.modulo-status[data-slug="${slug}"]`);
+                if (!ativo) {
+                    statusDiv.textContent = 'Instalado';
+                    statusDiv.style.color = '#10b981';
+                } else {
+                    statusDiv.textContent = 'Instalar';
+                    statusDiv.style.color = '#f59e0b';
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
