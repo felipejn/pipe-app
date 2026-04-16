@@ -1,9 +1,9 @@
-# PIPE — Estado Actual do Projecto — v1.1
+# PIPE — Estado Actual do Projecto — v1.2
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. A arquitectura suporta adição de novos módulos com a mesma identidade visual. O módulo Loja de Módulos é o sistema de personalização, permitindo a cada utilizador activar/desactivar módulos independentemente.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -23,24 +23,20 @@ pipe-app/
 │   ├── __init__.py          # create_app, app factory
 │   ├── extensions.py        # Limiter (Flask-Limiter, X-Forwarded-For para PA)
 │   ├── static/
-│   │   ├── css/pipe.css     # design system (tema escuro, âmbar/dourado)
+│   │   ├── css/pipe.css     # design system (tema escuro, âmbar/dourado) + cores de eventos do Calendário
 │   │   └── js/
 │   │       ├── pipe.js      # JS base (alertas)
 │   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
 │   ├── templates/
 │   │   ├── base.html        # navbar sem links de módulos (navegação via dashboard)
-│   │   ├── dashboard.html   # cards de módulos: Euromilhões + Tarefas + Notas + Passwords + Câmbio
+│   │   ├── dashboard.html   # cards de módulos dinâmicos (Loja de Módulos)
 │   │   ├── auth/
 │   │   ├── euromilhoes/
 │   │   ├── settings/
 │   │   ├── admin/
-│   │   │   ├── __init__.py
-│   │   │   ├── decorators.py    # @admin_required
-│   │   │   ├── routes.py        # /admin/ — incluindo gestão de convites
-│   │   │   └── templates/
-│   │   │       ├── dashboard.html
-│   │   │       ├── utilizadores.html
-│   │   │       └── convites.html   # gestão de convites (AJAX)
+│   │   │   ├── dashboard.html
+│   │   │   ├── utilizadores.html
+│   │   │   └── convites.html
 │   │   ├── tarefas/
 │   │   │   ├── index.html
 │   │   │   ├── editar.html
@@ -49,16 +45,14 @@ pipe-app/
 │   │   │   ├── index.html
 │   │   │   ├── editar.html
 │   │   │   └── _cartao.html
-│   │   └── passwords/
-│   │       └── index.html
-│   │   └── cambio/
-│   │       └── index.html
-│   │   └── modulos/
-│   │       └── loja.html
-│   └── conversoes/
-│       ├── __init__.py
-│       ├── models.py        # modelo Conversao (histórico, sem ficheiros)
-│       └── routes.py        # /conversoes/ — HEIC→JPG + PNG/JPG→ICO
+│   │   ├── passwords/
+│   │   │   └── index.html
+│   │   ├── cambio/
+│   │   │   └── index.html
+│   │   ├── modulos/
+│   │   │   └── loja.html
+│   │   └── calendario/
+│   │       └── index.html   # vistas Agenda + Mensal, modal CRUD, JS inline
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo (bloqueado), /auth/registo/<token>, /auth/logout, /auth/perfil, /auth/2fa/*
@@ -83,7 +77,7 @@ pipe-app/
 │   ├── admin/               # Blueprint de administração
 │   │   ├── __init__.py
 │   │   ├── decorators.py    # @admin_required
-│   │   └── routes.py        # /admin/
+│   │   └── routes.py        # /admin/ — incluindo gestão de convites
 │   ├── tarefas/             # Blueprint Tarefas
 │   │   ├── __init__.py
 │   │   ├── models.py        # Lista, Tarefa, TagTarefa
@@ -101,12 +95,16 @@ pipe-app/
 │   ├── cambio/              # Blueprint Câmbio
 │   │   ├── __init__.py
 │   │   └── routes.py        # /cambio/ — stateless, API ExchangeRate
-│   └── cores/               # Blueprint Cores Flutter
-│       ├── __init__.py
-│       └── routes.py        # /cores/ — stateless, HEX/RGB/HSL/CMYK para Flutter
+│   ├── cores/               # Blueprint Cores Flutter
+│   │   ├── __init__.py
+│   │   └── routes.py        # /cores/ — stateless, HEX/RGB/HSL/CMYK para Flutter
+│   ├── conversoes/          # Blueprint Conversões
+│   │   ├── __init__.py
+│   │   ├── models.py        # modelo Conversao (histórico, sem ficheiros)
+│   │   └── routes.py        # /conversoes/ — HEIC→JPG + PNG/JPG→ICO
 │   ├── modulos/             # Blueprint Loja de Módulos
 │   │   ├── __init__.py
-│   │   ├── config.py        # MODULOS_DISPONIVEIS
+│   │   ├── config.py        # MODULOS_DISPONIVEIS (inclui Calendário)
 │   │   ├── models.py        # UserModulo
 │   │   └── routes.py        # /modulos/loja, /modulos/api/toggle
 │   ├── assistente/          # Blueprint Assistente IA
@@ -115,6 +113,10 @@ pipe-app/
 │   │   ├── contexto.py      # tool use orchestration
 │   │   ├── ferramentas.py   # tool functions
 │   │   └── routes.py        # /assistente
+│   └── calendario/          # Blueprint Calendário ← NOVO
+│       ├── __init__.py
+│       ├── models.py        # modelo Evento
+│       └── routes.py        # /calendario/ + /calendario/api/eventos (CRUD)
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
@@ -130,16 +132,17 @@ pipe-app/
 └── run.py
 ```
 
+---
+
 ### Módulo Auth (`app/auth/`)
 - Modelo `User` com password em hash (Werkzeug)
 - Campo `is_admin` — Boolean, default=False
 - Novo modelo `Convite` — sistema de registo por convite (único, 7 dias de validade)
 - Formulários: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`, `PedirResetForm`, `ResetPasswordForm`
-- Rotas: `/auth/login`, `/auth/registo` (bloqueado — requer convite), `/auth/registo/<token>` (criação de conta via link de convite), `/auth/logout`, `/auth/perfil`
+- Rotas: `/auth/login`, `/auth/registo` (bloqueado — requer convite), `/auth/registo/<token>`, `/auth/logout`, `/auth/perfil`
 - Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
 - Rotas TOTP: `/auth/2fa/totp/configurar`, `/auth/2fa/totp/desactivar`
 - Rotas recuperação de password: `/auth/recuperar-password`, `/auth/reset-password/<token>`
-- Templates: `login.html`, `registo_token.html` (registo com convite), `perfil.html`, e 2FA
 - **Registo aberto desativado** — apenas entrada por convite gerado por admin
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
@@ -152,136 +155,75 @@ pipe-app/
 - **Modelos:** `Lista`, `Tarefa` (com `notificada_em`), `TagTarefa`
 - **Rotas:** criar/editar/apagar listas e tarefas, toggle concluída, adição rápida
 - **Funcionalidades:** vista "Todas", busca em tempo real, filtros, secção de concluídas colapsável, modal de nova lista com selector de emoji
-- **Comportamento ao abrir:** vista "Todas" por defeito (`lista='todas'`) — parâmetro `lista` tem default `'todas'` em `routes.py`
-- **Mobile:** selector `<select>` acima da grelha, visível apenas em ecrãs ≤ 640px; em desktop a sidebar continua a funcionar normalmente
+- **Comportamento ao abrir:** vista "Todas" por defeito — parâmetro `lista` tem default `'todas'` em `routes.py`
+- **Mobile:** selector `<select>` acima da grelha, visível apenas em ecrãs ≤ 640px
 
 ### Módulo Loja de Módulos (`app/modulos/`)
-- Sem BD própria — usa tabela `UserModulo` (`user_id` + `modulo_slug` + `ativo`)
-- `config.py` — dicionário `MODULOS_DISPONIVEIS` com 8 módulos (`slug`, `nome`, `icone`, `url_endpoint`, `descricao`)
+- Tabela `UserModulo` (`user_id` + `modulo_slug` + `ativo`)
+- `config.py` — dicionário `MODULOS_DISPONIVEIS` com 9 módulos (inclui Calendário)
 - `models.py` — modelo `UserModulo` (PK composta) + helper `get_modulos_ativos(user_id)`
 - `routes.py` — `GET /modulos/loja`, `POST /modulos/api/toggle` (AJAX + CSRF)
 - Ícone 🛒 na navbar acessível a todos os utilizadores autenticados
 - Zero módulos activos por defeito — dashboard mostra estado vazio com link para a loja
-- Cards com toggle switch + label 'Instalar'/'Instalado' com feedback visual
 
 ### Módulo Notas (`app/notas/`)
-- **Modelos:**
-  - `Nota` — texto livre ou checklist, cor de fundo, fixada, arquivada
-  - `ItemChecklist` — itens de notas do tipo checklist (ordem, feito)
-  - `EtiquetaNota` — etiquetas reutilizáveis, many-to-many com Nota
-- **Rotas:**
-  - `GET /notas/` — grelha de cartões (`?busca=`, `?etiqueta=`, `?arquivo=1`)
-  - `POST /notas/criar` — criar nota via AJAX (JSON)
-  - `GET/POST /notas/<id>` — editar nota (página completa)
-  - `POST /notas/<id>/accao` — fixar, arquivar, cor, toggle_item (JSON)
-  - `POST /notas/<id>/apagar` — apagar nota definitivamente
-- **Funcionalidades:**
-  - Grelha de cartões com criação inline sem mudar de página
-  - Suporte a texto livre e checklist
-  - 8 cores de fundo dentro do tema escuro
-  - Fixar no topo / arquivar (em vez de apagar)
-  - Etiquetas com sugestão automática na edição
-  - Busca em tempo real por título, corpo e etiquetas
-  - Toggle de itens de checklist directamente no cartão
-  - Navegação por clique em qualquer zona do cartão
-  - Sidebar com etiquetas e acesso ao arquivo
-  - Botão Arquivar/Recuperar consoante o estado da nota
+- **Modelos:** `Nota`, `ItemChecklist`, `EtiquetaNota`
+- **Rotas:** `GET /notas/`, `POST /notas/criar`, `GET/POST /notas/<id>`, `POST /notas/<id>/accao`, `POST /notas/<id>/apagar`
+- **Funcionalidades:** grelha de cartões, criação inline, texto livre e checklist, 8 cores, fixar/arquivar, etiquetas, busca em tempo real, toggle checklist no cartão
 
 ### Módulo Passwords (`app/passwords/`)
-- **Sem BD** — módulo totalmente stateless, sem modelos nem migrações
-- **Ficheiros:**
-  - `wordlist.py` — lista PT com ~200 palavras para geração de passphrases
-  - `generator.py` — geração criptograficamente segura com `secrets` + cálculo de força por entropia
-- **Rotas:**
-  - `GET /passwords/` — página do gerador
-  - `POST /passwords/api/gerar` — API JSON (requer `X-CSRFToken` no header)
-- **Modos:**
-  - **Password** — comprimento 8–64, toggles: maiúsculas, minúsculas, números, símbolos, excluir ambíguos
-  - **Passphrase** — 3–10 palavras PT separadas por hífen
-  - **PIN** — 4–12 dígitos numéricos
-- **Funcionalidades:**
-  - Tabs para alternar entre os três modos
-  - Barra de força com 5 níveis calculados por entropia no backend
-  - Botão Copiar com feedback visual ("Copiado!")
-  - Gera automaticamente ao carregar a página e ao mover sliders/toggles
-  - Frontend vanilla JS inline no template — sem ficheiros JS externos
-  - CSRF: token passado via `X-CSRFToken` no header do fetch (padrão do PIPE)
+- **Sem BD** — módulo totalmente stateless
+- **Modos:** Password (8–64 chars), Passphrase (3–10 palavras PT), PIN (4–12 dígitos)
+- **Funcionalidades:** barra de força por entropia, botão copiar, geração automática ao carregar
 
 ### Módulo Câmbio (`app/cambio/`)
-- **Sem BD** — módulo stateless, sem modelos nem migrações
-- **Rotas:**
-  - `GET /cambio/` — página de conversão
-  - `POST /cambio/api/convert` — API JSON (requer `X-CSRFToken` no header)
-- **API externa:** Wise API v3 (`/v3/quotes`) com fallback para ExchangeRate-API
-  - Seleciona opção de pagamento DEBIT (corresponde ao valor apresentado no site da Wise)
-  - Extrai fees detalhados: `fee.total`, `price.items` (fee pagamento, comissão Wise, IOF tax)
+- **Sem BD** — módulo stateless
+- **API externa:** Wise API v3 com fallback para ExchangeRate-API
 - **Moedas:** EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
-- **Funcionalidades:**
-  - Default EUR → BRL, selects configáveis para qualquer par
-  - Resultado formatado com `Intl.NumberFormat` por moeda (locale + currency corretos)
-  - Botão de inverter moedas entre os selects (troca origem/destino e reconverte automaticamente)
-  - Secção de taxas Wise exibida quando disponível: total das fees + discriminação individual
-  - Conversão automática ao trocar moedas, inverter moedas ou carregar o botão
-  - Botão Copiar com feedback visual
-  - Frontend vanilla JS inline no template — sem ficheiros JS externos
+- **Funcionalidades:** fees Wise detalhados, inverter moedas, botão copiar
 
 ### Módulo Cores (`app/cores/`)
-- **Sem BD** — módulo stateless, sem modelos nem migrações
-- **Rotas:**
-  - `GET /cores/` — página com color picker e tabs
-  - `POST /cores/api/convert` — API JSON (requer `X-CSRFToken` no header)
-- **Funcionalidades:**
-  - **Cor → Flutter**: color picker visual + input em HEX, RGB, HSL ou CMYK
-  - **Flutter → Cor**: cola código Flutter (`Color(0x..)`) → mostra cor e equivalentes
-  - Gera todos os equivalentes: `Color(0x..)`, `Color.fromRGBO`, `Color.fromARGB`, `HSLColor.fromAHSL`, `HSVColor.fromAHSV`, swatch Material mais próximo, CSS
-  - Botão Copiar em cada linha de código
-  - Preview visual da cor em tempo real
+- **Sem BD** — módulo stateless
+- **Funcionalidades:** Cor → Flutter (HEX/RGB/HSL/CMYK), Flutter → Cor, todos os equivalentes Flutter, preview em tempo real
 
 ### Módulo Conversões (`app/conversoes/`)
-- **Modelos:**
-  - `Conversao` — metadados no histórico (sem ficheiros armazenados)
-- **Rotas:**
-  - `GET /conversoes/` — dropzone + histórico recente
-  - `POST /conversoes/api/converter` — conversão (FormData com `ficheiros`, opção `tipo` e `tamanho`)
-- **Conversões:**
-  - **HEIC → JPG** — usa `pillow_heif`, dropzone drag & drop, validações: extensão .heic, 10MB/ficheiro, máx 20
-  - **PNG/JPG → ICO** — usa Pillow `resize` com `Image.LANCZOS`, tamanhos: 16, 32, 48, 64, 128, 256px
-- **Funcionalidades:**
-  - Seletor de tipo via tabs no frontend
-  - 1 ficheiro → download direto; 2+ ficheiros → download ZIP
-  - Lista de ficheiros selecionados com remoção individual
-  - Histórico das últimas 10 conversões com data, contagem e tamanho
-  - Zero disco — tudo processado em memória
+- **Modelo:** `Conversao` (metadados no histórico, sem ficheiros)
+- **Conversões:** HEIC→JPG (`pillow_heif`), PNG/JPG→ICO (Pillow LANCZOS)
+- **Funcionalidades:** dropzone drag & drop, download direto ou ZIP, zero disco
+
+### Módulo Calendário (`app/calendario/`) ← NOVO — v1.2
+- **Modelo:** `Evento` com campos: `id`, `user_id` (FK → `utilizadores.id`), `titulo`, `descricao`, `localizacao`, `data_inicio`, `data_fim`, `dia_inteiro`, `cor`, `notificar`, `notificado_em`, `criado_em`
+- **Paleta de 11 cores:** tomate, flamingo, tangerina, banana, sálvia, basil, peacock, mirtilo, lavanda, uva, grafite
+- **Rotas API:**
+  - `GET /calendario/` — página principal (login required)
+  - `GET /calendario/api/eventos?inicio=&fim=` — lista eventos do intervalo (60/min)
+  - `POST /calendario/api/eventos` — criar evento (30/min)
+  - `PUT /calendario/api/eventos/<id>` — editar evento (30/min)
+  - `DELETE /calendario/api/eventos/<id>` — apagar evento (30/min)
+- **Template `calendario/index.html`:**
+  - **Vista Agenda** — lista cronológica a partir de hoje, agrupada por data, com hora início–fim, cor, localização; botões editar e apagar por evento
+  - **Vista Mensal** — grelha 7×N (Seg–Dom), navegação mês anterior/seguinte/Hoje, pílulas coloridas com título, dia actual destacado (âmbar), clique em slot vazio pré-preenche data no modal
+  - **Modal único** (criar e editar) — título, descrição, localização, datetime início/fim, toggle dia inteiro, toggle notificar, selector de 11 cores (círculos clicáveis), validação data_fim ≥ data_inicio, mensagem de erro inline
+  - Frontend vanilla JS inline — padrão PIPE; CSRF via `X-CSRFToken` em todos os fetch
+- **Integração na Loja de Módulos** — entrada em `MODULOS_DISPONIVEIS` com slug `calendario`
+- **CSS** — 11 classes `.evento-<cor>` adicionadas ao `pipe.css`
+- **Padrão de imports corrigido:** `from app import db` + `from app.extensions import limiter` (padrão PIPE)
+- **Bug corrigido:** `#agenda-vazio` recriado via `innerHTML` a cada chamada `carregarAgenda()` para evitar perda de referência DOM ao alternar vistas
 
 ### Área Admin (`app/admin/`)
 - Blueprint em `/admin`, decorador `@admin_required`
 - Ícone 🛠️ na navbar visível apenas para admins
 - Dashboard com estatísticas, lista de utilizadores, toggle activo/admin, apagar utilizador
-- **Gestão de Convites** — nova funcionalidade:
-  - `GET /admin/convites` — lista todos os convites (activos, usados, expirados)
-  - `POST /admin/convites/gerar` — gera convite único (token criptográfico) com email, 7 dias de validade; pode enviar por email (SendGrid) ou gerar link para copiar
-  - `POST /admin/convites/<id>/revogar` — revoga convite não utilizado
-- Template `admin/convites.html` com formulário AJAX e tabela de estado
-- Reutiliza `EmailChannel` (SendGrid) para envio automático
-- Protecção: não é possível afectar a própria conta
-
-### Navegação
-- **Navbar** — marca PIPE (link para dashboard) + utilizador / admin / definições / sair
-- **Dashboard** — cards de módulos. Adicionar novos módulos aqui.
-- Links de módulos removidos da navbar — não escala com muitos módulos
+- **Gestão de Convites:** `GET /admin/convites`, `POST /admin/convites/gerar`, `POST /admin/convites/<id>/revogar`
+- Reutiliza `EmailChannel` (SendGrid) para envio automático de convites
 
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
-- **Sem BD** — módulo stateless, histórico de conversa em Flask session
-- **Ficheiros:**
-  - `cliente.py` — chamada HTTP a OpenRouter API com retry (3 tentativas com backoff 2s/5s/10s) e fallback entre modelos
-  - `contexto.py` — orquestração de tool use; histórico limitado a 20 mensagens (10 trocas); system prompt em PT-PT com regras explícitas de leitura apenas
-  - `ferramentas.py` — tool use com 4 funções: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`; todas filtram por `user_id` (obrigatório, injetado pelo caller)
-  - `routes.py` — rotas: `GET /assistente`, `POST /assistente/api/chat` (30/min), `POST /assistente/api/limpar` (10/min)
-- **Frontend:** balões de chat com cores distintas (utilizador = âmbar, assistente = azul-acinzentado), boas-vindas automáticas com delay de 800ms
-- **Variáveis de ambiente:** `OPENROUTER_API_KEY` (obrigatória), `OPENROUTER_MODEL` (opcional, default `qwen/qwen3.6-plus:free`)
+- **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens)
+- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x), `contexto.py` (tool use), `ferramentas.py` (4 tools: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`), `routes.py`
+- **Pendência:** conexão com API instável — retry/fallback a melhorar
 
 ### Sistema de notificações (`app/notifications/`)
-- Serviço central `NotificationService` — `notification_service.send(user, type, subject, body, data)`
+- `NotificationService` — `notification_service.send(user, type, subject, body, data)`
 - `TelegramChannel` ✅ e `EmailChannel` ✅ (SendGrid)
 - `UserNotificationPreferences` na BD; página de definições em `/definicoes`
 
@@ -292,8 +234,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 |---|---|---|
 | `tarefa_euromilhoes` | Terças e sextas | Verifica resultados e notifica utilizadores com jogos |
 | `tarefa_tarefas` | Todos os dias | Notifica tarefas em atraso (diariamente enquanto persistirem) |
-
-**Notificações de atraso diárias:** campo `notificada_em` (Date). Se `notificada_em < hoje` ou `NULL`, notifica e actualiza para hoje. Ao editar o prazo, `notificada_em` é resetado para `NULL`.
+| `tarefa_calendario_hoje` | **Pendente** | Notificar eventos do dia seguinte — **por implementar** |
 
 ### Autenticação 2FA
 - Telegram ✅, Email ✅, TOTP ✅ (pyotp + qrcode)
@@ -303,9 +244,9 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Tema escuro, acentos âmbar/dourado
 - Componentes: navbar, cartões, formulários, botões, alertas, skeleton loader, toggles, modais
 - Componentes Euromilhões: bolas, barras de frequência, badges de resultado
-- Componentes Tarefas: sidebar de listas, items com barra de prioridade, check circular, campo de busca, badges, estado vazio; selector mobile de listas (CSS inline no template)
-- Componentes Notas: grelha de cartões, cartão com hover/acções, palete de cores, caixa de criação inline, checklist, sidebar de etiquetas, página de edição
-- Módulo Passwords reutiliza exclusivamente classes existentes do design system — sem CSS adicional
+- Componentes Tarefas: sidebar, items, check circular, busca, badges, estado vazio, selector mobile
+- Componentes Notas: grelha de cartões, palete de cores, checklist, sidebar de etiquetas
+- **Componentes Calendário:** 11 classes `.evento-<cor>` (tomate → grafite) ← NOVO
 - Layout responsivo (sidebar oculta em mobile)
 
 ### Segurança
@@ -313,12 +254,12 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 | Medida | Implementação | Ficheiro |
 |---|---|---|
 | CSRF | Flask-WTF CSRFProtect em todos os formulários | `app/__init__.py` |
-| Rate limiting | Flask-Limiter nas rotas críticas — login (10/min), registo (5/h), recuperação (5/h), 2FA (10/min) | `app/auth/routes.py`, `app/extensions.py` |
-| Logging de login falhado | `app.logger.warning` com username e IP do utilizador | `app/auth/routes.py` |
-| Security headers | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` | `app/__init__.py` |
+| Rate limiting | Flask-Limiter nas rotas críticas | `app/auth/routes.py`, `app/extensions.py` |
+| Logging de login falhado | `app.logger.warning` com username e IP | `app/auth/routes.py` |
+| Security headers | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` | `app/__init__.py` |
 | Password hashing | Werkzeug `generate_password_hash` / `check_password_hash` | `app/auth/models.py` |
 | Controlo de acesso | `@login_required` e `@admin_required` | rotas protegidas |
-| Configuração IP PA | `X-Forwarded-For` no Limiter para proxy reverso do PythonAnywhere | `app/extensions.py` |
+| Configuração IP PA | `X-Forwarded-For` no Limiter | `app/extensions.py` |
 
 ### Testes realizados
 - Login e registo ✅
@@ -330,26 +271,16 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Recuperação de password por email ✅
 - Notificações Telegram e Email (manual) ✅
 - Área admin completa ✅
-- **Sistema de Convites** ✅ — geração de link, envio por email (SendGrid), registo por token, validação de 7 dias, uso único
+- Sistema de Convites ✅
 - Módulo Tarefas completo ✅
 - `pipe_tasks.py` com módulo Tarefas ✅
-- Módulo Tarefas — vista "Todas" por defeito ao abrir ✅
-- Módulo Tarefas — selector mobile de listas ✅
-- Módulo Notas — criação inline (texto e checklist) ✅
-- Módulo Notas — cores de fundo ✅
-- Módulo Notas — fixar / arquivar / recuperar ✅
-- Módulo Notas — etiquetas ✅
-- Módulo Notas — busca em tempo real ✅
-- Módulo Notas — toggle checklist no cartão ✅
-- Módulo Notas — edição completa ✅
-- Módulo Notas — deployed no PythonAnywhere ✅
-- Módulo Passwords — geração de password ✅
-- Módulo Passwords — geração de passphrase ✅
-- Módulo Passwords — geração de PIN ✅
-- Módulo Passwords — barra de força ✅
-- Módulo Passwords — botão copiar ✅
-- Módulo Passwords — deployed no PythonAnywhere ✅
+- Módulo Notas completo ✅
+- Módulo Passwords completo ✅
 - Módulo Câmbio — conversão EUR → BRL ✅
+- **Módulo Calendário — Vista Agenda** ✅ (criar, editar, apagar, agrupamento por data)
+- **Módulo Calendário — Vista Mensal** ✅ (grelha 7×N, navegação, pílulas coloridas, clique em slot)
+- **Módulo Calendário — Modal CRUD** ✅ (validação, selector de cor, toggles)
+- **Módulo Calendário — alternância Agenda ↔ Mensal** ✅ (bug DOM corrigido)
 
 ---
 
@@ -360,6 +291,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **WSGI configurado** ✅
 - **Static files** configurados ✅
 - **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às 08:00 ✅
+- **Módulo Calendário — deploy e migração de BD pendentes** ⚠️
 
 ### Configuração WSGI
 ```python
@@ -389,49 +321,60 @@ WISE_API_KEY=...
 ### Migrações de BD executadas
 - `scripts/adicionar_is_admin.py` ✅
 - `scripts/migrar_notificada_em.py` ✅
-- Módulo Notas — tabelas criadas automaticamente por `db.create_all()` ✅
+- Módulo Notas — tabelas criadas por `db.create_all()` ✅
 - Módulo Loja — tabela `user_modulos` criada por `db.create_all()` ✅
-- Módulo Passwords — sem BD, sem migrações ✅
+- Módulo Passwords — sem BD ✅
+- **Módulo Calendário — tabela `evento` a criar no PA após deploy** ⚠️
+
+### Comando de migração do Calendário (executar no PA após deploy)
+```bash
+python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"
+```
 
 ---
 
 ## Arquitectura de módulos
 
-Cada módulo é um Flask Blueprint independente.
-A navegação é feita pelos cards no dashboard.
+Cada módulo é um Flask Blueprint independente. A navegação é feita pelos cards no dashboard.
 
 **Para adicionar um novo módulo:**
 1. Criar `app/<modulo>/` com `__init__.py` e `routes.py` (+ `models.py` se precisar de BD)
 2. Registar o blueprint em `app/__init__.py`
-3. Adicionar card em `app/templates/dashboard.html`
-4. Adicionar função `tarefa_<modulo>(hoje)` em `scripts/pipe_tasks.py` se precisar de tarefa agendada
+3. Adicionar entrada em `app/modulos/config.py`
+4. Adicionar CSS específico em `pipe.css` se necessário
+5. Adicionar função `tarefa_<modulo>()` em `scripts/pipe_tasks.py` se precisar de tarefa agendada
 
 **Padrão AJAX/fetch no PIPE:**
 - Passar sempre `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch
 - Backend usa `request.get_json()` — não usa `validate_on_submit()`
 
+**Padrão de imports nos blueprints:**
+- `from app import db` — para SQLAlchemy
+- `from app.extensions import limiter` — para rate limiting
+
 ---
 
 ## Ponto onde estamos
 
-**Versão v1.1** — sete módulos completos e deployed. Infraestrutura madura: auth com 2FA multi-método, rate limiting, logging de segurança, security headers, sessões permanentes para PWA, notificações Telegram + Email, área admin, sistema de loja de módulos para personalização por utilizador, scheduled task unificada a correr às 08:00. Sistema de convites implementado e testado (registo restrito por link de 7 dias, uso único). Auditoria de segurança coberta: CSRF, brute force protection, clickjacking protection, MIME sniffing protection, login event logging.
+**Versão v1.2** — oito módulos completos (sete deployed + Calendário local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Commit `7f6e871` no branch `main`.
 
-**Pendências conhecidas:**
-- **Assistente IA**: conexão com API falha frequentemente (necessário melhorar retry/fallback)
-- **Melhorias em módulos existentes**: lista de tarefas (exportação?), notas (ordenar etiquetas manualmente?), etc. — por especificar
-- **Chat interno**: plano documentado mas não implementado (adiado por decisão)
+**Pendências do Calendário:**
+- `tarefa_calendario_hoje()` em `pipe_tasks.py` — notificação de eventos do dia seguinte às 08:00
+- Deploy no PythonAnywhere + migração da tabela `evento`
+- **Backlog v1.x:** tela de detalhe do evento (read-only, acionada ao clicar no evento na Agenda ou Vista Mensal; botão "Editar" dentro do detalhe abre o modal existente)
+
+**Pendências gerais:**
+- **Assistente IA:** conexão com API instável — melhorar retry/fallback
+- **Módulos futuros:** arquitectura pronta — versão 1.x
 
 ---
 
-## Próximos passos
+## Próximos passos imediatos
 
-- **Assistente IA**: estabilizar conexão com API (melhorar retry/fallback, monitorizar rate limits)
-- **Melhorias nos módulos existentes**: 
-  - Tarefas: exportação de lista?
-  - Notas: ordenação manual de etiquetas?
-  - Dashboard:.activity feed?
-- Revisitar **Chat Interno** apenas quando houver necessidade real de comunicação entre utilizadores
-- Novos módulos com valor prático (arquitectura pronta) — versão 1.x
+1. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
+2. Deploy do Calendário no PythonAnywhere
+3. Migração da tabela `evento` no PA
+4. Testar notificações do Calendário em produção
 
 ---
 
@@ -459,8 +402,8 @@ Flask-Limiter==3.8.0
 - Base de dados: SQLite
 - Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅) + recuperação de password por email ✅
 - Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes
-- Admin: área restrita com gestão de utilizadores, decorador `@admin_required`, script CLI de promoção
+- Admin: área restrita com gestão de utilizadores + sistema de convites, decorador `@admin_required`
 - Scheduled task: `pipe_tasks.py` — script unificado, um módulo por função, isolamento de erros
-- Rate limiting: Flask-Limiter com `X-Forwarded-For` para PythonAnywhere — protege rotas críticas (login, registo, recuperação de password, 2FA) contra brute force
-- Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` — via `@app.after_request` em `create_app()`
+- Rate limiting: Flask-Limiter com `X-Forwarded-For` para PythonAnywhere
+- Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`
 - Login event logging: tentativas falhadas registadas com username e IP via `app.logger.warning`
