@@ -7,5 +7,11 @@ MODULOS_DISPONIVEIS = {
     'cambio': {'nome': 'Câmbio', 'icone': '💱', 'url_endpoint': 'cambio.index', 'descricao': 'Conversão de moedas com taxas em tempo real (Wise + fallback).'},
     'cores': {'nome': 'Cores Flutter', 'icone': '🎨', 'url_endpoint': 'cores.index', 'descricao': 'Converte cores HEX/RGB/HSL para código Flutter.'},
     'conversoes': {'nome': 'Conversões', 'icone': '🔄', 'url_endpoint': 'conversoes.index', 'descricao': 'Converte ficheiros HEIC→JPG e PNG/JPG→ICO.'},
-    'assistente': {'nome': 'Assistente IA', 'icone': '🤖', 'url_endpoint': 'assistente.index', 'descricao': 'Assistente inteligente com acesso às tuas tarefas e notas.'}
+    'assistente': {'nome': 'Assistente IA', 'icone': '🤖', 'url_endpoint': 'assistente.index', 'descricao': 'Assistente inteligente com acesso às tuas tarefas e notas.'},
+    'calendario': {
+        'nome':         'Calendário',
+        'icone':        '📅',
+        'url_endpoint': 'calendario.index',
+        'descricao':    'Agenda pessoal com vistas mensal e de agenda.'
+    }
 }

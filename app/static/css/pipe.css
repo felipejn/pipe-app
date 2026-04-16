@@ -2456,3 +2456,16 @@ input[type="date"] {
     font-size: 0.78rem !important;
 }
 
+/* Cores de eventos do Calendário */
+.evento-tomate    { background-color: #d32f2f; color: #fff; }
+.evento-flamingo  { background-color: #e91e63; color: #fff; }
+.evento-tangerina { background-color: #f4511e; color: #fff; }
+.evento-banana    { background-color: #f6bf26; color: #1a1a1a; }
+.evento-salvia    { background-color: #33b679; color: #fff; }
+.evento-basil     { background-color: #0b8043; color: #fff; }
+.evento-peacock   { background-color: #039be5; color: #fff; }
+.evento-mirtilo   { background-color: #3f51b5; color: #fff; }
+.evento-lavanda   { background-color: #7986cb; color: #fff; }
+.evento-uva       { background-color: #8e24aa; color: #fff; }
+.evento-grafite   { background-color: #616161; color: #fff; }
+

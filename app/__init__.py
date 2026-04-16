@@ -65,6 +65,9 @@ def create_app(config_name='default'):
     from app.modulos import modulos_bp
     app.register_blueprint(modulos_bp)
 
+    from app.calendario import calendario_bp
+    app.register_blueprint(calendario_bp, url_prefix='/calendario')
+
     # Limiter inicializado após blueprints — necessário para decoradores funcionarem
     limiter.init_app(app)
 
@@ -109,6 +112,7 @@ def create_app(config_name='default'):
         from app.notas.models import Nota, ItemChecklist, EtiquetaNota  # noqa: F401
         from app.conversoes.models import Conversao  # noqa: F401
         from app.auth.models import Convite  # noqa: F401
+        from app.calendario.models import Evento  # noqa: F401
         db.create_all()
 
     return app
