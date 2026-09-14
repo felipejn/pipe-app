@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Combustíveis — PIPE{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo">
+
+  <div class="cabecalho-pagina">
+    <h1>⛽ Combustíveis</h1>
+    <p class="subtitulo">Preços dos postos nos teus concelhos</p>
+  </div>
+
+  {# ── Ações: atualizar + definições ──────────────────────────── #}
+  <div class="cabecalho-acoes" style="display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+    <form method="POST" action="{{ url_for('combustiveis.atualizar') }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-primario">🔄 Atualizar Dados</button>
+    </form>
+    <a href="{{ url_for('combustiveis.definicoes') }}" class="btn btn-secundario">⚙️ Definições</a>
+  </div>
+
+  {# ── Filtro por combustível (GET, filtra dentro do universo das Definições) ── #}
+  <form method="GET" action="{{ url_for('combustiveis.dashboard') }}" class="filtro-combustivel" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:.5rem;">
+    <label for="combustivel">Combustível:</label>
+    <select name="combustivel" id="combustivel" class="campo-texto" onchange="this.form.submit()">
+      {% for tipo in tipos_disponiveis %}
+        <option value="{{ tipo }}" {% if tipo == tipo_selecionado %}selected{% endif %}>{{ tipo }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {# ── Mais barato por combustível ─────────────────────────────── #}
+  {% set mais_barato = {} %}
+  {% for posto, ph in resultados %}
+    {% if ph.tipo_combustivel not in mais_barato or ph.preco < mais_barato[ph.tipo_combustivel].preco %}
+      {% if mais_barato.update({ph.tipo_combustivel: {'preco': ph.preco, 'posto': posto.nome}}) %}{% endif %}
+    {% endif %}
+  {% endfor %}
+
+  <div class="cartao definicoes-secao" style="margin-bottom:1.5rem;">
+    <div class="secao-cabecalho">
+      <div class="secao-titulo">
+        <span class="secao-icone">🏆</span>
+        <div>
+          <h2>Mais barato por combustível</h2>
+          <p class="secao-descricao">Preço mínimo entre os postos dos teus concelhos</p>
+        </div>
+      </div>
+    </div>
+    <div class="secao-corpo">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
+        {% if mais_barato %}
+          {% for tipo, info in mais_barato.items() %}
+          <div class="cartao" style="margin:0;">
+            <div style="font-size:1.05rem;font-weight:700;color:var(--cor-primaria);">{{ tipo }}</div>
+            <div style="font-size:1.5rem;font-weight:800;color:var(--cor-texto);margin-top:.25rem;">
+              {{ "%.3f"|format(info.preco) }} <span style="font-size:.85rem;color:var(--cor-texto-suave);">€/L</span>
+            </div>
+            <div style="font-size:.85rem;color:var(--cor-texto-suave);"><strong style="color:var(--cor-texto);">{{ info.posto }}</strong></div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="texto-subtil" style="margin:0;">Sem dados para mostrar.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Tabela completa de preços ────────────────────────────────── #}
+  <div class="cartao definicoes-secao">
+    <div class="secao-cabecalho">
+      <div class="secao-titulo">
+        <span class="secao-icone">📋</span>
+        <div>
+          <h2>Todos os preços</h2>
+          <p class="secao-descricao">Preços mais recentes por posto e combustível</p>
+        </div>
+      </div>
+    </div>
+    <div class="secao-corpo">
+      {% if resultados %}
+      <div style="overflow-x:auto;">
+        <table class="admin-tabela">
+          <thead>
+            <tr>
+              <th>Posto</th>
+              <th>Concelho</th>
+              <th>Combustível</th>
+              <th>Preço (€/L)</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for posto, ph in resultados %}
+            <tr>
+              <td>{{ posto.nome }}{% if posto.marca %} <span class="badge badge-info">{{ posto.marca }}</span>{% endif %}</td>
+              <td>{{ posto.concelho }}</td>
+              <td>{{ ph.tipo_combustivel }}</td>
+              <td><strong style="color:var(--cor-primaria);">{{ "%.3f"|format(ph.preco) }}</strong></td>
+              <td>{{ ph.data_recolha.strftime('%d/%m/%Y %H:%M') if ph.data_recolha else '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="texto-subtil" style="text-align:center;padding:1rem;margin:0;">Sem dados para os concelhos selecionados. Verifica as Definições.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

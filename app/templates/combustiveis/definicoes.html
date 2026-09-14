@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Definições — Combustíveis{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo" style="max-width: 640px;">
+
+  <div class="cabecalho-pagina">
+    <h1>⚙️ Definições — Combustíveis</h1>
+    <p class="subtitulo">Escolhe os concelhos para veres os preços dos combustíveis</p>
+  </div>
+
+  <form method="POST" action="{{ url_for('combustiveis.definicoes') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="cartao definicoes-secao">
+      <div class="secao-cabecalho">
+        <div class="secao-titulo">
+          <span class="secao-icone">📍</span>
+          <div>
+            <h2>Concelhos</h2>
+            <p class="secao-descricao">{{ concelhos_disponiveis|length }} concelho(s) disponível(is)</p>
+          </div>
+        </div>
+      </div>
+      <div class="secao-corpo">
+        {% if concelhos_disponiveis %}
+        <div style="display:flex;flex-direction:column;gap:.6rem;">
+          {% for concelho in concelhos_disponiveis %}
+          <label class="opcao-check">
+            <input type="checkbox" name="concelhos" value="{{ concelho }}"
+                   {% if concelho in concelhos_atuais %}checked{% endif %}>
+            <span>{{ concelho }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="texto-subtil" style="margin:0;">Ainda não há postos registados. Corre a recolha inicial primeiro.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cartao definicoes-secao">
+      <div class="secao-cabecalho">
+        <div class="secao-titulo">
+          <span class="secao-icone">⛽</span>
+          <div>
+            <h2>Combustíveis</h2>
+            <p class="secao-descricao">Se não escolheres nenhum, verás todos os tipos</p>
+          </div>
+        </div>
+      </div>
+      <div class="secao-corpo">
+        {% if tipos_disponiveis %}
+        <div style="display:flex;flex-direction:column;gap:.6rem;">
+          {% for tipo in tipos_disponiveis %}
+          <label class="opcao-check">
+            <input type="checkbox" name="combustiveis" value="{{ tipo }}"
+                   {% if tipo in combustiveis_atuais %}checked{% endif %}>
+            <span>{{ tipo }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="texto-subtil" style="margin:0;">Sem combustíveis disponíveis. Corre a recolha inicial primeiro.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="definicoes-acoes">
+      <button type="submit" class="btn btn-primario">Guardar</button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

@@ -13,5 +13,6 @@ MODULOS_DISPONIVEIS = {
         'icone':        '📅',
         'url_endpoint': 'calendario.index',
         'descricao':    'Agenda pessoal com vistas mensal e de agenda.'
-    }
+    },
+    'combustiveis': {'nome': 'Combustíveis', 'icone': '⛽', 'url_endpoint': 'combustiveis.dashboard', 'descricao': 'Preços de combustíveis nos concelhos que escolheres.'}
 }

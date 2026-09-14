@@ -174,12 +174,34 @@ def tarefa_tarefas(hoje):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MÓDULO 3 — Combustíveis
+# ══════════════════════════════════════════════════════════════════════════════
+
+def tarefa_combustiveis(hoje):
+    print(f'  [Combustíveis] A verificar necessidade de atualização...')
+
+    from app.combustiveis import services
+
+    resultado = services.atualizar_precos_se_necessario(forcar=False)
+
+    if not resultado['executado']:
+        print(f'  [Combustíveis] Hoje não é terça-feira — atualização automática ignorada.')
+        return
+
+    if resultado['sucesso']:
+        print(f'  [Combustíveis] {resultado["postos_atualizados"]} posto(s) atualizado(s) com sucesso.')
+    else:
+        print(f'  [Combustíveis] Concluído com erros: {resultado["erro"]}')
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ADICIONAR NOVOS MÓDULOS AQUI
 # ══════════════════════════════════════════════════════════════════════════════
 
 TAREFAS = [
     tarefa_euromilhoes,
     tarefa_tarefas,
+    tarefa_combustiveis,
 ]
 
 if __name__ == '__main__':

@@ -68,6 +68,9 @@ def create_app(config_name='default'):
     from app.calendario import calendario_bp
     app.register_blueprint(calendario_bp, url_prefix='/calendario')
 
+    from app.combustiveis import bp as combustiveis_bp
+    app.register_blueprint(combustiveis_bp)
+
     # Limiter inicializado após blueprints — necessário para decoradores funcionarem
     limiter.init_app(app)
 
@@ -113,6 +116,13 @@ def create_app(config_name='default'):
         from app.conversoes.models import Conversao  # noqa: F401
         from app.auth.models import Convite  # noqa: F401
         from app.calendario.models import Evento  # noqa: F401
+        from app.combustiveis.models import Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis  # noqa: F401
         db.create_all()
+
+        # Regra: uma só linha (id=1) na tabela EstadoAtualizacaoCombustiveis
+        from app.combustiveis.models import EstadoAtualizacaoCombustiveis
+        if EstadoAtualizacaoCombustiveis.query.get(1) is None:
+            db.session.add(EstadoAtualizacaoCombustiveis(id=1))
+            db.session.commit()
 
     return app

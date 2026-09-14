@@ -1,0 +1,90 @@
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_login import login_required, current_user
+from app import db
+from app.combustiveis.models import Posto, UtilizadorConcelho
+from app.combustiveis import services
+
+bp = Blueprint('combustiveis', __name__, url_prefix='/combustiveis')
+
+@bp.route('/')
+@login_required
+def dashboard():
+    from app.combustiveis.models import UtilizadorCombustivel
+
+    concelhos_utilizador = [
+        uc.concelho for uc in UtilizadorConcelho.query.filter_by(user_id=current_user.id).all()
+    ]
+    if not concelhos_utilizador:
+        return redirect(url_for('combustiveis.definicoes'))
+
+    tipos_utilizador = [
+        uc.tipo_combustivel for uc in UtilizadorCombustivel.query.filter_by(user_id=current_user.id).all()
+    ]
+
+    tipo_selecionado = request.args.get('combustivel', 'Todos')
+    tipos_disponiveis = ['Todos'] + services.obter_tipos_combustivel_disponiveis(concelhos_utilizador, tipos_utilizador)
+
+    # Se o utilizador tinha escolhido um combustível específico que já não
+    # está no universo (ex.: removeu-o nas Definições), volta a "Todos"
+    if tipo_selecionado not in tipos_disponiveis:
+        tipo_selecionado = 'Todos'
+
+    resultados = services.obter_precos_para_concelhos(concelhos_utilizador, tipos_utilizador, tipo_selecionado)
+
+    return render_template('combustiveis/dashboard.html',
+                            resultados=resultados,
+                            tipos_disponiveis=tipos_disponiveis,
+                            tipo_selecionado=tipo_selecionado)
+
+@bp.route('/definicoes', methods=['GET', 'POST'])
+@login_required
+def definicoes():
+    from app.combustiveis.models import UtilizadorCombustivel
+    from app.combustiveis.models import PrecoHistorico
+
+    concelhos_disponiveis = [
+        c[0] for c in db.session.query(Posto.concelho).distinct().order_by(Posto.concelho).all()
+    ]
+    tipos_disponiveis = [
+        t[0] for t in db.session.query(PrecoHistorico.tipo_combustivel)
+        .distinct().order_by(PrecoHistorico.tipo_combustivel).all()
+    ]
+
+    if request.method == 'POST':
+        # CSRF: usar o input hidden csrf_token, NUNCA csrf_field() — ver regras do projeto
+        selecionados = request.form.getlist('concelhos')
+        UtilizadorConcelho.query.filter_by(user_id=current_user.id).delete()
+        for c in selecionados:
+            if c in concelhos_disponiveis:
+                db.session.add(UtilizadorConcelho(user_id=current_user.id, concelho=c))
+
+        # Combustíveis de interesse — gravar (apagar anteriores e inserir as novas)
+        combustiveis_selecionados = request.form.getlist('combustiveis')
+        UtilizadorCombustivel.query.filter_by(user_id=current_user.id).delete()
+        for t in combustiveis_selecionados:
+            if t in tipos_disponiveis:
+                db.session.add(UtilizadorCombustivel(user_id=current_user.id, tipo_combustivel=t))
+
+        db.session.commit()
+        flash('Preferências guardadas.', 'success')
+        return redirect(url_for('combustiveis.dashboard'))
+
+    atuais = {uc.concelho for uc in UtilizadorConcelho.query.filter_by(user_id=current_user.id).all()}
+    combustiveis_atuais = {
+        uc.tipo_combustivel for uc in UtilizadorCombustivel.query.filter_by(user_id=current_user.id).all()
+    }
+    return render_template('combustiveis/definicoes.html',
+                            concelhos_disponiveis=concelhos_disponiveis,
+                            concelhos_atuais=atuais,
+                            tipos_disponiveis=tipos_disponiveis,
+                            combustiveis_atuais=combustiveis_atuais)
+
+@bp.route('/atualizar', methods=['POST'])
+@login_required
+def atualizar():
+    resultado = services.atualizar_precos_se_necessario(forcar=True)
+    if resultado['sucesso']:
+        flash(f"Preços atualizados ({resultado['postos_atualizados']} postos).", 'success')
+    else:
+        flash(f"Atualização com erros: {resultado['erro']}", 'warning')
+    return redirect(url_for('combustiveis.dashboard'))

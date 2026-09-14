@@ -100,7 +100,7 @@ def login():
             # Vários métodos — deixa o utilizador escolher
             return redirect(url_for('auth.escolher_2fa'))
 
-        app.logger.warning('Login falhado para utilizador: %s (IP: %s)',
+        current_app.logger.warning('Login falhado para utilizador: %s (IP: %s)',
                             form.username.data, request.remote_addr)
         flash('Utilizador ou palavra-passe incorrectos.', 'erro')
 
