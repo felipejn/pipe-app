@@ -1,9 +1,9 @@
-# PIPE — Estado Actual do Projecto — v1.2
+# PIPE — Estado Actual do Projecto — v1.3
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. O módulo Combustíveis é o nono módulo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -53,6 +53,15 @@ pipe-app/
 │   │   │   └── loja.html
 │   │   └── calendario/
 │   │       └── index.html   # vistas Agenda + Mensal, modal CRUD, JS inline
+│   ├── combustiveis/        # Blueprint Combustíveis ← NOVO
+│   │   ├── __init__.py
+│   │   ├── models.py        # Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis
+│   │   ├── services.py      # obter_precos_para_concelhos, atualizar_precos_se_necessario (terças), obter_tipos_combustivel_disponiveis
+│   │   ├── routes.py        # /combustiveis/, /combustiveis/definicoes, /combustiveis/atualizar
+│   │   └── templates/
+│   │       └── combustiveis/
+│   │           ├── dashboard.html
+│   │           └── definicoes.html
 │   ├── auth/                # Blueprint auth
 │   │   ├── __init__.py
 │   │   ├── routes.py        # /auth/login, /auth/registo (bloqueado), /auth/registo/<token>, /auth/logout, /auth/perfil, /auth/2fa/*
@@ -234,8 +243,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 |---|---|---|
 | `tarefa_euromilhoes` | Terças e sextas | Verifica resultados e notifica utilizadores com jogos |
 | `tarefa_tarefas` | Todos os dias | Notifica tarefas em atraso (diariamente enquanto persistirem) |
+| `tarefa_combustiveis` | **Terças-feiras** | Actualiza preços dos postos (via DGEG), respeitando o intervalo mínimo de 1x/dia por terça; ignorado nos restantes dias |
 | `tarefa_calendario_hoje` | **Pendente** | Notificar eventos do dia seguinte — **por implementar** |
-
 ### Autenticação 2FA
 - Telegram ✅, Email ✅, TOTP ✅ (pyotp + qrcode)
 - Múltiplos métodos em simultâneo — utilizador escolhe no login
@@ -248,6 +257,20 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Componentes Notas: grelha de cartões, palete de cores, checklist, sidebar de etiquetas
 - **Componentes Calendário:** 11 classes `.evento-<cor>` (tomate → grafite) ← NOVO
 - Layout responsivo (sidebar oculta em mobile)
+
+### Módulo Combustíveis (`app/combustiveis/`) ← NOVO — v1.3
+- **Schema:** tabelas `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel` e `combustiveis_estado_atualizacao`. FK de utilizador aponta para `utilizadores.id` (nome real da tabela). `db.create_all()` cria as tabelas no primeiro reload (sem Flask-Migrate).
+- **Modelo `Posto.id`** é o id da DGEG; relacionamento `precos` lazy='dynamic'.
+- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — agora corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`); o botão manual "Actualizar Dados" (`force=True`) ignora o dia. `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo.
+- **Rotas:**
+  - `GET /combustiveis/` — dashboard: cards "Mais barato por combustível" + tabela (Posto | Concelho | Combustível | Preço (€/L) | Data); filtro GET `?combustivel=`; redirect para Definições se sem concelhos.
+  - `GET/POST /combustiveis/definicoes` — checkboxes de concelhos + combustíveis; gravação em `UtilizadorConcelho` e `UtilizadorCombustivel` (delete+insert, como nas outras definições).
+  - `POST /combustiveis/atualizar` — força a actualização e faz redirect.
+- **Templates** em `app/templates/combustiveis/{dashboard,definicoes}.html` (arranjo do PIPE: `app/templates/<modulo>/`).
+- **CSS:** reutiliza as classes existentes (`pipe.css`) — `.cartao`, `.admin-tabela`, `.opcao-check`, `.btn`, `.campo-texto`, `.secao-*`. Dropdown usa `class="campo-texto"` e GET (sem CSRF).
+- **Scheduled task:** `tarefa_combustiveis` em `scripts/pipe_tasks.py` — chama `services.atualizar_precos_se_necessario(forcer=False)`; log "Hoje não é terça-feira — actualização automática ignorada." quando fora de terça.
+- **Primeira recolha:** `scripts/mapear_combustiveis_inicial.py` — script avulso (corrido manualmente uma vez) que preenche as tabelas com dados reais da DGEG, já filtrados para Braga/Vila Verde/Amares.
+- **Integração na Loja:** entrada em `MODULOS_DISPONIVEIS` com slug `combustiveis`, ícone ⛽, rota `combustiveis.dashboard`.
 
 ### Segurança
 
@@ -281,6 +304,9 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Módulo Calendário — Vista Mensal** ✅ (grelha 7×N, navegação, pílulas coloridas, clique em slot)
 - **Módulo Calendário — Modal CRUD** ✅ (validação, selector de cor, toggles)
 - **Módulo Calendário — alternância Agenda ↔ Mensal** ✅ (bug DOM corrigido)
+- **Módulo Combustíveis — dashboard com filtro `?combustivel=`** ✅
+- **Módulo Combustíveis — definições com checkboxes de concelhos + combustíveis** ✅
+- **Módulo Combustíveis — `tarefa_combustiveis` às terças** ✅ (ignora fora de terça; força no botão manual)
 
 ---
 
@@ -325,11 +351,15 @@ WISE_API_KEY=...
 - Módulo Loja — tabela `user_modulos` criada por `db.create_all()` ✅
 - Módulo Passwords — sem BD ✅
 - **Módulo Calendário — tabela `evento` a criar no PA após deploy** ⚠️
+- **Módulo Combustíveis — 4 tabelas** (`combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao`) criadas por `db.create_all()` no primeiro reload; modelo `UtilizadorCombustivel` adicionado ao import de `db.create_all()` em `app/__init__.py` ✅
 
 ### Comando de migração do Calendário (executar no PA após deploy)
 ```bash
 python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"
 ```
+
+### Módulo Combustíveis (migração)
+As tabelas do módulo Combustíveis são criadas **automaticamente** pelo `db.create_all()` (já chamado no arranque da app e com os modelos importados em `app/__init__.py`), **sem necessidade de script de migração manual**. A primeira população de dados é feita uma única vez por `scripts/mapear_combustiveis_inicial.py` (corrido manualmente, fora do `pipe_tasks.py`). No deploy do PA, basta o primeiro reload — as 4 tabelas + a linha seed `id=1` de `EstadoAtualizacaoCombustiveis` são criadas. Confirmar a whitelist de `precoscombustiveis.dgeg.gov.pt` antes da primeira tarefa automática (às terças).
 
 ---
 
@@ -356,7 +386,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
-**Versão v1.2** — oito módulos completos (sete deployed + Calendário local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Commit `7f6e871` no branch `main`.
+**Versão v1.3** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha da DGEG (Braga/Vila Verde/Amares), dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Commit `7f6e871` no branch `main`.
 
 **Pendências do Calendário:**
 - `tarefa_calendario_hoje()` em `pipe_tasks.py` — notificação de eventos do dia seguinte às 08:00
@@ -371,10 +401,13 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Próximos passos imediatos
 
-1. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
-2. Deploy do Calendário no PythonAnywhere
-3. Migração da tabela `evento` no PA
-4. Testar notificações do Calendário em produção
+1. Módulo Combustíveis — primeira recolha manual concluída em `scripts/mapear_combustiveis_inicial.py` ✅
+2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as 4 tabelas da DGEG (funciona no primeiro reload, sem migração manual)
+   - Confirmar que `precoscombustiveis.dgeg.gov.pt` está em whitelist no PA antes de correr a tarefa às terças
+3. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
+4. Deploy do Calendário no PythonAnywhere
+5. Migração da tabela `evento` no PA
+6. Testar notificações do Calendário em produção
 
 ---
 
