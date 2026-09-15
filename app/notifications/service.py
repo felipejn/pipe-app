@@ -35,12 +35,14 @@ class NotificationService:
         if telegram_token:
             self._canais['telegram'] = TelegramChannel(token=telegram_token)
 
-        sendgrid_key = os.environ.get('SENDGRID_API_KEY')
-        sendgrid_from = os.environ.get('SENDGRID_FROM_EMAIL')
-        if sendgrid_key and sendgrid_from:
+        mailjet_key = os.environ.get('MAILJET_API_KEY')
+        mailjet_secret = os.environ.get('MAILJET_API_SECRET')
+        mailjet_from = os.environ.get('MAILJET_FROM_EMAIL')
+        if mailjet_key and mailjet_from and mailjet_secret:
             self._canais['email'] = EmailChannel(
-                api_key=sendgrid_key,
-                remetente=sendgrid_from,
+                api_key=mailjet_key,
+                api_secret=mailjet_secret,
+                remetente=mailjet_from,
             )
 
         self._inicializado = True

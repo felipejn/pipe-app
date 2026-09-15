@@ -54,9 +54,10 @@ def _enviar_codigo_telegram(user):
 def _enviar_codigo_email(user):
     """Envia o código 2FA via email. Retorna True se bem-sucedido."""
     codigo = _gerar_e_guardar_codigo(user)
-    api_key = current_app.config.get('SENDGRID_API_KEY')
-    remetente = current_app.config.get('SENDGRID_FROM_EMAIL')
-    canal = EmailChannel(api_key=api_key, remetente=remetente)
+    api_key = current_app.config.get('MAILJET_API_KEY')
+    api_secret = current_app.config.get('MAILJET_API_SECRET')
+    remetente = current_app.config.get('MAILJET_FROM_EMAIL')
+    canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
 
     return canal.enviar(
         user,
@@ -404,9 +405,10 @@ def recuperar_password():
             db.session.commit()
 
             link = url_for('auth.reset_password', token=token, _external=True)
-            api_key = current_app.config.get('SENDGRID_API_KEY')
-            remetente = current_app.config.get('SENDGRID_FROM_EMAIL')
-            canal = EmailChannel(api_key=api_key, remetente=remetente)
+            api_key = current_app.config.get('MAILJET_API_KEY')
+            api_secret = current_app.config.get('MAILJET_API_SECRET')
+            remetente = current_app.config.get('MAILJET_FROM_EMAIL')
+            canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
             canal.enviar(
                 utilizador,
                 assunto='PIPE — Recuperação de palavra-passe',

@@ -16,7 +16,7 @@
 ### Infraestrutura transversal
 - Auth com 2FA (TOTP, Telegram, Email)
 - Flask-Limiter com ProxyFix para PythonAnywhere
-- Notificações via Telegram Bot API e SendGrid
+- Notificações via Telegram Bot API e Mailjet
 - Scheduled task `pipe_tasks.py` às 08:00
 - SQLite + SQLAlchemy ORM
 - Design system: tema escuro, acentos âmbar (`#f59e0b`)

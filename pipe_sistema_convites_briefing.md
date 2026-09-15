@@ -4,7 +4,7 @@
 
 **Problema:** O PIPE (Plataforma Inteligente Pessoal e Expansível) tem o registo aberto — qualquer pessoa pode criar conta em `/registo`. Queremos restringir o acesso à plataforma a **utilizadores convidados**, com registo exclusivamente via convite.
 
-**Solução:** O administrador gera convites na área de administração. Cada convite é um link único que pode ser enviado por email (via SendGrid) ou copiado manualmente. O destinatário abre o link, cria a sua conta, e o convite é consumido e invalidado.
+**Solução:** O administrador gera convites na área de administração. Cada convite é um link único que pode ser enviado por email (via Mailjet) ou copiado manualmente. O destinatário abre o link, cria a sua conta, e o convite é consumido e invalidado.
 
 ## Decisões de Design
 
@@ -14,7 +14,7 @@
 | Uso do convite | Único (1 registo = 1 convite) | Evita partilha pública de links |
 | Quem gera convites | Apenas utilizadores admin | Controlo centralizado por segurança |
 | Registo directo | Bloqueado | `/registo` redirect para `/login` com flash informativa |
-| Envio de convite | Email (SendGrid) ou link copiado | Flexibilidade para o admin |
+| Envio de convite | Email (Mailjet) ou link copiado | Flexibilidade para o admin |
 | Registo por convite | Formulário pré-preenchido | Email do destinatário aparece read-only |
 
 ## Arquitectura do Projecto (Contexto)
@@ -37,7 +37,7 @@ pipe-app/
 │   │   └── routes.py        # /admin/
 │   ├── notifications/
 │   │   └── channels/
-│   │       └── email.py     # EmailChannel (SendGrid) — JÁ EXISTE
+│   │       └── email.py     # EmailChannel (Mailjet) — JÁ EXISTE
 │   └── templates/
 │       ├── auth/            # Templates de auth
 │       └── admin/           # Templates de admin
@@ -72,7 +72,7 @@ class Convite(db.Model):
 ### 3. Rotas de convites no admin (`app/admin/routes.py`)
 
 - `GET /admin/convites` → lista todos os convites com estado (activo/usado/expirado)
-- `POST /admin/convites/gerar` → gera convite com email; se checkbox `enviar_email`, envia por SendGrid; senão retorna link para copiar
+- `POST /admin/convites/gerar` → gera convite com email; se checkbox `enviar_email`, envia por Mailjet; senão retorna link para copiar
 - `POST /admin/convites/<id>/revogar` → invalida convite não usado
 
 ### 4. Templates novos
@@ -85,8 +85,8 @@ class Convite(db.Model):
 
 | Componente | Ficheiro | Uso no sistema de convites |
 |---|---|---|
-| EmailChannel | `app/notifications/channels/email.py` | Enviar convite por email via SendGrid |
-| Config SendGrid | `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL` | Auth e remetente dos emails |
+| EmailChannel | `app/notifications/channels/email.py` | Enviar convite por email via Mailjet |
+| Config Mailjet | `MAILJET_API_KEY`, `MAILJET_API_SECRET`, `MAILJET_FROM_EMAIL` | Auth e remetente dos emails |
 | `@admin_required` | `app/admin/decorators.py` | Protecção de rotas de convite |
 | Padrão AJAX | `'X-CSRFToken': '{{ csrf_token() }}'` | Gerar/revogar convites sem reload |
 | `secrets` module | (stdlib Python) | Gerar token URL-safe para convite |

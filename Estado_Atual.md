@@ -79,7 +79,7 @@ pipe-app/
 │   │   └── channels/
 │   │       ├── base.py
 │   │       ├── telegram.py  # TelegramChannel
-│   │       └── email.py     # EmailChannel (SendGrid)
+│   │       └── email.py     # EmailChannel (Mailjet)
 │   ├── settings/            # Blueprint de definições
 │   │   ├── __init__.py
 │   │   └── routes.py        # /definicoes/
@@ -224,7 +224,7 @@ pipe-app/
 - Ícone 🛠️ na navbar visível apenas para admins
 - Dashboard com estatísticas, lista de utilizadores, toggle activo/admin, apagar utilizador
 - **Gestão de Convites:** `GET /admin/convites`, `POST /admin/convites/gerar`, `POST /admin/convites/<id>/revogar`
-- Reutiliza `EmailChannel` (SendGrid) para envio automático de convites
+- Reutiliza `EmailChannel` (Mailjet) para envio automático de convites
 
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
 - **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens)
@@ -233,7 +233,7 @@ pipe-app/
 
 ### Sistema de notificações (`app/notifications/`)
 - `NotificationService` — `notification_service.send(user, type, subject, body, data)`
-- `TelegramChannel` ✅ e `EmailChannel` ✅ (SendGrid)
+- `TelegramChannel` ✅ e `EmailChannel` ✅ (Mailjet)
 - `UserNotificationPreferences` na BD; página de definições em `/definicoes`
 
 ### Scheduled task — `scripts/pipe_tasks.py`
@@ -339,8 +339,9 @@ application = create_app()
 FLASK_ENV=production
 SECRET_KEY=<gerado com secrets.token_hex(32)>
 TELEGRAM_BOT_TOKEN=...
-SENDGRID_API_KEY=...
-SENDGRID_FROM_EMAIL=...
+MAILJET_API_KEY=...
+MAILJET_API_SECRET=...
+MAILJET_FROM_EMAIL=...
 WISE_API_KEY=...
 ```
 
@@ -434,7 +435,7 @@ Flask-Limiter==3.8.0
 - Custo total: zero
 - Base de dados: SQLite
 - Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅) + recuperação de password por email ✅
-- Notificações: Telegram ✅ + SendGrid email ✅ — arquitectura modular, canais independentes
+- Notificações: Telegram ✅ + Mailjet email ✅ — arquitectura modular, canais independentes
 - Admin: área restrita com gestão de utilizadores + sistema de convites, decorador `@admin_required`
 - Scheduled task: `pipe_tasks.py` — script unificado, um módulo por função, isolamento de erros
 - Rate limiting: Flask-Limiter com `X-Forwarded-For` para PythonAnywhere

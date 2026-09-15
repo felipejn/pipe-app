@@ -139,10 +139,11 @@ def gerar_convite():
 
     if enviar_email:
         try:
-            api_key = current_app.config.get('SENDGRID_API_KEY')
-            remetente = current_app.config.get('SENDGRID_FROM_EMAIL')
-            current_app.logger.info(f'[SENDGRID] API key configurada: {bool(api_key)}, remetente: {remetente}')
-            canal = EmailChannel(api_key=api_key, remetente=remetente)
+            api_key = current_app.config.get('MAILJET_API_KEY')
+            api_secret = current_app.config.get('MAILJET_API_SECRET')
+            remetente = current_app.config.get('MAILJET_FROM_EMAIL')
+            current_app.logger.info(f'[MAILJET] API key configurada: {bool(api_key)}, remetente: {remetente}')
+            canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
 
             # Criar objecto utilizador simulado com o email do convite
             class _Destinatario:
@@ -165,7 +166,7 @@ def gerar_convite():
 
             if enviado:
                 return {'sucesso': True, 'link': link, 'email_enviado': True}
-            return {'erro': 'Falha no envio (SendGrid retornou false).', 'link': link}, 500
+            return {'erro': 'Falha no envio (Mailjet retornou false).', 'link': link}, 500
 
         except Exception as e:
             current_app.logger.exception('Exceção ao enviar convite por email')

@@ -19,9 +19,11 @@ class Config:
     # Notificações — Telegram
     TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-    # Notificações — SendGrid
-    SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
-    SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL')
+    # Notificações — Mailjet
+    # Obter em: https://app.mailjet.com/settings/api_keys
+    MAILJET_API_KEY = os.environ.get('MAILJET_API_KEY')
+    MAILJET_API_SECRET = os.environ.get('MAILJET_API_SECRET')
+    MAILJET_FROM_EMAIL = os.environ.get('MAILJET_FROM_EMAIL')
 
     # Sessões
     SESSION_COOKIE_HTTPONLY = True

@@ -77,7 +77,7 @@ def testar_telegram():
 @settings.route('/testar-email', methods=['POST'])
 @login_required
 def testar_email():
-    """Envia email de teste ao utilizador via SendGrid."""
+    """Envia email de teste ao utilizador via Mailjet."""
     from app.notifications.channels.email import EmailChannel
     import os
 
@@ -86,14 +86,15 @@ def testar_email():
         flash('Activa primeiro o canal de email.', 'erro')
         return redirect(url_for('settings.index'))
 
-    api_key = os.environ.get('SENDGRID_API_KEY')
-    remetente = os.environ.get('SENDGRID_FROM_EMAIL')
+    api_key = os.environ.get('MAILJET_API_KEY')
+    api_secret = os.environ.get('MAILJET_API_SECRET')
+    remetente = os.environ.get('MAILJET_FROM_EMAIL')
 
-    if not api_key or not remetente:
-        flash('SENDGRID_API_KEY ou SENDGRID_FROM_EMAIL não configurados no servidor.', 'erro')
+    if not api_key or not remetente or not api_secret:
+        flash('MAILJET_API_KEY, MAILJET_API_SECRET ou MAILJET_FROM_EMAIL não configurados no servidor.', 'erro')
         return redirect(url_for('settings.index'))
 
-    canal = EmailChannel(api_key=api_key, remetente=remetente)
+    canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
     sucesso = canal.enviar(
         current_user,
         'Teste PIPE',
@@ -103,6 +104,6 @@ def testar_email():
     if sucesso:
         flash(f'Email de teste enviado para {current_user.email}.', 'sucesso')
     else:
-        flash('Erro ao enviar. Confirma as credenciais SendGrid no servidor.', 'erro')
+        flash('Erro ao enviar. Confirma as credenciais Mailjet no servidor.', 'erro')
 
     return redirect(url_for('settings.index'))
