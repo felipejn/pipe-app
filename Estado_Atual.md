@@ -56,7 +56,7 @@ pipe-app/
 │   ├── combustiveis/        # Blueprint Combustíveis ← NOVO
 │   │   ├── __init__.py
 │   │   ├── models.py        # Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis
-│   │   ├── services.py      # obter_precos_para_concelhos, atualizar_precos_se_necessario (terças), obter_tipos_combustivel_disponiveis
+│   │   ├── services.py      # API Aberta (api.apiaberta.pt); atualizar_precos_se_necessario, obter_precos_para_concelhos, obter_tipos_combustivel_disponiveis
 │   │   ├── routes.py        # /combustiveis/, /combustiveis/definicoes, /combustiveis/atualizar
 │   │   └── templates/
 │   │       └── combustiveis/
@@ -243,7 +243,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 |---|---|---|
 | `tarefa_euromilhoes` | Terças e sextas | Verifica resultados e notifica utilizadores com jogos |
 | `tarefa_tarefas` | Todos os dias | Notifica tarefas em atraso (diariamente enquanto persistirem) |
-| `tarefa_combustiveis` | **Terças-feiras** | Actualiza preços dos postos (via DGEG), respeitando o intervalo mínimo de 1x/dia por terça; ignorado nos restantes dias |
+| `tarefa_combustiveis` | **Terças-feiras** | Actualiza preços dos postos (via API Aberta api.apiaberta.pt), respeitando o intervalo mínimo de 1x/dia por terça; ignorado nos restantes dias |
 | `tarefa_calendario_hoje` | **Pendente** | Notificar eventos do dia seguinte — **por implementar** |
 ### Autenticação 2FA
 - Telegram ✅, Email ✅, TOTP ✅ (pyotp + qrcode)
@@ -260,8 +260,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 
 ### Módulo Combustíveis (`app/combustiveis/`) ← NOVO — v1.3
 - **Schema:** tabelas `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel` e `combustiveis_estado_atualizacao`. FK de utilizador aponta para `utilizadores.id` (nome real da tabela). `db.create_all()` cria as tabelas no primeiro reload (sem Flask-Migrate).
-- **Modelo `Posto.id`** é o id da DGEG; relacionamento `precos` lazy='dynamic'.
-- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — agora corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`); o botão manual "Actualizar Dados" (`force=True`) ignora o dia. `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo.
+- **Modelo `Posto.id`** é o id da API Aberta; relacionamento `precos` lazy='dynamic'.
+- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`); o botão manual "Actualizar Dados" (`forcar=True`) ignora o dia. Faz paginação completa da API Aberta (`GET /v1/fuel/stations?fuel=<slug>&page=&limit=100`) por combustível, filtra cliente `municipality` para Braga/Vila Verde/Amares e grava em `Posto` + `PrecoHistorico` (upsert por `station_id`). Autenticação via header `X-API-Key` (var `APIABERTA_API_KEY`, opcional — sem chave = 30 pedidos/min; com chave = 300/min). `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo.
 - **Rotas:**
   - `GET /combustiveis/` — dashboard: cards "Mais barato por combustível" + tabela (Posto | Concelho | Combustível | Preço (€/L) | Data); filtro GET `?combustivel=`; redirect para Definições se sem concelhos.
   - `GET/POST /combustiveis/definicoes` — checkboxes de concelhos + combustíveis; gravação em `UtilizadorConcelho` e `UtilizadorCombustivel` (delete+insert, como nas outras definições).
@@ -269,7 +269,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Templates** em `app/templates/combustiveis/{dashboard,definicoes}.html` (arranjo do PIPE: `app/templates/<modulo>/`).
 - **CSS:** reutiliza as classes existentes (`pipe.css`) — `.cartao`, `.admin-tabela`, `.opcao-check`, `.btn`, `.campo-texto`, `.secao-*`. Dropdown usa `class="campo-texto"` e GET (sem CSRF).
 - **Scheduled task:** `tarefa_combustiveis` em `scripts/pipe_tasks.py` — chama `services.atualizar_precos_se_necessario(forcer=False)`; log "Hoje não é terça-feira — actualização automática ignorada." quando fora de terça.
-- **Primeira recolha:** `scripts/mapear_combustiveis_inicial.py` — script avulso (corrido manualmente uma vez) que preenche as tabelas com dados reais da DGEG, já filtrados para Braga/Vila Verde/Amares.
+ - **Primeira recolha:** correu uma vez manualmente via `services.atualizar_precos_se_necessario(forcar=True)` (equivalente a `scripts/popular_combustiveis.py`). Substitui o antigo `scripts/mapear_combustiveis_inicial.py` (removido — não era necessário com a API Aberta: a paginação por combustível já devolve os postos da zona directamente).
 - **Integração na Loja:** entrada em `MODULOS_DISPONIVEIS` com slug `combustiveis`, ícone ⛽, rota `combustiveis.dashboard`.
 
 ### Segurança
@@ -343,6 +343,7 @@ MAILJET_API_KEY=...
 MAILJET_API_SECRET=...
 MAILJET_FROM_EMAIL=...
 WISE_API_KEY=...
+APIABERTA_API_KEY=...
 ```
 
 ### Migrações de BD executadas
@@ -360,7 +361,7 @@ python -c "from app import create_app; from app.extensions import db; from app.c
 ```
 
 ### Módulo Combustíveis (migração)
-As tabelas do módulo Combustíveis são criadas **automaticamente** pelo `db.create_all()` (já chamado no arranque da app e com os modelos importados em `app/__init__.py`), **sem necessidade de script de migração manual**. A primeira população de dados é feita uma única vez por `scripts/mapear_combustiveis_inicial.py` (corrido manualmente, fora do `pipe_tasks.py`). No deploy do PA, basta o primeiro reload — as 4 tabelas + a linha seed `id=1` de `EstadoAtualizacaoCombustiveis` são criadas. Confirmar a whitelist de `precoscombustiveis.dgeg.gov.pt` antes da primeira tarefa automática (às terças).
+As tabelas do módulo Combustíveis são criadas **automaticamente** pelo `db.create_all()` (já chamado no arranque da app e com os modelos importados em `app/__init__.py`), **sem necessidade de script de migração manual**. A primeira população de dados é feita uma única vez correndo `services.atualizar_precos_se_necessario(forcar=True)` — ou, por conveniência, `python scripts/popular_combustiveis.py` (script de ajuda, não obrigatório). No deploy do PA, basta o primeiro reload — as 4 tabelas + a linha seed `id=1` de `EstadoAtualizacaoCombustiveis` são criadas. **`api.apiaberta.pt` está na whitelist do PA** (é um domínio com documentação Swagger pública, diferentemente da DGEG que o substituiu).
 
 ---
 
@@ -387,7 +388,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
-**Versão v1.3** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha da DGEG (Braga/Vila Verde/Amares), dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Commit `7f6e871` no branch `main`.
+**Versão v1.3** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha concluída com **95 postos** e **1480 preços históricos**. Commit `7f6e871` no branch `main`.
 
 **Pendências do Calendário:**
 - `tarefa_calendario_hoje()` em `pipe_tasks.py` — notificação de eventos do dia seguinte às 08:00
@@ -402,9 +403,10 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Próximos passos imediatos
 
-1. Módulo Combustíveis — primeira recolha manual concluída em `scripts/mapear_combustiveis_inicial.py` ✅
-2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as 4 tabelas da DGEG (funciona no primeiro reload, sem migração manual)
-   - Confirmar que `precoscombustiveis.dgeg.gov.pt` está em whitelist no PA antes de correr a tarefa às terças
+1. Módulo Combustíveis — primeira recolha manual concluída ✅ (95 postos, 1480 preços; fonte: API Aberta)
+2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as tabelas (funciona no primeiro reload, sem migração manual)
+   - `api.apiaberta.pt` já está na whitelist do PA (documentação Swagger pública)
+   - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min e ~25s por recolha)
 3. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
 4. Deploy do Calendário no PythonAnywhere
 5. Migração da tabela `evento` no PA
