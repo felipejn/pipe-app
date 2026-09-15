@@ -112,7 +112,7 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
     Fonte de dados: API Aberta (api.apiaberta.pt/v1/fuel/stations), autenticada
     via header X-API-Key (chave em APIABERTA_API_KEY). Sem chave, tier anónimo
     de 30 pedidos/min; com chave, 300/min. Rate limit respeitado com
-    PAUSA_ENTRE_PEDIDOS (~2,1s) e retry em 429 respeitando Retry-After.
+        PAUSA_ENTRE_PEDIDOS (~0,21s) e retry em 429 respeitando Retry-After.
     """
     hoje = hoje or date_cls.today()
 
