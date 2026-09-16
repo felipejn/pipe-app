@@ -28,7 +28,7 @@ Gestor de tarefas pessoal com suporte a múltiplas listas.
 Bloco de notas com suporte a texto livre e checklists.
 - Grelha de cartões com criação inline sem mudar de página
 - Suporte a texto livre e checklist com toggle directo no cartão
-- 8 cores de fundo dentro do tema escuro
+- 8 cores de fundo (paleta Google Keep — aplicáveis em tema claro e escuro)
 - Fixar no topo, arquivar e etiquetas com sugestão automática
 - Busca em tempo real por título, corpo e etiquetas
 
