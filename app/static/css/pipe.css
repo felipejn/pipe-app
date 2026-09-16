@@ -2299,7 +2299,7 @@ input[type="date"] {
     background: none;
     border: none;
     border-bottom: 1px solid var(--cor-borda);
-    color: var(--cor-texto);
+    color: var(--nota-texto, var(--cor-texto));
     font-size: 1.2rem;
     font-weight: 700;
     padding: 0.3rem 0 0.6rem;
@@ -2314,7 +2314,7 @@ input[type="date"] {
     width: 100%;
     background: none;
     border: none;
-    color: var(--cor-texto);
+    color: var(--nota-texto, var(--cor-texto));
     font-size: 0.95rem;
     font-family: var(--fonte);
     line-height: 1.6;
@@ -2347,7 +2347,7 @@ input[type="date"] {
     background: none;
     border: none;
     border-bottom: 1px solid var(--cor-borda);
-    color: var(--cor-texto);
+    color: var(--nota-texto, var(--cor-texto));
     font-size: 0.9rem;
     padding: 0.2rem 0;
     outline: none;
