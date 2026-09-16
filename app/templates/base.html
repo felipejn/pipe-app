@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block titulo %}PIPE{% endblock %} — PIPE</title>
+    <script>
+        (function() {
+            var tema = localStorage.getItem('pipe-tema') || 'dark';
+            document.documentElement.setAttribute('data-theme', tema);
+        })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pipe.css') }}">
     {% block estilos_extra %}{% endblock %}
     <!-- PWA -->
@@ -37,6 +43,10 @@
            class="btn-logout {% if request.blueprint == 'modulos' %}activo{% endif %}" title="Loja de Módulos">🛒</a>
         <a href="{{ url_for('settings.index') }}"
            class="btn-logout {% if request.blueprint == 'settings' %}activo{% endif %}">⚙️</a>
+        <button type="button" class="btn-tema" id="btn-alternar-tema" title="Alternar tema"
+                aria-label="Alternar tema claro/escuro">
+            <span id="icone-tema">🌙</span>
+        </button>
         <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>
     </div>
 </nav>

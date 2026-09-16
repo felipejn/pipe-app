@@ -1,4 +1,4 @@
-const CACHE = 'pipe-v1';
+const CACHE = 'pipe-v2';
 const ASSETS = [
   '/',
   '/static/css/pipe.css',
@@ -22,6 +22,18 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Rede primeiro para CSS, JS e HTML — garante que as alterações chegam ao browser
+  if (['style', 'script', 'document'].includes(e.request.destination)) {
+    e.respondWith(
+      fetch(e.request).then(resposta => {
+        const copia = resposta.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, copia));
+        return resposta;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // Cache primeiro para o resto (ícones, manifestos, etc.)
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );

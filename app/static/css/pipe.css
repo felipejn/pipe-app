@@ -1,30 +1,61 @@
 /* =====================================================
    PIPE — Design System
    Paleta: escuro com acentos em dourado/âmbar
+   Tema claro: via [data-theme="light"] (alternância na navbar)
    ===================================================== */
 
 :root {
     --cor-fundo: #0f1117;
-    --cor-superficie: #1a1d27;
+    --cor-superficie: #1e1e2e;
     --cor-superficie-2: #22263a;
-    --cor-borda: #2e3347;
-    --cor-primaria: #f59e0b;       /* âmbar — identidade PIPE */
+    --cor-borda: #2e2e3e;
+    --cor-borda-hover: #404563;
+    --cor-primaria: #f59e0b;          /* âmbar — identidade PIPE (mantém-se em ambos os temas) */
     --cor-primaria-hover: #d97706;
     --cor-texto: #e2e8f0;
     --cor-texto-suave: #8892a4;
-    --cor-sucesso: #10b981;
-    --cor-erro: #ef4444;
-    --cor-info: #3b82f6;
-    --cor-estrela: #f59e0b;
-    --cor-destaque: #f59e0b;       /* âmbar */
-    --cor-destaque-rgb: 245, 158, 11;   /* ADICIONAR se não existir */
-    --cor-superficie: #1e1e2e;
-    --cor-borda: #2e2e3e;
     --cor-texto-subtil: #6b7280;
+    --cor-texto-subtil-2: #94a3b8;
+    --cor-sucesso: #10b981;
+    --cor-sucesso-texto: #6ee7b7;
+    --cor-erro: #ef4444;
+    --cor-erro-texto: #fca5a5;
+    --cor-info: #3b82f6;
+    --cor-info-texto: #93c5fd;
+    --cor-aviso-texto: #fcd34d;
+    --cor-prioridade-alta: #f87171;
+    --cor-prioridade-media: #818cf8;
+    --cor-prioridade-baixa: #4ade80;
+    --cor-estrela: #f59e0b;
+    --cor-destaque: #f59e0b;          /* âmbar */
+    --cor-destaque-rgb: 245, 158, 11;
+    --cor-overlay-hover: rgba(255,255,255,0.08);
     --raio: 10px;
     --raio-sm: 6px;
     --sombra: 0 4px 24px rgba(0,0,0,0.4);
     --fonte: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Tema claro — overrides semânticos */
+[data-theme="light"] {
+    --cor-fundo: #f8f9fb;
+    --cor-superficie: #ffffff;
+    --cor-superficie-2: #f1f3f7;
+    --cor-borda: #dde1e8;
+    --cor-borda-hover: #c5cad4;
+    --cor-texto: #1a1d27;
+    --cor-texto-suave: #5a6172;
+    --cor-texto-subtil: #8892a4;
+    --cor-texto-subtil-2: #6b7280;
+    --cor-sucesso-texto: #047857;
+    --cor-erro-texto: #b91c1c;
+    --cor-info-texto: #1d4ed8;
+    --cor-aviso-texto: #b45309;
+    --cor-prioridade-alta: #dc2626;
+    --cor-prioridade-media: #4f46e5;
+    --cor-prioridade-baixa: #16a34a;
+    --cor-overlay-hover: rgba(0,0,0,0.05);
+    --sombra: 0 4px 20px rgba(0,0,0,0.1);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -126,9 +157,9 @@ a:hover { text-decoration: underline; }
     font-size: 0.9rem;
 }
 
-.alerta-sucesso { background: rgba(16,185,129,0.1); border-color: var(--cor-sucesso); color: #6ee7b7; }
-.alerta-erro    { background: rgba(239,68,68,0.1);  border-color: var(--cor-erro);   color: #fca5a5; }
-.alerta-info    { background: rgba(59,130,246,0.1); border-color: var(--cor-info);   color: #93c5fd; }
+.alerta-sucesso { background: rgba(16,185,129,0.1); border-color: var(--cor-sucesso); color: var(--cor-sucesso-texto); }
+.alerta-erro    { background: rgba(239,68,68,0.1);  border-color: var(--cor-erro);   color: var(--cor-erro-texto); }
+.alerta-info    { background: rgba(59,130,246,0.1); border-color: var(--cor-info);   color: var(--cor-info-texto); }
 
 /* ---- Cartões ---- */
 .cartao {
@@ -542,7 +573,7 @@ a:hover { text-decoration: underline; }
 
 .badge-ganhou {
     background: rgba(16, 185, 129, 0.15);
-    color: #6ee7b7;
+    color: var(--cor-sucesso-texto);
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
@@ -554,7 +585,7 @@ a:hover { text-decoration: underline; }
 
 .badge-pendente {
     background: rgba(59, 130, 246, 0.1);
-    color: #93c5fd;
+    color: var(--cor-info-texto);
     border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
@@ -608,7 +639,7 @@ a:hover { text-decoration: underline; }
 
 .acerto-est {
     background: rgba(100, 116, 139, 0.15);
-    color: #94a3b8;
+    color: var(--cor-texto-subtil-2);
     border-color: rgba(100, 116, 139, 0.3);
 }
 
@@ -621,7 +652,7 @@ a:hover { text-decoration: underline; }
     border-radius: var(--raio-sm);
     padding: 0.65rem 1rem;
     font-size: 0.83rem;
-    color: #93c5fd;
+        color: var(--cor-info-texto);
     margin-bottom: 1.5rem;
 }
 
@@ -1184,19 +1215,19 @@ a:hover { text-decoration: underline; }
 
 .badge-activo {
     background: rgba(74, 222, 128, 0.1);
-    color: #4ade80;
+    color: var(--cor-prioridade-baixa);
     border: 1px solid rgba(74, 222, 128, 0.3);
 }
 
 .badge-inactivo {
     background: rgba(248, 113, 113, 0.1);
-    color: #f87171;
+    color: var(--cor-prioridade-alta);
     border: 1px solid rgba(248, 113, 113, 0.3);
 }
 
 .badge-2fa {
     background: rgba(129, 140, 248, 0.1);
-    color: #818cf8;
+    color: var(--cor-prioridade-media);
     border: 1px solid rgba(129, 140, 248, 0.3);
     margin-left: 0;
     margin-right: 0.2rem;
@@ -1224,7 +1255,7 @@ a:hover { text-decoration: underline; }
 }
 
 .btn-acao-apagar:hover {
-    border-color: #f87171;
+    border-color: var(--cor-prioridade-alta);
     background: rgba(248, 113, 113, 0.1);
 }
 
@@ -1487,7 +1518,7 @@ input[type="date"] {
     transition: border-color 0.15s;
 }
 
-.tarefa-item:hover { border-color: #404563; border-left-color: inherit; }
+.tarefa-item:hover { border-color: var(--cor-borda-hover); border-left-color: inherit; }
 .tarefa-item.concluida { opacity: 0.5; }
 .tarefa-item.em-atraso { background: rgba(239,68,68,0.05); }
 
@@ -1551,12 +1582,12 @@ input[type="date"] {
     white-space: nowrap;
 }
 
-.badge-alta  { background: rgba(239,68,68,0.15);  color: #fca5a5; }
-.badge-media { background: rgba(245,158,11,0.15); color: #fcd34d; }
-.badge-baixa { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+.badge-alta  { background: rgba(239,68,68,0.15);  color: var(--cor-erro-texto); }
+.badge-media { background: rgba(245,158,11,0.15); color: var(--cor-aviso-texto); }
+.badge-baixa { background: rgba(16,185,129,0.15); color: var(--cor-sucesso-texto); }
 .badge-data  { background: var(--cor-superficie); color: var(--cor-texto-suave); }
-.badge-atraso { background: rgba(239,68,68,0.2); color: #fca5a5; }
-.badge-tag   { background: rgba(59,130,246,0.15); color: #93c5fd; }
+.badge-atraso { background: rgba(239,68,68,0.2); color: var(--cor-erro-texto); }
+.badge-tag   { background: rgba(59,130,246,0.15); color: var(--cor-info-texto); }
 
 /* Acções da tarefa */
 .tarefa-acoes {
@@ -1801,7 +1832,7 @@ input[type="date"] {
 
 .btn-secundario:hover {
     color: var(--cor-texto);
-    border-color: #404563;
+    border-color: var(--cor-borda-hover);
     text-decoration: none;
 }
 
@@ -2019,7 +2050,7 @@ input[type="date"] {
     line-height: 1;
 }
 
-.nota-acao-btn:hover { background: rgba(255,255,255,0.08); }
+.nota-acao-btn:hover { background: var(--cor-overlay-hover); }
 .nota-acao-apagar:hover { background: rgba(239,68,68,0.12); }
 
 /* ── Palete de cores ──────────────────────────────────── */
@@ -2168,7 +2199,7 @@ input[type="date"] {
     transition: background 0.15s;
 }
 
-.btn-tipo-nota:hover { background: rgba(255,255,255,0.08); }
+.btn-tipo-nota:hover { background: var(--cor-overlay-hover); }
 
 .nota-criar-titulo {
     width: 100%;
@@ -2426,9 +2457,9 @@ input[type="date"] {
 
 .chat-bubble--assistant {
     align-self: flex-start;
-    background: #2a2f47;
+    background: var(--cor-superficie-2);
     color: var(--cor-texto);
-    border-color: #3a4060;
+    border-color: var(--cor-borda);
 }
 
 /* ---- Info convite (registo com token) ---- */
@@ -2452,7 +2483,7 @@ input[type="date"] {
 }
 
 .info-convite-validade {
-    color: #94a3b8 !important;
+    color: var(--cor-texto-subtil-2) !important;
     font-size: 0.78rem !important;
 }
 
@@ -2485,4 +2516,17 @@ input[type="date"] {
 .nav-link-secundario:hover {
     text-decoration: underline;
 }
+
+/* ---- Botão de alternância de tema ---- */
+.btn-tema {
+    background: none;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm);
+    color: var(--cor-texto-suave);
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    font-size: 1rem;
+    transition: border-color 0.2s, color 0.2s;
+}
+.btn-tema:hover { border-color: var(--cor-primaria); color: var(--cor-primaria); }
 
