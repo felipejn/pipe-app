@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.3
+# PIPE — Estado Actual do Projecto — v1.3.1
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -23,12 +23,15 @@ pipe-app/
 │   ├── __init__.py          # create_app, app factory
 │   ├── extensions.py        # Limiter (Flask-Limiter, X-Forwarded-For para PA)
 │   ├── static/
-│   │   ├── css/pipe.css     # design system (tema escuro, âmbar/dourado) + cores de eventos do Calendário
+│   │   ├── css/pipe.css     # design system (tema escuro, âmbar/dourado) + cores de eventos do Calendário + navegação secundária
+│   │   ├── icons/           # icon-192.png, icon-512.png (PWA)
+│   │   ├── manifest.json    # PWA — manifest
+│   │   ├── sw.js            # PWA — service worker
 │   │   └── js/
 │   │       ├── pipe.js      # JS base (alertas)
 │   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
 │   ├── templates/
-│   │   ├── base.html        # navbar sem links de módulos (navegação via dashboard)
+│   │   ├── base.html        # navbar + barra secundária «Voltar/Home» (oculta no dashboard)
 │   │   ├── dashboard.html   # cards de módulos dinâmicos (Loja de Módulos)
 │   │   ├── auth/
 │   │   ├── euromilhoes/
@@ -132,6 +135,7 @@ pipe-app/
 │   ├── adicionar_is_admin.py
 │   ├── migrar_notificada_em.py
 │   ├── pipe_tasks.py        # única scheduled task
+│   ├── popular_combustiveis.py  # recolha manual de combustíveis (helper)
 │   └── verificar_resultados.py  # mantido para referência histórica
 ├── instance/
 │   └── pipe.db              # SQLite (excluído do git)
@@ -258,14 +262,19 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Componentes Calendário:** 11 classes `.evento-<cor>` (tomate → grafite) ← NOVO
 - Layout responsivo (sidebar oculta em mobile)
 
+### Interface / Navegação (frontend — sessão paralela)
+- **Barra secundária «Voltar / Home»** em `base.html`: renderizada em todas as páginas excepto o dashboard (`{% if request.endpoint != 'dashboard' %}`); «← Voltar» usa `javascript:history.back()` e «Home» aponta para `url_for('dashboard')`.
+- **Estilos CSS:** `.nav-secundaria` (barra com fundo `--cor-superficie` e borda inferior) e `.nav-link-secundario` (+ `:hover` com sublinhado), em `pipe.css`.
+- **PWA (já presente em `app/static/`):** `manifest.json`, `sw.js` (service worker, registado no `base.html`) e ícones `icons/icon-192.png` / `icons/icon-512.png` — inclui `theme-color` âmbar e modo standalone em iOS.
+
 ### Módulo Combustíveis (`app/combustiveis/`) ← NOVO — v1.3
 - **Schema:** tabelas `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel` e `combustiveis_estado_atualizacao`. FK de utilizador aponta para `utilizadores.id` (nome real da tabela). `db.create_all()` cria as tabelas no primeiro reload (sem Flask-Migrate).
 - **Modelo `Posto.id`** é o id da API Aberta; relacionamento `precos` lazy='dynamic'.
-- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`); o botão manual "Actualizar Dados" (`forcar=True`) ignora o dia. Faz paginação completa da API Aberta (`GET /v1/fuel/stations?fuel=<slug>&page=&limit=100`) por combustível, filtra cliente `municipality` para Braga/Vila Verde/Amares e grava em `Posto` + `PrecoHistorico` (upsert por `station_id`). Autenticação via header `X-API-Key` (var `APIABERTA_API_KEY`, opcional — sem chave = 30 pedidos/min; com chave = 300/min). `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo.
+- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`, marcador gravado apenas em execuções com sucesso, para permitir retry no mesmo dia após falha); o botão manual "Actualizar Dados" (`forcar=True`) ignora o dia. Faz paginação completa da API Aberta (`GET /v1/fuel/stations?fuel=<slug>&district=Braga&page=&limit=100`) por combustível (~12 pedidos, ~3-4 s por recolha), filtra do lado do cliente por `municipality` (Braga/Vila Verde/Amares) e grava em `Posto` + `PrecoHistorico` (chave `station_id`); só grava novo histórico quando `preco` ou `updated_at` mudam (deduplicação). Autenticação via header `X-API-Key` (var `APIABERTA_API_KEY`, opcional — sem chave = 30 pedidos/min; com chave = 300/min). `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo. Devolve `postos_verificados`, `precos_novos` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade).
 - **Rotas:**
   - `GET /combustiveis/` — dashboard: cards "Mais barato por combustível" + tabela (Posto | Concelho | Combustível | Preço (€/L) | Data); filtro GET `?combustivel=`; redirect para Definições se sem concelhos.
   - `GET/POST /combustiveis/definicoes` — checkboxes de concelhos + combustíveis; gravação em `UtilizadorConcelho` e `UtilizadorCombustivel` (delete+insert, como nas outras definições).
-  - `POST /combustiveis/atualizar` — força a actualização e faz redirect.
+  - `POST /combustiveis/atualizar` — força a actualização (rate limit 6/hora) e faz redirect, com flash honesto ("X postos verificados, Y registos novos" ou "sem alterações desde a última recolha").
 - **Templates** em `app/templates/combustiveis/{dashboard,definicoes}.html` (arranjo do PIPE: `app/templates/<modulo>/`).
 - **CSS:** reutiliza as classes existentes (`pipe.css`) — `.cartao`, `.admin-tabela`, `.opcao-check`, `.btn`, `.campo-texto`, `.secao-*`. Dropdown usa `class="campo-texto"` e GET (sem CSRF).
 - **Scheduled task:** `tarefa_combustiveis` em `scripts/pipe_tasks.py` — chama `services.atualizar_precos_se_necessario(forcar=False)`; log "Actualização automática ignorada — hoje não é terça-feira." quando fora de terça e "— já actualizado hoje" quando já correu nessa terça; em execução, loga postos verificados, registos novos e total na BD.
@@ -277,7 +286,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
   - **Estado visível** — o dashboard mostra "Última actualização: … · N postos na base de dados" e o erro da última recolha, se existir.
   - **`ultima_atualizacao` só é marcada em caso de sucesso** — uma falha na terça permite retry no mesmo dia (antes, a falha às 08:00 bloqueava o resto do dia).
   - **Rate limit** — `POST /combustiveis/atualizar` limitado a 6/hora (`@limiter.limit`).
- - **Primeira recolha:** correu uma vez manualmente via `services.atualizar_precos_se_necessario(forcar=True)` (equivalente a `scripts/popular_combustiveis.py`). Substitui o antigo `scripts/mapear_combustiveis_inicial.py` (removido — não era necessário com a API Aberta: a paginação por combustível já devolve os postos da zona directamente).
+- **Primeira recolha:** correu uma vez manualmente via `services.atualizar_precos_se_necessario(forcar=True)` (equivalente a `scripts/popular_combustiveis.py`). Substitui o antigo `scripts/mapear_combustiveis_inicial.py` (removido — não era necessário com a API Aberta: a paginação por combustível já devolve os postos da zona directamente).
 - **Integração na Loja:** entrada em `MODULOS_DISPONIVEIS` com slug `combustiveis`, ícone ⛽, rota `combustiveis.dashboard`.
 
 ### Segurança
@@ -285,7 +294,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 | Medida | Implementação | Ficheiro |
 |---|---|---|
 | CSRF | Flask-WTF CSRFProtect em todos os formulários | `app/__init__.py` |
-| Rate limiting | Flask-Limiter nas rotas críticas | `app/auth/routes.py`, `app/extensions.py` |
+| Rate limiting | Flask-Limiter nas rotas críticas | `app/auth/routes.py`, `app/combustiveis/routes.py`, `app/extensions.py` |
 | Logging de login falhado | `app.logger.warning` com username e IP | `app/auth/routes.py` |
 | Security headers | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` | `app/__init__.py` |
 | Password hashing | Werkzeug `generate_password_hash` / `check_password_hash` | `app/auth/models.py` |
@@ -397,7 +406,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
-**Versão v1.3** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit `7f6e871` no branch `main`.
+**Versão v1.3.1** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit do fix `cf58e59` no branch `main` (publicado no GitHub).
 
 **Pendências do Calendário:**
 - `tarefa_calendario_hoje()` em `pipe_tasks.py` — notificação de eventos do dia seguinte às 08:00
@@ -412,10 +421,10 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Próximos passos imediatos
 
-1. Módulo Combustíveis — primeira recolha manual concluída ✅ (95 postos; as 1480 linhas existentes vieram da era DGEG — a via API Aberta passa a recolher tudo desde a correcção v1.3.1)
+1. Módulo Combustíveis — primeira recolha manual concluída ✅ (95 postos; as 1480 linhas existentes vieram da era DGEG — após a correcção v1.3.1 a recolha via API Aberta valida 80 postos por ciclo e o dedup impede linhas repetidas)
 2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as tabelas (funciona no primeiro reload, sem migração manual)
    - `api.apiaberta.pt` já está na whitelist do PA (documentação Swagger pública)
-   - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min e ~25s por recolha)
+   - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min — com o filtro `district` a recolha desceu de ~25 s para ~3-4 s)
 3. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
 4. Deploy do Calendário no PythonAnywhere
 5. Migração da tabela `evento` no PA
