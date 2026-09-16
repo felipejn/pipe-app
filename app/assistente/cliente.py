@@ -13,9 +13,12 @@ _ESPERA_RETRY = [2, 5, 10]  # segundos de backoff entre tentativas
 
 def _listar_modelos():
     """Devolve lista de modelos gratuitos disponiveis, ordenados por preferencia."""
-    padrao = os.environ.get('OPENROUTER_MODEL', 'qwen/qwen3.6-plus:free')
+    padrao = os.environ.get('OPENROUTER_MODEL', 'google/gemma-4-31b-it:free')
     fallbacks = [m for m in [
-        'qwen/qwen3-coder:free',
+        'google/gemma-4-31b-it:free',
+        'nvidia/nemotron-3-super-120b-a12b:free',
+        'cohere/north-mini-code:free',
+        'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
     ] if m != padrao]
     return [padrao] + fallbacks
 
@@ -68,11 +71,8 @@ def chamar_llm(mensagens, ferramentas=None):
                 continue
 
             if resposta.status_code == 429:
-                rate_after = resposta.headers.get('Retry-After', '')
-                wait = int(rate_after) if rate_after.isdigit() else espera
-                if i < len(_ESPERA_RETRY) - 1:
-                    time.sleep(wait)
-                continue
+                # Rate limit — passa imediatamente ao proximo modelo
+                break
 
             if resposta.status_code == 404:
                 # Modelo nao existe — passa ao proximo

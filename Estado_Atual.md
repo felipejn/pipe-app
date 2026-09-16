@@ -232,8 +232,10 @@ pipe-app/
 
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
 - **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens)
-- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x), `contexto.py` (tool use), `ferramentas.py` (4 tools: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`), `routes.py`
-- **Pendência:** conexão com API instável — retry/fallback a melhorar
+- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (4 tools: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`), `routes.py`
+- **Modelo:** `google/gemma-4-31b-it:free` (suporta tool use) — configurado via `OPENROUTER_MODEL` env var. Fallbacks: `google/gemma-4-31b-it:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
+- **Correção aplicada (v1.4.0):** o modelo anterior (`google/gemma-4-26b-a4b-it:free`) não suportava tool use, causando falhas silenciosas com a mensagem genérica de erro. Trocado para `google/gemma-4-31b-it:free`. Removidos modelos inválidos (`qwen/qwen3.6-plus:free`, `qwen/qwen3-coder:free`). Adicionado `import traceback` e `traceback.print_exc()` + `print(f'[Assistente ERRO] ...')` nos blocos `except Exception` de `contexto.py` para diagnóstico visível nos logs. Simplificado tratamento de HTTP 429 (break imediato para próximo modelo, sem parsing de `Retry-After` header)
+- **Teste:** modelo faz tool calls correctamente (confirmado com `get_tarefas`)
 
 ### Sistema de notificações (`app/notifications/`)
 - `NotificationService` — `notification_service.send(user, type, subject, body, data)`
@@ -423,7 +425,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 - **Backlog v1.x:** tela de detalhe do evento (read-only, acionada ao clicar no evento na Agenda ou Vista Mensal; botão "Editar" dentro do detalhe abre o modal existente)
 
 **Pendências gerais:**
-- **Assistente IA:** conexão com API instável — melhorar retry/fallback
+- **Assistente IA:** retry/fallback a melhorar (modelo e logging corrigidos em v1.4.0)
 - **Módulos futuros:** arquitectura pronta — versão 1.x
 
 ---

@@ -6,6 +6,7 @@ orquestra o fluxo de chamadas à API OpenRouter com tool use.
 
 import json
 import time
+import traceback
 
 from flask import session
 
@@ -100,7 +101,9 @@ def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None):
             _guardar_historico(historico)
             return erro_msg
         return erro_msg, historico
-    except Exception:
+    except Exception as e:
+        traceback.print_exc()
+        print(f'[Assistente ERRO] {type(e).__name__}: {e}')
         erro_msg = 'Neste momento não consegui processar o teu pedido. Tenta novamente mais tarde.'
         historico.append({'role': 'assistant', 'content': erro_msg})
         historico = _limpar_historico(historico)
@@ -147,9 +150,10 @@ def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None):
                 _guardar_historico(historico)
                 return erro_msg
             return erro_msg, historico
-        except Exception:
+        except Exception as e:
             import traceback
             traceback.print_exc()
+            print(f'[Assistente ERRO] {type(e).__name__}: {e}')
             erro_msg = 'Recebi os dados da consulta, mas não consegui formular a resposta. Tenta novamente.'
             historico.append({'role': 'assistant', 'content': erro_msg})
             historico = _limpar_historico(historico)
