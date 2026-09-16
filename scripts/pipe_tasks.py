@@ -185,13 +185,16 @@ def tarefa_combustiveis(hoje):
     resultado = services.atualizar_precos_se_necessario(forcar=False)
 
     if not resultado['executado']:
-        print(f'  [Combustíveis] Hoje não é terça-feira — atualização automática ignorada.')
+        motivo = ('já actualizado hoje' if hoje.weekday() == 1 else 'hoje não é terça-feira')
+        print(f'  [Combustíveis] Actualização automática ignorada — {motivo}.')
         return
 
     if resultado['sucesso']:
-        print(f'  [Combustíveis] {resultado["postos_atualizados"]} posto(s) atualizado(s) com sucesso.')
+        print(f'  [Combustíveis] {resultado["postos_verificados"]} posto(s) verificado(s), '
+              f'{resultado["precos_novos"]} registo(s) novo(s); total na BD: {resultado["postos_na_bd"]}.')
     else:
-        print(f'  [Combustíveis] Concluído com erros: {resultado["erro"]}')
+        print(f'  [Combustíveis] Concluído com erros ({resultado["postos_verificados"]} postos '
+              f'verificados): {resultado["erro"]}')
 
 
 # ══════════════════════════════════════════════════════════════════════════════

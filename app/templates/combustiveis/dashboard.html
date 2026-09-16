@@ -8,6 +8,19 @@
   <div class="cabecalho-pagina">
     <h1>⛽ Combustíveis</h1>
     <p class="subtitulo">Preços dos postos nos teus concelhos</p>
+    {% if estado and estado.ultima_atualizacao %}
+      <p class="texto-subtil" style="margin-top:.35rem;">
+        Última actualização: {{ estado.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') }}
+        · {{ total_postos }} posto{{ 's' if total_postos != 1 else '' }} na base de dados
+      </p>
+    {% else %}
+      <p class="texto-subtil" style="margin-top:.35rem;">Ainda sem recolhas registadas.</p>
+    {% endif %}
+    {% if estado and not estado.ultima_execucao_sucesso and estado.mensagem_erro %}
+      <p class="texto-subtil" style="margin-top:.35rem;color:var(--cor-erro);">
+        A última recolha terminou com erros: {{ estado.mensagem_erro }}
+      </p>
+    {% endif %}
   </div>
 
   {# ── Ações: atualizar + definições ──────────────────────────── #}

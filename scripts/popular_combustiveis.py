@@ -70,7 +70,8 @@ def main():
 
         print(f'  Executado:             {resultado["executado"]}')
         print(f'  Sucesso:               {resultado["sucesso"]}')
-        print(f'  Postos actualizados:   {resultado["postos_atualizados"]}')
+        print(f'  Postos verificados:    {resultado["postos_verificados"]}')
+        print(f'  Registos novos:        {resultado["precos_novos"]}')
         if resultado['erro']:
             print(f'  Erro:                  {resultado["erro"]}')
         print(f'  Duração:               {duracao:.1f}s')

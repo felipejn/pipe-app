@@ -268,7 +268,15 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
   - `POST /combustiveis/atualizar` — força a actualização e faz redirect.
 - **Templates** em `app/templates/combustiveis/{dashboard,definicoes}.html` (arranjo do PIPE: `app/templates/<modulo>/`).
 - **CSS:** reutiliza as classes existentes (`pipe.css`) — `.cartao`, `.admin-tabela`, `.opcao-check`, `.btn`, `.campo-texto`, `.secao-*`. Dropdown usa `class="campo-texto"` e GET (sem CSRF).
-- **Scheduled task:** `tarefa_combustiveis` em `scripts/pipe_tasks.py` — chama `services.atualizar_precos_se_necessario(forcer=False)`; log "Hoje não é terça-feira — actualização automática ignorada." quando fora de terça.
+- **Scheduled task:** `tarefa_combustiveis` em `scripts/pipe_tasks.py` — chama `services.atualizar_precos_se_necessario(forcar=False)`; log "Actualização automática ignorada — hoje não é terça-feira." quando fora de terça e "— já actualizado hoje" quando já correu nessa terça; em execução, loga postos verificados, registos novos e total na BD.
+- **Correcções v1.3.1 (após o refactor para a API Aberta):**
+  - **Bug crítico de paginação corrigido** — o `return encontrados` de `_paginar_fuel` estava indentado *dentro* do `while True`, devolvendo logo após a página 1. A recolha via API Aberta via apenas 4 postos (de 95) e o botão manual respondia "Preços atualizados (4 postos)." em ~1 s. Corrigido (return ao nível da função) e adicionada guarda `PAGINAS_MAX = 60`.
+  - **Filtro `district`** — a API honra `district` (não honra `municipality`, `municipio`, `concelho`, `q` ou `search`). Com `district=Braga` a paginação passa de ~96 para ~12 pedidos (~21 s → ~3 s). O match é por prefixo (devolve também Bragança), pelo que o filtro por concelho continua a ser aplicado do lado do cliente.
+  - **Deduplicação de histórico** — só se grava `PrecoHistorico` quando `preco` ou `data_atualizacao_dgeg` (o `updated_at` da API) difere do último registo do mesmo posto+combustível. Evita linhas 100% duplicadas (as recolhas DGEG tinham triplicado o histórico).
+  - **Retorno honesto** — `atualizar_precos_se_necessario` devolve `postos_verificados`, `precos_novos` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade). O flash distingue "Preços actualizados — X postos verificados, Y registos novos." de "Preços verificados — X postos, sem alterações desde a última recolha."
+  - **Estado visível** — o dashboard mostra "Última actualização: … · N postos na base de dados" e o erro da última recolha, se existir.
+  - **`ultima_atualizacao` só é marcada em caso de sucesso** — uma falha na terça permite retry no mesmo dia (antes, a falha às 08:00 bloqueava o resto do dia).
+  - **Rate limit** — `POST /combustiveis/atualizar` limitado a 6/hora (`@limiter.limit`).
  - **Primeira recolha:** correu uma vez manualmente via `services.atualizar_precos_se_necessario(forcar=True)` (equivalente a `scripts/popular_combustiveis.py`). Substitui o antigo `scripts/mapear_combustiveis_inicial.py` (removido — não era necessário com a API Aberta: a paginação por combustível já devolve os postos da zona directamente).
 - **Integração na Loja:** entrada em `MODULOS_DISPONIVEIS` com slug `combustiveis`, ícone ⛽, rota `combustiveis.dashboard`.
 
@@ -307,6 +315,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Módulo Combustíveis — dashboard com filtro `?combustivel=`** ✅
 - **Módulo Combustíveis — definições com checkboxes de concelhos + combustíveis** ✅
 - **Módulo Combustíveis — `tarefa_combustiveis` às terças** ✅ (ignora fora de terça; força no botão manual)
+- **Módulo Combustíveis — paginação completa + deduplicação** (95 postos verificados num só ciclo, histórico sem linhas duplicadas, filtro `district`)
 
 ---
 
@@ -388,7 +397,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
-**Versão v1.3** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha concluída com **95 postos** e **1480 preços históricos**. Commit `7f6e871` no branch `main`.
+**Versão v1.3** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit `7f6e871` no branch `main`.
 
 **Pendências do Calendário:**
 - `tarefa_calendario_hoje()` em `pipe_tasks.py` — notificação de eventos do dia seguinte às 08:00
@@ -403,7 +412,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Próximos passos imediatos
 
-1. Módulo Combustíveis — primeira recolha manual concluída ✅ (95 postos, 1480 preços; fonte: API Aberta)
+1. Módulo Combustíveis — primeira recolha manual concluída ✅ (95 postos; as 1480 linhas existentes vieram da era DGEG — a via API Aberta passa a recolher tudo desde a correcção v1.3.1)
 2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as tabelas (funciona no primeiro reload, sem migração manual)
    - `api.apiaberta.pt` já está na whitelist do PA (documentação Swagger pública)
    - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min e ~25s por recolha)

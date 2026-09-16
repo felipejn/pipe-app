@@ -3,13 +3,14 @@ from flask_login import login_required, current_user
 from app import db
 from app.combustiveis.models import Posto, UtilizadorConcelho
 from app.combustiveis import services
+from app.extensions import limiter
 
 bp = Blueprint('combustiveis', __name__, url_prefix='/combustiveis')
 
 @bp.route('/')
 @login_required
 def dashboard():
-    from app.combustiveis.models import UtilizadorCombustivel
+    from app.combustiveis.models import UtilizadorCombustivel, EstadoAtualizacaoCombustiveis
 
     concelhos_utilizador = [
         uc.concelho for uc in UtilizadorConcelho.query.filter_by(user_id=current_user.id).all()
@@ -31,10 +32,17 @@ def dashboard():
 
     resultados = services.obter_precos_para_concelhos(concelhos_utilizador, tipos_utilizador, tipo_selecionado)
 
+    # Estado da recolha — mostrado no cabeçalho para o utilizador perceber se os
+    # preços são frescos ou se a última tentativa falhou.
+    estado = EstadoAtualizacaoCombustiveis.query.get(1)
+    total_postos = Posto.query.count()
+
     return render_template('combustiveis/dashboard.html',
                             resultados=resultados,
                             tipos_disponiveis=tipos_disponiveis,
-                            tipo_selecionado=tipo_selecionado)
+                            tipo_selecionado=tipo_selecionado,
+                            estado=estado,
+                            total_postos=total_postos)
 
 @bp.route('/definicoes', methods=['GET', 'POST'])
 @login_required
@@ -80,11 +88,19 @@ def definicoes():
                             combustiveis_atuais=combustiveis_atuais)
 
 @bp.route('/atualizar', methods=['POST'])
+@limiter.limit("6/hour", methods=["POST"])
 @login_required
 def atualizar():
     resultado = services.atualizar_precos_se_necessario(forcar=True)
-    if resultado['sucesso']:
-        flash(f"Preços atualizados ({resultado['postos_atualizados']} postos).", 'success')
+
+    if not resultado['sucesso']:
+        flash(f"Actualização com erros ({resultado['postos_verificados']} postos "
+              f"verificados antes da falha): {resultado['erro']}", 'warning')
+    elif resultado['precos_novos']:
+        flash(f"Preços actualizados — {resultado['postos_verificados']} postos "
+              f"verificados, {resultado['precos_novos']} registos novos.", 'success')
     else:
-        flash(f"Atualização com erros: {resultado['erro']}", 'warning')
+        flash(f"Preços verificados — {resultado['postos_verificados']} postos, "
+              "sem alterações desde a última recolha.", 'success')
+
     return redirect(url_for('combustiveis.dashboard'))

@@ -35,9 +35,16 @@ MUNICIPIOS_INTERESSE = {"Braga", "Vila Verde", "Amares"}
 
 PAGE_LIMIT = 100
 # 300 pedidos/minuto com chave (~0,2 s por pedido); 30/minuto sem chave.
-# A paginação completa são ~98 pedidos, logo ~21 s com chave.
+# Com o filtro `district` a paginação completa são ~12 pedidos (≈3-4 páginas
+# por combustível), logo ~3 s com chave. Sem chave, ~12 pedidos ainda cabem
+# no tier anónimo de 30/min.
 PAUSA_ENTRE_PEDIDOS = 0.21  # segundos, margem de segurança face ao rate limit
 TENTATIVAS_MAX = 3          # tentativas por página antes de desistir do combustível
+PAGINAS_MAX = 60            # corte de segurança contra loop infinito de paginação
+# Distrito cujo nome é prefixo de todos os concelhos de interesse. A API
+# filtra por distrito (match por prefixo → inclui "Bragança", daí o filtro por
+# concelho é sempre aplicado de cliente para cliente em _paginar_fuel).
+DISTRITO_INTERESSE = 'Braga'
 
 
 def _headers():
@@ -84,11 +91,18 @@ def _get_com_retry(session, params):
 
 def _paginar_fuel(session, fuel_slug):
     """Percorre todas as páginas de um combustível e devolve só os
-    registos cujo municipality está em MUNICIPIOS_INTERESSE."""
+    registos cujo municipality está em MUNICIPIOS_INTERESSE.
+
+    A API filtra por ``district`` no pedido, o que reduz de ~32 para ~4
+    páginas por combustível (~12 pedidos ao todo vs ~96 sem filtro). O match
+    de distrito é por prefixo, devolvendo também Bragança — inofensivo, porque
+    o filtro por concelho é aplicado aqui, de cliente para o cliente.
+    """
     encontrados = []
     page = 1
     while True:
-        params = {'fuel': fuel_slug, 'page': page, 'limit': PAGE_LIMIT}
+        params = {'fuel': fuel_slug, 'district': DISTRITO_INTERESSE,
+                  'page': page, 'limit': PAGE_LIMIT}
         resp = _get_com_retry(session, params)
         corpo = resp.json()
 
@@ -97,22 +111,25 @@ def _paginar_fuel(session, fuel_slug):
                 encontrados.append(registo)
 
         meta = corpo.get('meta', {})
-        if page >= meta.get('pages', 1):
+        paginas = meta.get('pages', 1)
+        if page >= paginas or page >= PAGINAS_MAX:
             break
         page += 1
         time.sleep(PAUSA_ENTRE_PEDIDOS)
 
-        return encontrados
+    return encontrados
 
 
 def atualizar_precos_se_necessario(forcar=False, hoje=None):
     """
-    Retorna dict: {'executado': bool, 'sucesso': bool, 'postos_atualizados': int, 'erro': str|None}
+    Retorna dict com as chaves 'executado', 'sucesso',
+    'postos_verificados', 'postos_atualizados' (nº de postos
+    verificados), 'precos_novos', 'postos_na_bd' e 'erro'.
 
     Fonte de dados: API Aberta (api.apiaberta.pt/v1/fuel/stations), autenticada
     via header X-API-Key (chave em APIABERTA_API_KEY). Sem chave, tier anónimo
     de 30 pedidos/min; com chave, 300/min. Rate limit respeitado com
-        PAUSA_ENTRE_PEDIDOS (~0,21s) e retry em 429 respeitando Retry-After.
+    PAUSA_ENTRE_PEDIDOS (~0,21s) e retry em 429 respeitando Retry-After.
     """
     hoje = hoje or date_cls.today()
 
@@ -129,6 +146,7 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
     session = requests.Session()
     erros = []
     postos_vistos = set()
+    precos_gravados = 0
 
     for fuel_slug in FUEL_SLUGS:
         try:
@@ -149,23 +167,43 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
             db.session.add(posto)
             db.session.flush()
 
+            # Deduplicação: só grava histórico quando há alteração real. A API
+            # devolve updated_at (timestamp DGEG) + preço; se coincidirem com o
+            # último registo conhecido do mesmo posto+combustível, nada grava.
+            ultimo = (PrecoHistorico.query
+                      .filter_by(posto_id=posto.id, tipo_combustivel=r.get('fuel_name'))
+                      .order_by(PrecoHistorico.data_recolha.desc()).first())
+            if (ultimo is not None
+                    and ultimo.preco == r.get('price_eur')
+                    and ultimo.data_atualizacao_dgeg == r.get('updated_at')):
+                postos_vistos.add(posto_id)
+                continue
+
             db.session.add(PrecoHistorico(
                 posto_id=posto.id,
                 tipo_combustivel=r.get('fuel_name'),
                 preco=r.get('price_eur'),
                 data_atualizacao_dgeg=r.get('updated_at'),
             ))
+            precos_gravados += 1
             postos_vistos.add(posto_id)
 
-    estado.ultima_atualizacao = datetime.utcnow()
-    estado.ultima_execucao_sucesso = len(erros) == 0
+    sucesso = len(erros) == 0
+    # Marca "correu hoje" só quando tudo correu bem: em caso de falha permite
+    # retry na mesma terça-feira, em vez de perder o dia inteiro.
+    if sucesso:
+        estado.ultima_atualizacao = datetime.utcnow()
+    estado.ultima_execucao_sucesso = sucesso
     estado.mensagem_erro = '; '.join(erros) if erros else None
     db.session.commit()
 
     return {
         'executado': True,
-        'sucesso': len(erros) == 0,
-        'postos_atualizados': len(postos_vistos),
+        'sucesso': sucesso,
+        'postos_verificados': len(postos_vistos),
+        'postos_atualizados': len(postos_vistos),  # compat. retroativa
+        'precos_novos': precos_gravados,
+        'postos_na_bd': Posto.query.count(),
         'erro': estado.mensagem_erro,
     }
 
