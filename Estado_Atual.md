@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.3.1
+# PIPE — Estado Actual do Projecto — v1.4.0
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -23,15 +23,15 @@ pipe-app/
 │   ├── __init__.py          # create_app, app factory
 │   ├── extensions.py        # Limiter (Flask-Limiter, X-Forwarded-For para PA)
 │   ├── static/
-│   │   ├── css/pipe.css     # design system (tema escuro, âmbar/dourado) + cores de eventos do Calendário + navegação secundária
+│   │   ├── css/pipe.css     # design system (tema escuro + tema claro via tokens semânticos) + cores de eventos do Calendário + navegação secundária
 │   │   ├── icons/           # icon-192.png, icon-512.png (PWA)
 │   │   ├── manifest.json    # PWA — manifest
-│   │   ├── sw.js            # PWA — service worker
+│   │   ├── sw.js            # PWA — service worker (network-first para CSS/JS/HTML, cache pipe-v2)
 │   │   └── js/
-│   │       ├── pipe.js      # JS base (alertas)
+│   │       ├── pipe.js      # JS base (alertas + alternância de tema claro/escuro)
 │   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
 │   ├── templates/
-│   │   ├── base.html        # navbar + barra secundária «Voltar/Home» (oculta no dashboard)
+│   │   ├── base.html        # navbar + alternador de tema 🌙/☀️ + anti-FOUC + barra secundária «Voltar/Home» (oculta no dashboard)
 │   │   ├── dashboard.html   # cards de módulos dinâmicos (Loja de Módulos)
 │   │   ├── auth/
 │   │   ├── euromilhoes/
@@ -254,7 +254,11 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Múltiplos métodos em simultâneo — utilizador escolhe no login
 
 ### Design System (`app/static/css/pipe.css`)
-- Tema escuro, acentos âmbar/dourado
+- Tema escuro (por defeito) e tema claro — acentos âmbar/dourado mantêm-se nos dois
+- **Tokens semânticos em `:root`:** superfícies (`--cor-superficie`, `--cor-superficie-2`), bordas (`--cor-borda`, `--cor-borda-hover`), texto (`--cor-texto`, `--cor-texto-suave`, `--cor-texto-subtil(-2)`), estados (`--cor-sucesso/erro/info/aviso-texto`), prioridades (alta/média/baixa), `--cor-overlay-hover`, `--sombra` — ~23 cores fixas substituídas por variáveis
+- **Tema claro via `[data-theme="light"]`** — sobrepõe apenas os tokens; o `data-theme` é definido no `<html>` antes do CSS (script anti-FOUC no `base.html` lê `localStorage['pipe-tema']`, default `dark`)
+- Cores de identidade preservadas nos dois temas: âmbar (`--cor-primaria`), 11 classes `.evento-*` do Calendário, bolas do Euromilhões, `#1a1000` sobre âmbar no `.btn-primario`
+- `.btn-tema` — botão de alternância na navbar (fundo transparente, `--cor-overlay-hover` no hover)
 - Componentes: navbar, cartões, formulários, botões, alertas, skeleton loader, toggles, modais
 - Componentes Euromilhões: bolas, barras de frequência, badges de resultado
 - Componentes Tarefas: sidebar, items, check circular, busca, badges, estado vazio, selector mobile
@@ -265,7 +269,9 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 ### Interface / Navegação (frontend — sessão paralela)
 - **Barra secundária «Voltar / Home»** em `base.html`: renderizada em todas as páginas excepto o dashboard (`{% if request.endpoint != 'dashboard' %}`); «← Voltar» usa `javascript:history.back()` e «Home» aponta para `url_for('dashboard')`.
 - **Estilos CSS:** `.nav-secundaria` (barra com fundo `--cor-superficie` e borda inferior) e `.nav-link-secundario` (+ `:hover` com sublinhado), em `pipe.css`.
-- **PWA (já presente em `app/static/`):** `manifest.json`, `sw.js` (service worker, registado no `base.html`) e ícones `icons/icon-192.png` / `icons/icon-512.png` — inclui `theme-color` âmbar e modo standalone em iOS.
+- **Alternador de tema (v1.4):** botão 🌙/☀️ em `.navbar-utilizador` (entre ⚙️ Definições e «Sair»); lógica centralizada em `pipe.js` (IIFE com guarda `if (!btn) return`): alterna `data-theme` entre `light`/`dark`, grava em `localStorage['pipe-tema']` e troca o ícone ☀️/🌙
+- **Anti-FOUC:** script inline no `<head>`, antes do `pipe.css`, aplica o tema guardado antes do primeiro paint (evita flash de tema errado ao carregar)
+- **PWA (já presente em `app/static/`):** `manifest.json`, `sw.js` (service worker, registado no `base.html`; desde a v1.4 **network-first para CSS/JS/HTML** com cache `pipe-v2` — garante que alterações de estilos chegam aos clientes; cache-first só como fallback offline) e ícones `icons/icon-192.png` / `icons/icon-512.png` — inclui `theme-color` âmbar e modo standalone em iOS.
 
 ### Módulo Combustíveis (`app/combustiveis/`) ← NOVO — v1.3
 - **Schema:** tabelas `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel` e `combustiveis_estado_atualizacao`. FK de utilizador aponta para `utilizadores.id` (nome real da tabela). `db.create_all()` cria as tabelas no primeiro reload (sem Flask-Migrate).
@@ -325,6 +331,9 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Módulo Combustíveis — definições com checkboxes de concelhos + combustíveis** ✅
 - **Módulo Combustíveis — `tarefa_combustiveis` às terças** ✅ (ignora fora de terça; força no botão manual)
 - **Módulo Combustíveis — paginação completa + deduplicação** (95 postos verificados num só ciclo, histórico sem linhas duplicadas, filtro `district`)
+- **Tema claro/escuro — alternância via botão na navbar** ✅ (tema e ícone mudam; escolha persiste após reload via `localStorage`)
+- **Tema claro/escuro — anti-FOUC** ✅ (tema aplicado antes do primeiro paint, sem flash)
+- **Tema claro/escuro — bug inicial corrigido** ✅ (JS alternava `claro`/`escuro` mas o CSS só reagia a `light`; valores unificados para `light`/`dark` e cache do service worker bumpado para `pipe-v2`)
 
 ---
 
@@ -406,7 +415,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
-**Versão v1.3.1** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit do fix `cf58e59` no branch `main` (publicado no GitHub).
+**Versão v1.4.0** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit do fix `cf58e59` no branch `main` (publicado no GitHub). Em v1.4.0: tema claro/escuro concluído e testado — tokens semânticos no `pipe.css`, alternador 🌙/☀️ na navbar (persistido em `localStorage['pipe-tema']`, default escuro), anti-FOUC no `base.html` e service worker passado a network-first para CSS/JS/HTML (cache `pipe-v2`); sem migração de BD — o deploy exige apenas push + Reload no PA (na primeira visita ao browser, recarregar 2× para o SW novo activar).
 
 **Pendências do Calendário:**
 - `tarefa_calendario_hoje()` em `pipe_tasks.py` — notificação de eventos do dia seguinte às 08:00
