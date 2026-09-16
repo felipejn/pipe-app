@@ -42,6 +42,13 @@
 </nav>
 {% endif %}
 
+{% if request.endpoint != 'dashboard' %}
+<div class="nav-secundaria">
+    <a href="javascript:history.back()" class="nav-link-secundario">← Voltar</a>
+    <a href="{{ url_for('dashboard') }}" class="nav-link-secundario">🏠 Home</a>
+</div>
+{% endif %}
+
 <main class="conteudo-principal">
     {% with mensagens = get_flashed_messages(with_categories=true) %}
         {% if mensagens %}

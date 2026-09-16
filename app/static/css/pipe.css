@@ -2469,3 +2469,20 @@ input[type="date"] {
 .evento-uva       { background-color: #8e24aa; color: #fff; }
 .evento-grafite   { background-color: #616161; color: #fff; }
 
+/* ---- Navegação secundária ---- */
+.nav-secundaria {
+    display: flex;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--cor-superficie);
+    border-bottom: 1px solid var(--cor-borda);
+}
+.nav-link-secundario {
+    color: var(--cor-primaria);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+.nav-link-secundario:hover {
+    text-decoration: underline;
+}
+
