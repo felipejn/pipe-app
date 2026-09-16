@@ -17,6 +17,7 @@ login_manager.login_message_category = 'info'
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
     # Configurações de sessão para PWA
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)

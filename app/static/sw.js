@@ -1,4 +1,4 @@
-const CACHE = 'pipe-v2';
+const CACHE = 'pipe-v3';
 const ASSETS = [
   '/',
   '/static/css/pipe.css',

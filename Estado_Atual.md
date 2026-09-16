@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.0
+# PIPE — Estado Actual do Projecto — v1.4.3
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -26,7 +26,7 @@ pipe-app/
 │   │   ├── css/pipe.css     # design system (tema escuro + tema claro via tokens semânticos) + cores de eventos do Calendário + navegação secundária
 │   │   ├── icons/           # icon-192.png, icon-512.png (PWA)
 │   │   ├── manifest.json    # PWA — manifest
-│   │   ├── sw.js            # PWA — service worker (network-first para CSS/JS/HTML, cache pipe-v2)
+│   │   ├── sw.js            # PWA — service worker (network-first para CSS/JS/HTML, cache pipe-v3)
 │   │   └── js/
 │   │       ├── pipe.js      # JS base (alertas + alternância de tema claro/escuro)
 │   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
@@ -273,7 +273,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Estilos CSS:** `.nav-secundaria` (barra com fundo `--cor-superficie` e borda inferior) e `.nav-link-secundario` (+ `:hover` com sublinhado), em `pipe.css`.
 - **Alternador de tema (v1.4):** botão 🌙/☀️ em `.navbar-utilizador` (entre ⚙️ Definições e «Sair»); lógica centralizada em `pipe.js` (IIFE com guarda `if (!btn) return`): alterna `data-theme` entre `light`/`dark`, grava em `localStorage['pipe-tema']` e troca o ícone ☀️/🌙
 - **Anti-FOUC:** script inline no `<head>`, antes do `pipe.css`, aplica o tema guardado antes do primeiro paint (evita flash de tema errado ao carregar)
-- **PWA (já presente em `app/static/`):** `manifest.json`, `sw.js` (service worker, registado no `base.html`; desde a v1.4 **network-first para CSS/JS/HTML** com cache `pipe-v2` — garante que alterações de estilos chegam aos clientes; cache-first só como fallback offline) e ícones `icons/icon-192.png` / `icons/icon-512.png` — inclui `theme-color` âmbar e modo standalone em iOS.
+- **PWA (já presente em `app/static/`):** `manifest.json`, `sw.js` (service worker, registado no `base.html`; desde a v1.4 **network-first para CSS/JS/HTML** com cache `pipe-v3` — garante que alterações de estilos chegam aos clientes após deploy; cache-first só como fallback offline) e ícones `icons/icon-192.png` / `icons/icon-512.png` — inclui `theme-color` âmbar e modo standalone em iOS.
 
 ### Módulo Combustíveis (`app/combustiveis/`) ← NOVO — v1.3
 - **Schema:** tabelas `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel` e `combustiveis_estado_atualizacao`. FK de utilizador aponta para `utilizadores.id` (nome real da tabela). `db.create_all()` cria as tabelas no primeiro reload (sem Flask-Migrate).
@@ -418,6 +418,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 ---
 
 ## Ponto onde estamos
+
+**Versão v1.4.3** — fix de cache pós-deploy. As alterações CSS e a alternância de tema não chegavam aos utilizadores após deploy porque o Service Worker (`pipe-v2`) e o cache HTTP do Flask (12h) serviam ficheiros antigos. Corrigido com três alterações: (1) `app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0` em `app/__init__.py` para desactivar cache HTTP de ficheiros estáticos; (2) bumped do Service Worker para `CACHE = 'pipe-v3'` em `app/static/sw.js` (o `activate` handler já tinha `skipWaiting()` + `clients.claim()` para invalidar caches antigos); (3) cache-busting `?v=3` no link do CSS em `app/templates/base.html`. Sem alteração de BD.
 
 **Versão v1.4.2** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit do fix `cf58e59` no branch `main` (publicado no GitHub). Em v1.4.0: tema claro/escuro concluído e testado — tokens semânticos no `pipe.css`, alternador 🌙/☀️ na navbar (persistido em `localStorage['pipe-tema']`, default escuro), anti-FOUC no `base.html` e service worker passado a network-first para CSS/JS/HTML (cache `pipe-v2`); sem migração de BD — o deploy exige apenas push + Reload no PA (na primeira visita ao browser, recarregar 2× para o SW novo activar). Em v1.4.1: paleta de cores do módulo Notas actualizada para a paleta Google Keep (8 cores vibrantes aplicáveis em tema claro e escuro, sem necessidade de migração de BD); sem novas rotas. Em v1.4.2: fix de contraste — texto em cartões de nota coloridos forçado a preto (`css .nota-com-cor` + fallback `var(--nota-texto, var(--cor-texto))` nas classes do editor `.nota-editar-titulo`/`.nota-editar-textarea`/`.checklist-editar-input`) em ambos os temas, evitando texto branco invisível sobre fundos claros; sem alteração de BD.
 
