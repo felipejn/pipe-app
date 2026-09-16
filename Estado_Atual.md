@@ -182,7 +182,7 @@ pipe-app/
 ### Módulo Notas (`app/notas/`)
 - **Modelos:** `Nota`, `ItemChecklist`, `EtiquetaNota`
 - **Rotas:** `GET /notas/`, `POST /notas/criar`, `GET/POST /notas/<id>`, `POST /notas/<id>/accao`, `POST /notas/<id>/apagar`
-- **Funcionalidades:** grelha de cartões, criação inline, texto livre e checklist, 8 cores (paleta Google Keep — claro + escuro), fixar/arquivar, etiquetas, busca em tempo real, toggle checklist no cartão
+- **Funcionalidades:** grelha de cartões, criação inline, texto livre e checklist, 8 cores (paleta Google Keep — claro + escuro, texto forçado a preto sobre cores claras para contraste), fixar/arquivar, etiquetas, busca em tempo real, toggle checklist no cartão
 
 ### Módulo Passwords (`app/passwords/`)
 - **Sem BD** — módulo totalmente stateless
@@ -264,7 +264,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Componentes: navbar, cartões, formulários, botões, alertas, skeleton loader, toggles, modais
 - Componentes Euromilhões: bolas, barras de frequência, badges de resultado
 - Componentes Tarefas: sidebar, items, check circular, busca, badges, estado vazio, selector mobile
-- Componentes Notas: grelha de cartões, palete de cores, checklist, sidebar de etiquetas, 8 cores alinhadas à paleta Google Keep (`#F28B82`, `#FBBC05`, `#FFF475`, `#CCFF90`, `#CBF0F8`, `#D7AEFB`, `#E8EAED`) aplicáveis em tema claro e escuro ✅
+- Componentes Notas: grelha de cartões, palete de cores, checklist, sidebar de etiquetas, 8 cores alinhadas à paleta Google Keep (`#F28B82`, `#FBBC05`, `#FFF475`, `#CCFF90`, `#CBF0F8`, `#D7AEFB`, `#E8EAED`) aplicáveis em tema claro e escuro ✅ — texto forçado a preto em cartões coloridos via `.nota-com-cor` para garantir contraste em ambos os temas
 - **Componentes Calendário:** 11 classes `.evento-<cor>` (tomate → grafite) ← NOVO
 - Layout responsivo (sidebar oculta em mobile)
 
@@ -335,7 +335,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Módulo Combustíveis — paginação completa + deduplicação** (95 postos verificados num só ciclo, histórico sem linhas duplicadas, filtro `district`)
 - **Tema claro/escuro — alternância via botão na navbar** ✅ (tema e ícone mudam; escolha persiste após reload via `localStorage`)
 - **Tema claro/escuro — anti-FOUC** ✅ (tema aplicado antes do primeiro paint, sem flash)
-- **Módulo Notas — paleta de cores Google Keep** ✅ (8 cores substituíram as cores escuras anteriores; aplicáveis em tema claro e escuro, sem alteração de BD — `Nota.CORES`, `_cartao.html`, `index.html` actualizados; `editar.html` usa a mesma fonte via `|tojson`
+- **Módulo Notas — paleta de cores Google Keep** ✅ (8 cores substituíram as cores escuras anteriores; aplicáveis em tema claro e escuro, sem alteração de BD — `Nota.CORES`, `_cartao.html`, `index.html` actualizados; `editar.html` usa a mesma fonte via `|tojson`)
+- **Módulo Notas — contraste de texto em cartões coloridos** ✅ (texto forçado a preto via `.nota-com-cor` sobre fundos claros, aplicado em `_cartao.html`, `index.html` e `editar.html`; garante legibilidade em tema claro e escuro)
 
 
 ---
@@ -418,7 +419,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
-**Versão v1.4.1** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit do fix `cf58e59` no branch `main` (publicado no GitHub). Em v1.4.0: tema claro/escuro concluído e testado — tokens semânticos no `pipe.css`, alternador 🌙/☀️ na navbar (persistido em `localStorage['pipe-tema']`, default escuro), anti-FOUC no `base.html` e service worker passado a network-first para CSS/JS/HTML (cache `pipe-v2`); sem migração de BD — o deploy exige apenas push + Reload no PA (na primeira visita ao browser, recarregar 2× para o SW novo activar). Em v1.4.1: paleta de cores do módulo Notas actualizada para a paleta Google Keep (8 cores vibrantes aplicáveis em tema claro e escuro, sem necessidade de migração de BD); sem novas rotas.
+**Versão v1.4.2** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit do fix `cf58e59` no branch `main` (publicado no GitHub). Em v1.4.0: tema claro/escuro concluído e testado — tokens semânticos no `pipe.css`, alternador 🌙/☀️ na navbar (persistido em `localStorage['pipe-tema']`, default escuro), anti-FOUC no `base.html` e service worker passado a network-first para CSS/JS/HTML (cache `pipe-v2`); sem migração de BD — o deploy exige apenas push + Reload no PA (na primeira visita ao browser, recarregar 2× para o SW novo activar). Em v1.4.1: paleta de cores do módulo Notas actualizada para a paleta Google Keep (8 cores vibrantes aplicáveis em tema claro e escuro, sem necessidade de migração de BD); sem novas rotas. Em v1.4.2: fix de contraste — texto em cartões de nota coloridos forçado a preto (`css .nota-com-cor`) em ambos os temas, evitando texto branco invisível sobre fundos claros; sem alteração de BD.
 
 **Pendências do Calendário:**
 - `tarefa_calendario_hoje()` em `pipe_tasks.py` — notificação de eventos do dia seguinte às 08:00
