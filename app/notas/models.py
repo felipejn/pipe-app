@@ -20,15 +20,18 @@ class Nota(db.Model):
     TIPOS          = (TIPO_TEXTO, TIPO_CHECKLIST)
 
     # Cores de fundo disponíveis (nome semântico → valor CSS)
+    # Alinhado à paleta do Google Keep (claro + escuro). O 'padrao' é None
+    # porque o fundo do cartão é a superfície por defeito (branco em claro,
+    # escuro em escuro, como o Keep).
     CORES = {
         'padrao':   None,
-        'vermelho': '#2d1515',
-        'laranja':  '#2d1e10',
-        'amarelo':  '#2a2210',
-        'verde':    '#112a1a',
-        'azul':     '#101e2d',
-        'roxo':     '#1e1030',
-        'cinzento': '#1e2028',
+        'vermelho': '#F28B82',
+        'laranja':  '#FBBC05',
+        'amarelo':  '#FFF475',
+        'verde':    '#CCFF90',
+        'azul':     '#CBF0F8',
+        'roxo':     '#D7AEFB',
+        'cinzento': '#E8EAED',
     }
 
     id           = db.Column(db.Integer, primary_key=True)

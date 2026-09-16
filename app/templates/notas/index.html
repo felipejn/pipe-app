@@ -65,9 +65,9 @@
                             <div class="nota-criar-cores" id="notaCriarCores">
                                 {% for nome_cor, val_cor in {
                                     'padrao':'',
-                                    'vermelho':'#2d1515','laranja':'#2d1e10',
-                                    'amarelo':'#2a2210','verde':'#112a1a',
-                                    'azul':'#101e2d','roxo':'#1e1030','cinzento':'#1e2028'
+                                    'vermelho':'#F28B82','laranja':'#FBBC05',
+                                    'amarelo':'#FFF475','verde':'#CCFF90',
+                                    'azul':'#CBF0F8','roxo':'#D7AEFB','cinzento':'#E8EAED'
                                 }.items() %}
                                 <button class="nota-cor-btn {% if not val_cor %}nota-cor-padrao{% endif %}"
                                         data-cor="{{ nome_cor }}"
