@@ -2158,6 +2158,18 @@ input[type="date"] {
     padding: 0.1rem 0.45rem;
 }
 
+/* Texto escuro sobre fundos coloridos (paleta Google Keep) — garante contraste */
+.nota-com-cor {
+    --nota-texto: #1a1a1a;
+    --nota-texto-suave: #3a3a3a;
+    --nota-texto-subtil: #5a5a5a;
+}
+.nota-com-cor .nota-titulo      { color: var(--nota-texto); }
+.nota-com-cor .nota-corpo-preview { color: var(--nota-texto-suave); }
+.nota-com-cor .item-texto       { color: var(--nota-texto-suave); }
+.nota-com-cor .nota-mais-itens  { color: var(--nota-texto-subtil); }
+.nota-com-cor .nota-cor-btn     { color: var(--nota-texto); }
+
 /* ── Caixa de criação rápida ──────────────────────────── */
 .nota-criar-container { margin-bottom: 1.25rem; }
 

@@ -1,5 +1,5 @@
 {# _cartao.html — cartão de uma nota na grelha #}
-<div class="nota-cartao {% if nota.fixada %}nota-fixada{% endif %}"
+<div class="nota-cartao {% if nota.fixada %}nota-fixada{% endif %}{% if nota.cor_css() %} nota-com-cor{% endif %}"
      data-nota-id="{{ nota.id }}"
      data-busca="{{ (nota.titulo or '') | lower }} {{ (nota.corpo or '') | lower }} {{ nota.etiquetas | map(attribute='nome') | join(' ') | lower }}"
      data-href="{{ url_for('notas.editar', nota_id=nota.id) }}"

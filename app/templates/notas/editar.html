@@ -7,7 +7,7 @@
           id="formEditarNota">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="nota-editar-cartao"
+        <div class="nota-editar-cartao{% if nota.cor_css() %} nota-com-cor{% endif %}"
              id="notaEditarCartao"
              {% if nota.cor_css() %}style="background:{{ nota.cor_css() }}"{% endif %}>
 
@@ -109,6 +109,7 @@ document.querySelectorAll('.nota-cor-radio').forEach(radio => {
         const cores = {{ cores | tojson }};
         const val = cores[this.value];
         cartao.style.background = val || '';
+        cartao.classList.toggle('nota-com-cor', !!val);  /* texto escuro sobre cor colorida */
         document.querySelectorAll('.nota-cor-label').forEach(l => l.classList.remove('activa'));
         this.closest('.nota-cor-label').classList.add('activa');
     });
