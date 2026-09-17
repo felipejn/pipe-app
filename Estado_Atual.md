@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.3
+# PIPE — Estado Actual do Projecto — v1.4.4
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -233,8 +233,10 @@ pipe-app/
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
 - **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens)
 - **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (4 tools: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`), `routes.py`
-- **Modelo:** `google/gemma-4-31b-it:free` (suporta tool use) — configurado via `OPENROUTER_MODEL` env var. Fallbacks: `google/gemma-4-31b-it:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
+- **Modelo:** `thinkingmachines/inkling-small:free` (1M ctx, ~105 tps, Intelligence Index 26) — configurado via `OPENROUTER_MODEL` env var. Fallbacks: `thinkingmachines/inkling:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`, `google/gemma-4-31b-it:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
 - **Correção aplicada (v1.4.0):** o modelo anterior (`google/gemma-4-26b-a4b-it:free`) não suportava tool use, causando falhas silenciosas com a mensagem genérica de erro. Trocado para `google/gemma-4-31b-it:free`. Removidos modelos inválidos (`qwen/qwen3.6-plus:free`, `qwen/qwen3-coder:free`). Adicionado `import traceback` e `traceback.print_exc()` + `print(f'[Assistente ERRO] ...')` nos blocos `except Exception` de `contexto.py` para diagnóstico visível nos logs. Simplificado tratamento de HTTP 429 (break imediato para próximo modelo, sem parsing de `Retry-After` header)
+- **Correção de bug crítica (v1.4.4):** `processar_mensagem_assistente('cria um evento para amanhã: "Cortar cabelo" às 9 horas')` devolvia "Não consegui gerar uma resposta" em vez de criar o evento. Diagnóstico: o OpenRouter devolve HTTP 200 com corpo `{"error": ...}` quando o provider upstream falha; o código original só fazia `raise_for_status()` (200 passava como sucesso) e `raise_for_status()` estava fora do `try`, abortando a cadeia de fallback. Correção em `app/assistente/cliente.py`: classes `RateLimitError` e `ServicoIndisponivelError`, constante `_MODELOS_FALLBACK`, função `_classificar_resposta()` que valida HTTP e corpo da resposta (distinguindo `rate_limit` / `modelo_indisponivel` / `servico` / `ok`), `chamar_llm()` com fallback imediato em qualquer falha de provider e backoff apenas para exceções de rede. Reforço em `app/assistente/contexto.py`: parsing defensivo de `choices` (verificação de tipo), `tool_calls` com validação de tipo, `content` vazio aceite, `argumentos` aceita `str` ou `dict`, `ServicoIndisponivelError` tratado no ciclo. Validação: 21 testes unitários offline passaram; smoke test real contra OpenRouter com `cohere/north-mini-code:free` criou evento com sucesso (ID 4).
+ - **Teste:** modelo faz tool calls correctamente (confirmado com `get_tarefas`)
 - **Teste:** modelo faz tool calls correctamente (confirmado com `get_tarefas`)
 
 ### Sistema de notificações (`app/notifications/`)
@@ -418,6 +420,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 ---
 
 ## Ponto onde estamos
+
+**Versão v1.4.4** — correção de bug crítico no Assistente IA. `processar_mensagem_assistente('cria um evento para amanhã: "Cortar cabelo" às 9 horas')` devolvia "Não consegui gerar uma resposta" em vez de criar o evento. Diagnóstico: o OpenRouter devolve HTTP 200 com corpo `{"error": ...}` quando o provider upstream falha; o código original só fazia `raise_for_status()` (200 passava como sucesso) e `raise_for_status()` estava fora do `try`, abortando a cadeia de fallback. Correção em `app/assistente/cliente.py`: classes `RateLimitError` e `ServicoIndisponivelError`, constante `_MODELOS_FALLBACK`, função `_classificar_resposta()` que valida HTTP e corpo da resposta (distinguindo `rate_limit` / `modelo_indisponivel` / `servico` / `ok`), `chamar_llm()` com fallback imediato em qualquer falha de provider e backoff apenas para exceções de rede. Reforço em `app/assistente/contexto.py`: parsing defensivo de `choices` (verificação de tipo), `tool_calls` com validação de tipo, `content` vazio aceite, `argumentos` aceita `str` ou `dict`, `ServicoIndisponivelError` tratado no ciclo. Validação: 21 testes unitários offline passaram; smoke test real contra OpenRouter com `cohere/north-mini-code:free` criou evento com sucesso (ID 4). Sem alteração de BD.
 
 **Versão v1.4.3** — fix de cache pós-deploy. As alterações CSS e a alternância de tema não chegavam aos utilizadores após deploy porque o Service Worker (`pipe-v2`) e o cache HTTP do Flask (12h) serviam ficheiros antigos. Corrigido com três alterações: (1) `app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0` em `app/__init__.py` para desactivar cache HTTP de ficheiros estáticos; (2) bumped do Service Worker para `CACHE = 'pipe-v3'` em `app/static/sw.js` (o `activate` handler já tinha `skipWaiting()` + `clients.claim()` para invalidar caches antigos); (3) cache-busting `?v=3` no link do CSS em `app/templates/base.html`. Sem alteração de BD.
 
