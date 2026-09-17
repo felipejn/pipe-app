@@ -5,7 +5,7 @@ ao nível de Python/SQLAlchemy. Este filtro é inegociável.
 """
 
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import session
 
@@ -182,6 +182,26 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
             'parameters': {
                 'type': 'object',
                 'properties': {},
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'get_eventos',
+            'description': 'Consulta os eventos do calendário do utilizador.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'data': {
+                        'type': 'string',
+                        'description': 'Data no formato AAAA-MM-DD para filtrar eventos desse dia (opcional).',
+                    },
+                    'futuros': {
+                        'type': 'boolean',
+                        'description': 'Se True, devolve apenas eventos futuros.',
+                    },
+                },
             },
         },
     },
@@ -370,6 +390,7 @@ REGISTO_FERRAMENTAS = {
     'get_notas': 'get_notas',
     'get_euromilhoes': 'get_euromilhoes',
     'get_resumo_geral': 'get_resumo_geral',
+    'get_eventos': 'get_eventos',
     'criar_tarefa': 'criar_tarefa',
     'alternar_tarefa': 'alternar_tarefa',
     'apagar_tarefa': 'apagar_tarefa',
@@ -553,6 +574,54 @@ def get_resumo_geral(user_id):
         'notas_fixadas': notas_fixadas,
         'euromilhoes_jogos_total': euromilhoes_jogos_total,
     }
+
+
+def get_eventos(user_id, data=None, futuros=False):
+    """Consulta eventos do calendário do utilizador, com filtros opcionais.
+
+    Args:
+        user_id: ID do utilizador (obrigatório).
+        data: data no formato AAAA-MM-DD para filtrar eventos desse dia (opcional).
+        futuros: se True, só devolve eventos futuros (data_inicio >= agora).
+
+    Returns:
+        Lista de dicts com id, titulo, descricao, localizacao, data_inicio,
+        data_fim, dia_inteiro, cor, notificar, notificado_em, criado_em.
+    """
+    q = Evento.query.filter_by(user_id=user_id)
+
+    if data:
+        try:
+            data_dt = datetime.strptime(data, '%Y-%m-%d')
+            q = q.filter(
+                Evento.data_inicio >= data_dt,
+                Evento.data_inicio < data_dt + timedelta(days=1),
+            )
+        except ValueError:
+            return {'erro': f'Data inválida: "{data}". Usa o formato AAAA-MM-DD.'}
+
+    if futuros:
+        agora = datetime.utcnow()
+        q = q.filter(Evento.data_inicio >= agora)
+
+    resultados = q.order_by(Evento.data_inicio.asc()).all()
+
+    return [
+        {
+            'id': e.id,
+            'titulo': e.titulo,
+            'descricao': e.descricao,
+            'localizacao': e.localizacao,
+            'data_inicio': e.data_inicio.isoformat() if e.data_inicio else None,
+            'data_fim': e.data_fim.isoformat() if e.data_fim else None,
+            'dia_inteiro': e.dia_inteiro,
+            'cor': e.cor,
+            'notificar': e.notificar,
+            'notificado_em': e.notificado_em.isoformat() if e.notificado_em else None,
+            'criado_em': e.criado_em.isoformat() if e.criado_em else None,
+        }
+        for e in resultados
+    ]
 
 
 # ── Tarefas — escrita ────────────────────────────────────────────────────

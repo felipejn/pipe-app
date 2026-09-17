@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.4
+# PIPE — Estado Actual do Projecto — v1.4.5
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -28,8 +28,7 @@ pipe-app/
 │   │   ├── manifest.json    # PWA — manifest
 │   │   ├── sw.js            # PWA — service worker (network-first para CSS/JS/HTML, cache pipe-v3)
 │   │   └── js/
-│   │       ├── pipe.js      # JS base (alertas + alternância de tema claro/escuro)
-│   │       └── passwords.js # JS do módulo Passwords (não utilizado — JS inline no template)
+│   │       └── pipe.js      # JS base (alertas + alternância de tema claro/escuro)
 │   ├── templates/
 │   │   ├── base.html        # navbar + alternador de tema 🌙/☀️ + anti-FOUC + barra secundária «Voltar/Home» (oculta no dashboard)
 │   │   ├── dashboard.html   # cards de módulos dinâmicos (Loja de Módulos)
@@ -232,12 +231,13 @@ pipe-app/
 
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
 - **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens)
-- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (4 tools: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`), `routes.py`
+- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (5 tools de leitura: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`; 10 tools de escrita), `routes.py`
 - **Modelo:** `thinkingmachines/inkling-small:free` (1M ctx, ~105 tps, Intelligence Index 26) — configurado via `OPENROUTER_MODEL` env var. Fallbacks: `thinkingmachines/inkling:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`, `google/gemma-4-31b-it:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
 - **Correção aplicada (v1.4.0):** o modelo anterior (`google/gemma-4-26b-a4b-it:free`) não suportava tool use, causando falhas silenciosas com a mensagem genérica de erro. Trocado para `google/gemma-4-31b-it:free`. Removidos modelos inválidos (`qwen/qwen3.6-plus:free`, `qwen/qwen3-coder:free`). Adicionado `import traceback` e `traceback.print_exc()` + `print(f'[Assistente ERRO] ...')` nos blocos `except Exception` de `contexto.py` para diagnóstico visível nos logs. Simplificado tratamento de HTTP 429 (break imediato para próximo modelo, sem parsing de `Retry-After` header)
 - **Correção de bug crítica (v1.4.4):** `processar_mensagem_assistente('cria um evento para amanhã: "Cortar cabelo" às 9 horas')` devolvia "Não consegui gerar uma resposta" em vez de criar o evento. Diagnóstico: o OpenRouter devolve HTTP 200 com corpo `{"error": ...}` quando o provider upstream falha; o código original só fazia `raise_for_status()` (200 passava como sucesso) e `raise_for_status()` estava fora do `try`, abortando a cadeia de fallback. Correção em `app/assistente/cliente.py`: classes `RateLimitError` e `ServicoIndisponivelError`, constante `_MODELOS_FALLBACK`, função `_classificar_resposta()` que valida HTTP e corpo da resposta (distinguindo `rate_limit` / `modelo_indisponivel` / `servico` / `ok`), `chamar_llm()` com fallback imediato em qualquer falha de provider e backoff apenas para exceções de rede. Reforço em `app/assistente/contexto.py`: parsing defensivo de `choices` (verificação de tipo), `tool_calls` com validação de tipo, `content` vazio aceite, `argumentos` aceita `str` ou `dict`, `ServicoIndisponivelError` tratado no ciclo. Validação: 21 testes unitários offline passaram; smoke test real contra OpenRouter com `cohere/north-mini-code:free` criou evento com sucesso (ID 4).
- - **Teste:** modelo faz tool calls correctamente (confirmado com `get_tarefas`)
-- **Teste:** modelo faz tool calls correctamente (confirmado com `get_tarefas`)
+
+- **Implementação (v1.4.5):** adicionada ferramenta de leitura `get_eventos` ao Assistente IA. O calendário era o único módulo sem ferramenta de consulta. Adicionados em `app/assistente/ferramentas.py`: schema JSON em `DEFINICOES_FERRAMENTAS_LEITURA`, entrada em `REGISTO_FERRAMENTAS`, e função `get_eventos(user_id, data=None, futuros=False)` com query filtrada por `user_id`, data específica (AAAA-MM-DD) e eventos futuros. Correcção do import `from datetime import date, datetime, timedelta`.
+    - **Teste:** import verificado com sucesso — `get_eventos` presente em `REGISTO_FERRAMENTAS` e `DEFINICOES_FERRAMENTAS_LEITURA`
 
 ### Sistema de notificações (`app/notifications/`)
 - `NotificationService` — `notification_service.send(user, type, subject, body, data)`
