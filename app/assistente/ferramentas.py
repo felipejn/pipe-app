@@ -4,16 +4,111 @@ Cada função recebe user_id e filtra TODAS as queries por esse valor
 ao nível de Python/SQLAlchemy. Este filtro é inegociável.
 """
 
-from datetime import date
+import time
+from datetime import date, datetime
 
-from app.tarefas.models import Lista, Tarefa
-from app.notas.models import EtiquetaNota, Nota
+from flask import session
+
+from app.tarefas.models import Lista, Tarefa, TagTarefa
+from app.notas.models import ItemChecklist, Nota, EtiquetaNota
 from app.euromilhoes.models import Jogo
+from app.calendario.models import Evento
+from app.passwords.generator import gerar_password, gerar_passphrase, gerar_pin
+from app import db
+
+
+# ── Constantes de controlo (antes de DEFINICOES_FERRAMENTAS) ─────────────────
+
+# Cores válidas do módulo Calendário
+CORES_EVENTO = (
+    'tomate', 'flamingo', 'tangerina', 'banana', 'salvia',
+    'basil', 'peacock', 'mirtilo', 'lavanda', 'uva', 'grafite',
+)
+
+# Ferramentas que alteram dados — sujeitas a limite de débito e só
+# disponíveis quando a sessão está em modo 'escrita'.
+FERRAMENTAS_ESCRITA = {
+    'criar_tarefa', 'alternar_tarefa', 'apagar_tarefa',
+    'criar_nota', 'alternar_nota_acao', 'apagar_nota',
+    'criar_evento', 'atualizar_evento', 'apagar_evento',
+    'gerar_credencial',
+}
+
+LIMITE_ESCRITAS_POR_MINUTO = 10
+
+
+def _limite_escrita_excedido():
+    """Limite de débito simples para ferramentas de escrita, por sessão."""
+    agora = time.time()
+    janela = [t for t in session.get('assistente_escritas_ts', []) if agora - t < 60]
+    if len(janela) >= LIMITE_ESCRITAS_POR_MINUTO:
+        session['assistente_escritas_ts'] = janela
+        return True
+    janela.append(agora)
+    session['assistente_escritas_ts'] = janela
+    session.modified = True
+    return False
+
+
+def _obter_ou_criar_lista(user_id, nome_lista=None):
+    """Devolve a lista pelo nome (case-insensitive) ou cria 'Geral' se não houver nenhuma."""
+    if nome_lista:
+        lista = Lista.query.filter_by(user_id=user_id).filter(
+            Lista.nome.ilike(nome_lista)
+        ).first()
+        if lista:
+            return lista
+        lista = Lista(nome=nome_lista, user_id=user_id)
+        db.session.add(lista)
+        db.session.flush()
+        return lista
+
+    lista = Lista.query.filter_by(user_id=user_id).order_by(Lista.ordem.asc()).first()
+    if lista:
+        return lista
+    lista = Lista(nome='Geral', icone='📋', user_id=user_id)
+    db.session.add(lista)
+    db.session.flush()
+    return lista
+
+
+def _obter_ou_criar_tags(user_id, tags_texto):
+    """tags_texto: string separada por vírgulas. Devolve lista de TagTarefa."""
+    if not tags_texto:
+        return []
+    nomes = [t.strip().lower() for t in tags_texto.split(',') if t.strip()]
+    resultado = []
+    for nome in nomes:
+        tag = TagTarefa.query.filter_by(user_id=user_id, nome=nome).first()
+        if not tag:
+            tag = TagTarefa(nome=nome, user_id=user_id)
+            db.session.add(tag)
+            db.session.flush()
+        resultado.append(tag)
+    return resultado
+
+
+def _obter_ou_criar_etiquetas_nota(user_id, etiquetas):
+    """etiquetas: lista de strings. Devolve lista de EtiquetaNota."""
+    if not etiquetas:
+        return []
+    resultado = []
+    for nome in etiquetas:
+        nome = nome.strip().lower()
+        if not nome:
+            continue
+        etq = EtiquetaNota.query.filter_by(user_id=user_id, nome=nome).first()
+        if not etq:
+            etq = EtiquetaNota(nome=nome, user_id=user_id)
+            db.session.add(etq)
+            db.session.flush()
+        resultado.append(etq)
+    return resultado
 
 
 # ── Definições de ferramentas (formato OpenAI Function Calling) ──────────────────
 
-DEFINICOES_FERRAMENTAS = [
+DEFINICOES_FERRAMENTAS_LEITURA = [
     {
         'type': 'function',
         'function': {
@@ -92,12 +187,199 @@ DEFINICOES_FERRAMENTAS = [
     },
 ]
 
+DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA = [
+    {
+        'type': 'function',
+        'function': {
+            'name': 'criar_tarefa',
+            'description': 'Cria uma nova tarefa numa lista do utilizador. Se a lista não existir, é criada automaticamente.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'texto': {'type': 'string', 'description': 'Texto da tarefa.'},
+                    'prioridade': {'type': 'string', 'enum': ['baixa', 'media', 'alta']},
+                    'data_limite': {'type': 'string', 'description': 'Formato AAAA-MM-DD (opcional).'},
+                    'lista_nome': {'type': 'string', 'description': 'Nome da lista (opcional; usa/cria "Geral" se omitido).'},
+                    'tags': {'type': 'string', 'description': 'Etiquetas separadas por vírgula (opcional).'},
+                },
+                'required': ['texto'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'alternar_tarefa',
+            'description': 'Marca uma tarefa como concluída ou volta a marcá-la como pendente.',
+            'parameters': {
+                'type': 'object',
+                'properties': {'tarefa_id': {'type': 'integer'}},
+                'required': ['tarefa_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'apagar_tarefa',
+            'description': 'Apaga uma tarefa. Na primeira chamada (sem confirmado=true) devolve um pedido de confirmação — pergunta ao utilizador e só voltas a chamar com confirmado=true se ele confirmar.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'tarefa_id': {'type': 'integer'},
+                    'confirmado': {'type': 'boolean', 'description': 'Só true depois do utilizador confirmar explicitamente.'},
+                },
+                'required': ['tarefa_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'criar_nota',
+            'description': 'Cria uma nota de texto livre ou checklist.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'titulo': {'type': 'string'},
+                    'corpo': {'type': 'string', 'description': 'Texto livre (só para tipo=texto).'},
+                    'tipo': {'type': 'string', 'enum': ['texto', 'checklist']},
+                    'cor': {'type': 'string', 'enum': ['padrao', 'vermelho', 'laranja', 'amarelo', 'verde', 'azul', 'roxo', 'cinzento']},
+                    'etiquetas': {'type': 'array', 'items': {'type': 'string'}},
+                    'itens': {'type': 'array', 'items': {'type': 'string'}, 'description': 'Itens do checklist (só para tipo=checklist).'},
+                },
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'alternar_nota_acao',
+            'description': 'Fixa/desfixa, arquiva/desarquiva uma nota, ou marca/desmarca um item de checklist.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'nota_id': {'type': 'integer'},
+                    'accao': {'type': 'string', 'enum': ['toggle_fixada', 'toggle_arquivada', 'toggle_item']},
+                    'item_id': {'type': 'integer', 'description': 'Obrigatório apenas quando accao=toggle_item.'},
+                },
+                'required': ['nota_id', 'accao'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'apagar_nota',
+            'description': 'Apaga uma nota. Sem confirmado=true devolve pedido de confirmação primeiro.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'nota_id': {'type': 'integer'},
+                    'confirmado': {'type': 'boolean'},
+                },
+                'required': ['nota_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'criar_evento',
+            'description': 'Cria um evento no Calendário.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'titulo': {'type': 'string'},
+                    'data_inicio': {'type': 'string', 'description': 'ISO 8601, ex: 2026-09-20T14:00:00.'},
+                    'data_fim': {'type': 'string', 'description': 'ISO 8601.'},
+                    'descricao': {'type': 'string'},
+                    'localizacao': {'type': 'string'},
+                    'cor': {'type': 'string', 'enum': ['tomate', 'flamingo', 'tangerina', 'banana', 'salvia', 'basil', 'peacock', 'mirtilo', 'lavanda', 'uva', 'grafite']},
+                    'dia_inteiro': {'type': 'boolean'},
+                    'notificar': {'type': 'boolean'},
+                },
+                'required': ['titulo', 'data_inicio', 'data_fim'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'atualizar_evento',
+            'description': 'Actualiza campos de um evento existente. Só envia os campos que mudam.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'evento_id': {'type': 'integer'},
+                    'titulo': {'type': 'string'},
+                    'data_inicio': {'type': 'string'},
+                    'data_fim': {'type': 'string'},
+                    'descricao': {'type': 'string'},
+                    'localizacao': {'type': 'string'},
+                    'cor': {'type': 'string'},
+                    'dia_inteiro': {'type': 'boolean'},
+                    'notificar': {'type': 'boolean'},
+                },
+                'required': ['evento_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'apagar_evento',
+            'description': 'Apaga um evento. Sem confirmado=true devolve pedido de confirmação primeiro.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'evento_id': {'type': 'integer'},
+                    'confirmado': {'type': 'boolean'},
+                },
+                'required': ['evento_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'gerar_credencial',
+            'description': 'Gera uma password, passphrase ou PIN aleatório. Não guarda nada.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'modo': {'type': 'string', 'enum': ['password', 'passphrase', 'pin']},
+                    'comprimento': {'type': 'integer', 'description': 'Para password (8-64) ou pin (4-12).'},
+                    'maiusculas': {'type': 'boolean'},
+                    'minusculas': {'type': 'boolean'},
+                    'numeros': {'type': 'boolean'},
+                    'simbolos': {'type': 'boolean'},
+                    'excluir_ambiguos': {'type': 'boolean'},
+                    'num_palavras': {'type': 'integer', 'description': 'Para passphrase (3-10).'},
+                },
+            },
+        },
+    },
+]
+
+DEFINICOES_FERRAMENTAS_ESCRITA = DEFINICOES_FERRAMENTAS_LEITURA + DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA
+
 # Mapa nome → função executável
 REGISTO_FERRAMENTAS = {
     'get_tarefas': 'get_tarefas',
     'get_notas': 'get_notas',
     'get_euromilhoes': 'get_euromilhoes',
     'get_resumo_geral': 'get_resumo_geral',
+    'criar_tarefa': 'criar_tarefa',
+    'alternar_tarefa': 'alternar_tarefa',
+    'apagar_tarefa': 'apagar_tarefa',
+    'criar_nota': 'criar_nota',
+    'alternar_nota_acao': 'alternar_nota_acao',
+    'apagar_nota': 'apagar_nota',
+    'criar_evento': 'criar_evento',
+    'atualizar_evento': 'atualizar_evento',
+    'apagar_evento': 'apagar_evento',
+    'gerar_credencial': 'gerar_credencial',
 }
 
 
@@ -273,22 +555,246 @@ def get_resumo_geral(user_id):
     }
 
 
-def executar_ferramenta(nome_ferramenta, argumentos, user_id):
-    """Despacha a chamada para a função correspondente ao nome recebido.
+# ── Tarefas — escrita ────────────────────────────────────────────────────
 
-    O user_id é sempre injetado como primeiro argumento — nunca vem do modelo.
+def criar_tarefa(user_id, texto, prioridade='media', data_limite=None, lista_nome=None, tags=None):
+    """Cria uma nova tarefa. Se a lista não existir, é criada; se nenhuma for indicada, usa/cria 'Geral'."""
+    if prioridade not in Tarefa.PRIORIDADES:
+        prioridade = 'media'
 
-    Args:
-        nome_ferramenta: str com o nome da função (ex: 'get_tarefas').
-        argumentos: dict com os argumentos extraídos do tool_call.
-        user_id: ID do utilizador autenticado (injetado pelo caller).
+    prazo = None
+    if data_limite:
+        try:
+            prazo = datetime.strptime(data_limite, '%Y-%m-%d').date()
+        except ValueError:
+            return {'erro': f'Data limite inválida: "{data_limite}". Usa o formato AAAA-MM-DD.'}
 
-    Returns:
-        O resultado da função chamada, ou mensagem de erro.
+    lista = _obter_ou_criar_lista(user_id, lista_nome)
+    tarefa = Tarefa(
+        texto=texto,
+        prioridade=prioridade,
+        data_limite=prazo,
+        lista_id=lista.id,
+        user_id=user_id,
+    )
+    if tags:
+        tarefa.tags = _obter_ou_criar_tags(user_id, tags)
+
+    db.session.add(tarefa)
+    db.session.commit()
+    return {'ok': True, 'id': tarefa.id, 'texto': tarefa.texto, 'lista': lista.nome}
+
+
+def alternar_tarefa(user_id, tarefa_id):
+    """Alterna o estado concluída/pendente de uma tarefa do utilizador."""
+    tarefa = Tarefa.query.filter_by(id=tarefa_id, user_id=user_id).first()
+    if not tarefa:
+        return {'erro': 'Tarefa não encontrada.'}
+
+    tarefa.concluida = not tarefa.concluida
+    tarefa.data_conclusao = datetime.utcnow() if tarefa.concluida else None
+    if tarefa.concluida:
+        tarefa.notificada_em = None
+    db.session.commit()
+    return {'ok': True, 'id': tarefa.id, 'concluida': tarefa.concluida}
+
+
+def apagar_tarefa(user_id, tarefa_id, confirmado=False):
+    """Apaga uma tarefa. Exige confirmação explícita do utilizador antes de executar."""
+    tarefa = Tarefa.query.filter_by(id=tarefa_id, user_id=user_id).first()
+    if not tarefa:
+        return {'erro': 'Tarefa não encontrada.'}
+
+    if not confirmado:
+        return {
+            'confirmacao_necessaria': True,
+            'mensagem': f'Confirmas que queres apagar a tarefa "{tarefa.texto}"?',
+        }
+
+    db.session.delete(tarefa)
+    db.session.commit()
+    return {'ok': True}
+
+
+# ── Notas — escrita ──────────────────────────────────────────────────────
+
+def criar_nota(user_id, titulo=None, corpo=None, tipo='texto', cor='padrao', etiquetas=None, itens=None):
+    """Cria uma nova nota, de texto livre ou checklist."""
+    if tipo not in Nota.TIPOS:
+        tipo = Nota.TIPO_TEXTO
+    if cor not in Nota.CORES:
+        cor = 'padrao'
+
+    nota = Nota(titulo=titulo, corpo=corpo if tipo == Nota.TIPO_TEXTO else None, tipo=tipo, cor=cor, user_id=user_id)
+    if etiquetas:
+        nota.etiquetas = _obter_ou_criar_etiquetas_nota(user_id, etiquetas)
+
+    db.session.add(nota)
+    db.session.flush()
+
+    if tipo == Nota.TIPO_CHECKLIST and itens:
+        for i, texto_item in enumerate(itens):
+            db.session.add(ItemChecklist(texto=texto_item, nota_id=nota.id, ordem=i))
+
+    db.session.commit()
+    return {'ok': True, 'id': nota.id, 'titulo': nota.titulo or 'Sem título'}
+
+
+def alternar_nota_acao(user_id, nota_id, accao, item_id=None):
+    """accao: 'toggle_fixada', 'toggle_arquivada' ou 'toggle_item' (requer item_id).
+
+    Alinhado com app/notas/routes.py → accao(): ao arquivar, desfixa a nota;
+    data_edicao é actualizada em todas as acções.
+    """
+    nota = Nota.query.filter_by(id=nota_id, user_id=user_id).first()
+    if not nota:
+        return {'erro': 'Nota não encontrada.'}
+
+    if accao == 'toggle_fixada':
+        nota.fixada = not nota.fixada
+    elif accao == 'toggle_arquivada':
+        nota.arquivada = not nota.arquivada
+        nota.fixada = False
+    elif accao == 'toggle_item':
+        if not item_id:
+            return {'erro': 'item_id é obrigatório para toggle_item.'}
+        item = ItemChecklist.query.filter_by(id=item_id, nota_id=nota.id).first()
+        if not item:
+            return {'erro': 'Item não encontrado.'}
+        item.feito = not item.feito
+    else:
+        return {'erro': f'Acção desconhecida: {accao}'}
+
+    nota.data_edicao = datetime.utcnow()
+    db.session.commit()
+    return {'ok': True}
+
+
+def apagar_nota(user_id, nota_id, confirmado=False):
+    """Apaga uma nota. Exige confirmação explícita antes de executar."""
+    nota = Nota.query.filter_by(id=nota_id, user_id=user_id).first()
+    if not nota:
+        return {'erro': 'Nota não encontrada.'}
+
+    if not confirmado:
+        return {
+            'confirmacao_necessaria': True,
+            'mensagem': f'Confirmas que queres apagar a nota {nota.titulo or "sem título"}?',
+        }
+
+    db.session.delete(nota)
+    db.session.commit()
+    return {'ok': True}
+
+
+# ── Calendário — escrita ─────────────────────────────────────────────────
+
+def criar_evento(user_id, titulo, data_inicio, data_fim, descricao=None, localizacao=None,
+                  cor='tomate', dia_inteiro=False, notificar=True):
+    try:
+        inicio = datetime.fromisoformat(data_inicio)
+        fim = datetime.fromisoformat(data_fim)
+    except (ValueError, TypeError):
+        return {'erro': 'Datas inválidas. Usa o formato ISO (ex: 2026-09-20T14:00:00).'}
+
+    if fim < inicio:
+        return {'erro': 'A data de fim não pode ser anterior à data de início.'}
+    if cor not in CORES_EVENTO:
+        cor = 'tomate'
+
+    evento = Evento(
+        user_id=user_id, titulo=titulo, descricao=descricao, localizacao=localizacao,
+        data_inicio=inicio, data_fim=fim, dia_inteiro=dia_inteiro, cor=cor, notificar=notificar,
+    )
+    db.session.add(evento)
+    db.session.commit()
+    return {'ok': True, 'id': evento.id, 'titulo': evento.titulo}
+
+
+def atualizar_evento(user_id, evento_id, titulo=None, data_inicio=None, data_fim=None,
+                      descricao=None, localizacao=None, cor=None, dia_inteiro=None, notificar=None):
+    evento = Evento.query.filter_by(id=evento_id, user_id=user_id).first()
+    if not evento:
+        return {'erro': 'Evento não encontrado.'}
+
+    inicio = evento.data_inicio
+    fim = evento.data_fim
+    if data_inicio:
+        try:
+            inicio = datetime.fromisoformat(data_inicio)
+        except ValueError:
+            return {'erro': f'Data de início inválida: "{data_inicio}".'}
+    if data_fim:
+        try:
+            fim = datetime.fromisoformat(data_fim)
+        except ValueError:
+            return {'erro': f'Data de fim inválida: "{data_fim}".'}
+    if fim < inicio:
+        return {'erro': 'A data de fim não pode ser anterior à data de início.'}
+
+    evento.titulo = titulo or evento.titulo
+    evento.descricao = descricao if descricao is not None else evento.descricao
+    evento.localizacao = localizacao if localizacao is not None else evento.localizacao
+    evento.data_inicio = inicio
+    evento.data_fim = fim
+    if cor and cor in CORES_EVENTO:
+        evento.cor = cor
+    if dia_inteiro is not None:
+        evento.dia_inteiro = dia_inteiro
+    if notificar is not None:
+        evento.notificar = notificar
+    evento.notificado_em = None  # como na rota — reabre a janela de notificação
+
+    db.session.commit()
+    return {'ok': True, 'id': evento.id}
+
+
+def apagar_evento(user_id, evento_id, confirmado=False):
+    evento = Evento.query.filter_by(id=evento_id, user_id=user_id).first()
+    if not evento:
+        return {'erro': 'Evento não encontrado.'}
+
+    if not confirmado:
+        return {
+            'confirmacao_necessaria': True,
+            'mensagem': f'Confirmas que queres apagar o evento "{evento.titulo}"?',
+        }
+
+    db.session.delete(evento)
+    db.session.commit()
+    return {'ok': True}
+
+
+# ── Passwords — escrita (stateless) ──────────────────────────────────────
+
+def gerar_credencial(user_id, modo='password', comprimento=16, maiusculas=True, minusculas=True,
+                      numeros=True, simbolos=True, excluir_ambiguos=False, num_palavras=4):
+    if modo == 'passphrase':
+        return gerar_passphrase(num_palavras)
+    if modo == 'pin':
+        return gerar_pin(comprimento)
+    return gerar_password(comprimento, maiusculas, minusculas, numeros, simbolos, excluir_ambiguos)
+
+
+def executar_ferramenta(nome_ferramenta, argumentos, user_id, modo='leitura'):
+    """Despacha a chamada para a função correspondente.
+
+    O user_id é sempre injetado — nunca vem do modelo. Ferramentas de escrita
+    só executam em modo='escrita', mesmo que o modelo as invoque por engano.
     """
     func_nome = REGISTO_FERRAMENTAS.get(nome_ferramenta)
     if not func_nome:
-        return f'[Ferramenta desconhecida: {nome_ferramenta}]'
+        return {'erro': f'Ferramenta desconhecida: {nome_ferramenta}'}
+
+    if nome_ferramenta in FERRAMENTAS_ESCRITA:
+        if modo != 'escrita':
+            return {'erro': 'Esta acção só está disponível em modo de execução.'}
+        if _limite_escrita_excedido():
+            return {'erro': 'Limite de acções por minuto atingido. Aguarda um momento e tenta novamente.'}
 
     func = globals()[func_nome]
-    return func(user_id=user_id, **argumentos) if argumentos else func(user_id=user_id)
+    try:
+        return func(user_id=user_id, **argumentos) if argumentos else func(user_id=user_id)
+    except Exception as e:
+        db.session.rollback()
+        return {'erro': f'Falha ao executar {nome_ferramenta}: {e}'}

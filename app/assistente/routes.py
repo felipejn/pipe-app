@@ -1,10 +1,12 @@
 """Rotas do módulo Assistente IA.
 
-- GET  /assistente          — página temporária de placeholder
-- POST /assistente/api/chat — API AJAX {mensagem: "..."} → {resposta: "..."}
+- GET  /assistente            — página do assistente (interface de chat)
+- POST /assistente/api/chat   — API AJAX {mensagem: "..."} → {resposta: "..."}
+- POST /assistente/api/modo   — alterna entre modo leitura e escrita
+- POST /assistente/api/limpar — limpa o histórico de conversa
 """
 
-from flask import jsonify, request, render_template
+from flask import jsonify, request, render_template, session
 from flask_login import login_required, current_user
 
 from app.assistente import assistente
@@ -16,7 +18,8 @@ from app.extensions import limiter
 @login_required
 def index():
     """Página do Assistente PIPE — interface de chat."""
-    return render_template('assistente/index.html')
+    modo = session.get('assistente_modo', 'leitura')
+    return render_template('assistente/index.html', modo=modo)
 
 
 @assistente.route('/assistente/api/chat', methods=['POST'])
@@ -35,8 +38,8 @@ def api_chat():
     if not mensagem:
         return jsonify({'erro': 'A mensagem não pode estar vazia.'}), 400
 
-    resposta = processar_mensagem_assistente(mensagem, user_id=current_user.id)
-    return jsonify({'resposta': resposta})
+    resposta_texto, modelo = processar_mensagem_assistente(mensagem, user_id=current_user.id)
+    return jsonify({'resposta': resposta_texto, 'modelo': modelo})
 
 
 @assistente.route('/assistente/api/limpar', methods=['POST'])
@@ -44,6 +47,22 @@ def api_chat():
 @limiter.limit('10 per minute')
 def api_limpar():
     """Limpa o histórico de conversa da sessão."""
-    from flask import session
     session.pop('chat_historico', None)
     return jsonify({'ok': True})
+
+
+@assistente.route('/assistente/api/modo', methods=['POST'])
+@login_required
+@limiter.limit('10 per minute')
+def api_modo():
+    """Alterna entre modo leitura e modo escrita do assistente.
+
+    Recebe JSON com {modo: "leitura"|"escrita"} e grava na sessão.
+    """
+    dados = request.get_json(silent=True) or {}
+    modo = dados.get('modo')
+    if modo not in ('leitura', 'escrita'):
+        return jsonify({'erro': 'Modo inválido. Usa "leitura" ou "escrita".'}), 400
+
+    session['assistente_modo'] = modo
+    return jsonify({'ok': True, 'modo': modo})

@@ -1,13 +1,71 @@
 {% extends "base.html" %}
 {% block titulo %}Assistente{% endblock %}
 
+{% block estilos_extra %}
+<style>
+/* ── Indicador de modo (consulta / execução) ─────────── */
+.modo-assistente {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.7rem 0.3rem 0.85rem;
+    border: 1px solid var(--cor-borda);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    color: var(--cor-texto-suave);
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.modo-assistente.modo-escrita {
+    border-color: var(--cor-primaria);
+    color: var(--cor-primaria);
+    background: rgba(245, 158, 11, 0.08);
+}
+.modo-assistente-ponto {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cor-texto-subtil);
+    flex-shrink: 0;
+}
+.modo-assistente.modo-escrita .modo-assistente-ponto {
+    background: var(--cor-primaria);
+    box-shadow: 0 0 6px var(--cor-primaria);
+}
+.chat-sistema {
+    align-self: center;
+    font-size: 0.78rem;
+    color: var(--cor-texto-subtil);
+    background: var(--cor-superficie-2);
+    border: 1px dashed var(--cor-borda);
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    text-align: center;
+}
+.chat-modelo {
+    font-size: 0.72rem;
+    color: var(--cor-texto-subtil);
+    font-style: italic;
+    margin-top: 0.3rem;
+    opacity: 0.7;
+}
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <div class="modulo-cabecalho">
     <h1>Assistente PIPE</h1>
     <p class="modulo-desc">Conversa com o teu assistente pessoal. Usa linguagem natural para consultar tarefas, notas e jogos.</p>
 </div>
 
-<div class="modulo-nav">
+<div class="modulo-nav" style="align-items: center; flex-wrap: wrap;">
+    <div class="modo-assistente {% if modo == 'escrita' %}modo-escrita{% endif %}" id="modo-assistente">
+        <span class="modo-assistente-ponto"></span>
+        <span id="modo-assistente-texto">{% if modo == 'escrita' %}Modo execução{% else %}Modo consulta{% endif %}</span>
+        <label class="toggle" title="Alternar entre modo de consulta (leitura) e modo de execução (escrita)">
+            <input type="checkbox" id="toggle-modo" {% if modo == 'escrita' %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
     <button id="btn-nova-conversa" class="btn btn-secundario" title="Limpar histórico de conversa">Nova conversa</button>
     {# Limpa historico e recarrega a pagina #}
 </div>
@@ -67,13 +125,17 @@
     }
 
     // ── Renderizar mensagens ─────────────────────────────
-    function adicionarMensagem(texto, tipo) {
+    function adicionarMensagem(texto, tipo, modelo) {
         mostrarVazio(false);
 
         var wrapper = document.createElement('div');
         wrapper.className = 'chat-bubble chat-bubble--' + (tipo === 'utilizador' ? 'user' : 'assistant');
 
-        wrapper.innerHTML = escaparHtml(texto).replace(/\n/g, '<br>');
+        var html = escaparHtml(texto).replace(/\n/g, '<br>');
+        if (modelo) {
+            html += '<div class="chat-modelo">Modelo: ' + escaparHtml(modelo) + '</div>';
+        }
+        wrapper.innerHTML = html;
 
         mensagensDiv.appendChild(wrapper);
         autoScroll();
@@ -108,6 +170,15 @@
         autoScroll();
     }
 
+    function adicionarSistema(texto) {
+        mostrarVazio(false);
+        var el = document.createElement('div');
+        el.className = 'chat-sistema';
+        el.textContent = texto;
+        mensagensDiv.appendChild(el);
+        autoScroll();
+    }
+
     // ── Enviar mensagem ──────────────────────────────────
     function enviar() {
         var texto = input.value.trim();
@@ -136,7 +207,7 @@
             removerIndicador();
             setBloqueado(false);
             if (res.ok && res.dados.resposta) {
-                adicionarMensagem(res.dados.resposta, 'assistente');
+                adicionarMensagem(res.dados.resposta, 'assistente', res.dados.modelo);
             } else {
                 var erro = res.dados.erro || 'Erro de comunicação. Tenta novamente.';
                 adicionarMensagemErro('Erro: ' + erro);
@@ -154,12 +225,16 @@
     // ── Mensagem de boas-vindas ─────────────────────────
     function boasVindas() {
         mostrarVazio(false);
+        var modoEscrita = {{ 'true' if modo == 'escrita' else 'false' }};
         var boas = 'Olá, {{ current_user.username }}! Sou o teu assistente PIPE.\n\n' +
             'Posso ajudar-te com:\n' +
             'Consultar as tuas tarefas e prazos\n' +
             'Ler as tuas notas\n' +
             'Ver os teus jogos do Euromilhões\n' +
             'Dar-te um resumo geral da tua conta\n\n' +
+            (modoEscrita
+                ? 'Estou em modo de execução — também posso criar, alterar e apagar dados.\n\n'
+                : 'Estou em modo de consulta — activa o modo de execução para eu poder alterar dados.\n\n') +
             'Em que posso ajudar?';
         adicionarMensagem(boas, 'assistente');
     }
@@ -178,6 +253,52 @@
                 headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
             }).then(function () {
                 window.location.reload();
+            });
+        });
+    }
+
+    // ── Modo de sessão (consulta / execução) ─────────────
+    var toggleModo = document.getElementById('toggle-modo');
+    var modoWrap   = document.getElementById('modo-assistente');
+    var modoTexto  = document.getElementById('modo-assistente-texto');
+
+    function actualizarIndicadorModo(modo) {
+        var escrita = (modo === 'escrita');
+        if (modoWrap) modoWrap.classList.toggle('modo-escrita', escrita);
+        if (modoTexto) modoTexto.textContent = escrita ? 'Modo execução' : 'Modo consulta';
+    }
+
+    if (toggleModo) {
+        toggleModo.addEventListener('change', function () {
+            var novoModo = this.checked ? 'escrita' : 'leitura';
+            toggleModo.disabled = true;
+
+            fetch('/assistente/api/modo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ modo: novoModo })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d && d.ok) {
+                    actualizarIndicadorModo(d.modo);
+                    adicionarSistema(d.modo === 'escrita'
+                        ? '🔓 Modo de execução activado — o assistente pode alterar dados.'
+                        : '🔒 Modo de consulta activado — apenas leitura.');
+                } else {
+                    toggleModo.checked = !toggleModo.checked;
+                    adicionarMensagemErro((d && d.erro) || 'Não foi possível alterar o modo.');
+                }
+            })
+            .catch(function () {
+                toggleModo.checked = !toggleModo.checked;
+                adicionarMensagemErro('Erro de ligação ao alterar o modo. Tenta novamente.');
+            })
+            .then(function () {
+                toggleModo.disabled = false;
             });
         });
     }

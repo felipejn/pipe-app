@@ -40,7 +40,7 @@ class ProcessarMensagemTests(TestCase):
             resultado,
             "Não consegui gerar uma resposta. Tenta reformular a tua pergunta.",
         )
-        self.assertIsNone(modelo)
+        self.assertEqual(modelo, 'desconhecido')
         self.assertEqual(len(historico), 2)
         self.assertEqual(historico[0]["role"], "user")
         self.assertEqual(historico[1]["role"], "assistant")

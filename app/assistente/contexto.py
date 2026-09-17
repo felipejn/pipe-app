@@ -168,6 +168,7 @@ def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None, 
         return msg, hist, None
 
     resposta_texto = None
+    modelo = None
 
     def _registar_resposta_invalida(resposta):
         """Regista uma amostra da escolha recebida quando não há resposta útil."""
@@ -198,7 +199,6 @@ def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None, 
             return _finalizar_erro('Neste momento não conseguimos processar o teu pedido. Tenta novamente mais tarde.')
 
         modelo = resposta.get('model', 'desconhecido') if isinstance(resposta, dict) else 'desconhecido'
-
         escolhas = resposta.get('choices') if isinstance(resposta, dict) else None
         escolha = escolhas[0] if isinstance(escolhas, list) and escolhas else {}
         if not isinstance(escolha, dict):
