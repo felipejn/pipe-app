@@ -57,7 +57,7 @@ Flask 3.0, SQLAlchemy, Flask-Login, Flask-WTF, Werkzeug, Flask-Limiter, Pillow, 
 Módulo de chat com IA via OpenRouter, com tool use para consultar dados reais dos módulos do PIPE. Card no dashboard com badge "IA" e destaque visual. **Nota:** Conexão com API pode ser instável — requer melhorias em retry/fallback.
 
 ### Arquitectura
-- **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo default via `OPENROUTER_MODEL` env var (default: `thinkingmachines/inkling-small:free`). Auth por `OPENROUTER_API_KEY`. Retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback entre modelos.
+- **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo default via `OPENROUTER_MODEL` env var (default: `inclusionai/ling-3.0-flash-fin:free`). Auth por `OPENROUTER_API_KEY`. Retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback entre modelos. Fila de fallbacks: `nex-agi/nex-n2.5-mini:free`, `inclusionai/ling-3.0-flash-sante:free`, `liquid/lfm2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`.
 - **Contexto** (`contexto.py`): `processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None)` — orquestra o fluxo: monta prompt + histórico, chama LLM, executa tool calls se necessário, guarda resposta. Histórico em Flask session (limite 20 mensagens = 10 trocas).
 - **Ferramentas** (`ferramentas.py`): tool use com 4 funções — `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`. Apenas leitura — não criam, editam nem apagam nada. Todas filtram por `user_id` (obrigatório, injetado pelo caller — nunca vem do modelo).
 - **Rotas** (`routes.py`):

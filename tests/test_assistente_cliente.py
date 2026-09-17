@@ -45,13 +45,15 @@ def _resposta_erro_servico():
     })
 
 
-MODELO_DEFAULT = os.environ.get("OPENROUTER_MODEL") or "thinkingmachines/inkling-small:free"
-MODELOS_FALLBACK = [m for m in [
-    "thinkingmachines/inkling:free",
+MODELO_DEFAULT = "inclusionai/ling-3.0-flash-fin:free"  # hardcoded para consistência entre testes e cliente
+_MODELOS_FALLBACK_BRUTOS = [
+    "nex-agi/nex-n2.5-mini:free",
+    "inclusionai/ling-3.0-flash-sante:free",
+    "liquid/lfm2.5-2.6b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
-    "google/gemma-4-31b-it:free",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-] if m != MODELO_DEFAULT]
+]
+MODELOS_FALLBACK = [m for m in _MODELOS_FALLBACK_BRUTOS if m != MODELO_DEFAULT]
 
 
 class ClassificacaoTests(TestCase):
@@ -91,35 +93,43 @@ class ChamarLlmTests(TestCase):
     @mock.patch("app.assistente.cliente.time.sleep")
     @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
     def test_fallback_apos_429_e_erro_de_servico_ate_resposta_valida(self, _, post):
+        modelos_ordenados = _listar_modelos()
+        self.assertTrue(len(modelos_ordenados) >= 3, "O teste requer pelo menos 3 modelos únicos")
+        m1, m2, m3 = modelos_ordenados[0], modelos_ordenados[1], modelos_ordenados[2]
+
         post.side_effect = [_FakeResponse(429), _resposta_erro_servico(), _resposta_valida()]
 
         resultado = chamar_llm([{"role": "user", "content": "cria evento"}])
 
         self.assertEqual(post.call_count, 3)
-        self.assertEqual(post.call_args_list[0][1]["json"]["model"], MODELO_DEFAULT)
-        self.assertEqual(post.call_args_list[1][1]["json"]["model"], MODELOS_FALLBACK[0])
-        self.assertEqual(post.call_args_list[2][1]["json"]["model"], MODELOS_FALLBACK[1])
+        self.assertEqual(post.call_args_list[0][1]["json"]["model"], m1)
+        self.assertEqual(post.call_args_list[1][1]["json"]["model"], m2)
+        self.assertEqual(post.call_args_list[2][1]["json"]["model"], m3)
         self.assertIn("choices", resultado)
 
     @mock.patch("app.assistente.cliente.requests.post")
     @mock.patch("app.assistente.cliente.time.sleep")
     @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
     def test_todos_os_modelos_com_rate_limit_levanta_rate_limit(self, _, post):
-        post.side_effect = [_FakeResponse(429) for _ in MODELOS_FALLBACK + [MODELO_DEFAULT]]
+        modelos_ordenados = _listar_modelos()
+        post.side_effect = [_FakeResponse(429) for _ in modelos_ordenados]
 
         with self.assertRaises(RateLimitError):
             chamar_llm([{"role": "user", "content": "cria evento"}])
 
-        self.assertEqual(post.call_count, len(MODELOS_FALLBACK) + 1)
+        self.assertEqual(post.call_count, len(modelos_ordenados))
 
     @mock.patch("app.assistente.cliente.requests.post")
     @mock.patch("app.assistente.cliente.time.sleep")
     @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
     def test_todos_os_modelos_com_erro_de_servico_levanta_servico_indisponivel(self, _, post):
-        post.side_effect = [_resposta_erro_servico() for _ in MODELOS_FALLBACK + [MODELO_DEFAULT]]
+        modelos_ordenados = _listar_modelos()
+        post.side_effect = [_resposta_erro_servico() for _ in modelos_ordenados]
 
         with self.assertRaises(ServicoIndisponivelError):
             chamar_llm([{"role": "user", "content": "cria evento"}])
+
+        self.assertEqual(post.call_count, len(modelos_ordenados))
 
     @mock.patch("app.assistente.cliente.requests.post")
     @mock.patch("app.assistente.cliente.time.sleep")
