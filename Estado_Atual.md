@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.9
+# PIPE — Estado Actual do Projecto — v1.4.10
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -58,7 +58,7 @@ pipe-app/
 │   ├── combustiveis/        # Blueprint Combustíveis ← NOVO
 │   │   ├── __init__.py
 │   │   ├── models.py        # Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis
-│   │   ├── services.py      # API Aberta (api.apiaberta.pt); atualizar_precos_se_necessario, obter_precos_para_concelhos, obter_tipos_combustivel_disponiveis; NOMES_IGNORADOS (blocklist)
+│   │   ├── services.py      # API Aberta (api.apiaberta.pt); atualizar_precos_se_necessario, obter_precos_para_concelhos, obter_tipos_combustivel_disponiveis; NOMES_IGNORADOS (blocklist) + MAX_DIAS_PRECO_ATIVO / obter_ids_postos_obsoletos (regra geral de obsolescência)
 │   │   ├── routes.py        # /combustiveis/, /combustiveis/definicoes, /combustiveis/atualizar
 │   │   └── templates/
 │   │       └── combustiveis/
@@ -463,6 +463,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
+**Versão v1.4.10** — módulo Combustíveis: regra geral de obsolescência, para além da blocklist por nomes. `DJB COMBUSTIVEIS` (id 69288) incluído em `services.NOMES_IGNORADOS` (dados DGEG de Abr/2026 que falseiam o card de gasolina 95 — antes 1,935 €) e nova constante `MAX_DIAS_PRECO_ATIVO = 30` com helper `obter_ids_postos_obsoletos()`, que exclui no ambiente de **leitura** (`obter_precos_para_concelhos`, `obter_tipos_combustivel_disponiveis` e a contagem `total_postos` do dashboard) qualquer posto cuja actualização DGEG mais recente tenha mais de 30 dias ou cujo nome esteja bloqueado. Esta abordagem (ignorar, não arquivar) é intencional: estes postos continuam a ser devolvidos pela API em todas as recolhas (`ciclos_ausente=0`), pelo que o arquivamento automático não os apanha e um `ativo=False` seria revertido na recolha seguinte; a regra também cobre futuros casos sem lista manual, é reversível (ajustando a constante) e preserva todo o histórico. `scripts/remover_postos_ignorados.py` agora também limpa o DJB (`id 69288`). Verificação: recolha forçada confirma 76 → 75 postos, sem regressão dos nomes bloqueados nem dos 4 homólogos frescos; mínimo gasolina 95 passa de 1,935 € (DJB, Abr/2026) para 1,959 € (PLENERGY - BRAGA I, hoje); a regra deteta um posto falso com dados de 8 meses e exclui-o, e um rollback confirma a BD inalterada. `git push` pendente de credencial (https, sem token/ssh neste ambiente). 22 testes `pytest` a passar. **Alteração de BD** — correr `python scripts/remover_postos_ignorados.py` no PA após o deploy, antes de abrir o dashboard.
+
 **Versão v1.4.9** — módulo Combustíveis: eliminação dos postos duplicados com preços desactualizados (v1.3.3). A API Aberta continua a devolver os `id` antigos de estações reatribuídas mas com valores congelados; como aparecem em todas as recolhas, o arquivamento automático não os apanha e, por serem mais baratos que os reais, ganhavam o card "Mais barato por combustível". Nova constante `NOMES_IGNORADOS` em `services.py` (E.S. FERREIROS, E.S. BRAGA PISCINAS I, E.S. BRAGA PISCINAS II, BP Braga João 21) com auxiliar `_nome_ignorado()` normalizado, aplicada antes de qualquer escrita na recolha (os postos nunca são criados, actualizados nem reactivados) e `scripts/remover_postos_ignorados.py` para limpar o que já estava gravado (80 → 76 postos, 12 registos de preço). Verificação: recolha forçada após a limpeza confirma 76 → 76 sem regressão dos nomes bloqueados e homólogos frescos intactos; card de gasóleo simples corrigido de 1,919 € (falso, Jul/2026) para 2,049 € (hoje). `DJB COMBUSTIVEIS` mantido por decisão explícita (não é duplicado), apesar de actualmente liderar o card de gasolina 95 com dados de Abril/2026. Validação: 22 testes `pytest` a passar. Sem alteração de BD.
 
 **Versão v1.4.8** — módulo Combustíveis: arquivamento automático de postos (v1.3.2) e reinício das tabelas de postos/histórico. Um posto que deixe de aparecer nas respostas da API Aberta passa a ser arquivado em vez de ficar visível indefinidamente com dados desactualizados — o caso dos `id` reatribuídos pela DGEG, em que o posto antigo ficava "congelado" na BD e o id novo criava um registo em paralelo, com o dashboard a mostrar os dois como postos distintos. Novos campos `Posto.ativo` / `Posto.ciclos_ausente`, constante `LIMIAR_CICLOS_AUSENTE = 2`, reactivação automática ao reaparecer, arquivamento condicionado a recolhas sem erros, filtro `Posto.ativo == True` em `obter_precos_para_concelhos` e na contagem do dashboard, chave `postos_arquivados` no retorno e flash do botão manual. Reinício completo das tabelas de postos e histórico com `scripts/reset_postos_combustiveis.py`, preservando as definições do utilizador (95 → 80 postos). Validação: 22 testes `pytest` a passar + testes manuais (arquivamento exactamente ao 2.º ciclo, reactivação, 2.ª recolha sem subir contadores, render do dashboard e flash). **Alteração de BD** — exige correr o script de reset no PythonAnywhere após o deploy, antes de abrir o dashboard.
@@ -487,7 +489,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 **Pendências gerais:**
 - **Assistente IA:** ✅ resolvido em v1.4.6 — fila de modelos validada contra o catálogo do OpenRouter e fallback automático a funcionar (`OPENROUTER_MODEL` do `.env` corrigido; era a causa da lentidão)
 - **Combustíveis — duplicados na própria API:** "E.S. FERREIROS" (id `66475`, EN 14, Ferreiros) vs "Posto Ferreiros- ESO305" (id `95233`, Rua Cidade do Porto, Braga) e os quatro "Santos da Cunha 6 - Logística e Transportes, Lda." vêm **todos** da API Aberta, com ids e moradas diferentes — não são registos congelados, pelo que o arquivamento automático não os remove (chegam em todas as recolhas com `ciclos_ausente=0`). Só uma heurística de deduplicação por morada+concelho, ou arquivamento manual, os resolve
-- **Combustíveis — follow-up opcional:** filtrar `Posto.ativo` também em `obter_tipos_combustivel_disponiveis`, para o dropdown do dashboard não listar um combustível que só exista em postos arquivados
+- **Combustíveis — follow-up opcional:** ✅ resolvido em v1.4.10 — `obter_tipos_combustivel_disponiveis` agora exclui, via `obter_ids_postos_obsoletos()`, não só postos arquivados como também os obsoletos (dados DGEG congelados, caso do DJB), mantendo o dropdown alinhado ao dashboard
 - **Módulos futuros:** arquitectura pronta — versão 1.x
 
 ---
@@ -499,7 +501,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
    - `api.apiaberta.pt` já está na whitelist do PA (documentação Swagger pública)
    - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min — com o filtro `district` a recolha desceu de ~25 s para ~3-4 s)
    - ⚠️ **Correr `python scripts/reset_postos_combustiveis.py` no PA** — é o que cria as colunas `ativo`/`ciclos_ausente` (o `create_all()` não faz `ALTER TABLE`); correr **antes** de abrir o dashboard
-   - ⚠️ **Correr `python scripts/remover_postos_ignorados.py` no PA** — remove os 4 postos duplicados com preços congelados (E.S. FERREIROS, E.S. BRAGA PISCINAS I/II, BP Braga João 21) e o respectivo histórico; idempotente
+   - ⚠️ **Correr `python scripts/remover_postos_ignorados.py` no PA** — remove os postos em `NOMES_IGNORADOS` (os 4 duplicados com preços congelados — E.S. FERREIROS, E.S. BRAGA PISCINAS I/II, BP Braga João 21 — e o `DJB COMBUSTIVEIS`, dados DGEG de Abr/2026) e o respectivo histórico; idempotente
 3. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
 4. Deploy do Calendário no PythonAnywhere
 5. Migração da tabela `evento` no PA

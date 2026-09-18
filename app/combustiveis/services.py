@@ -20,7 +20,7 @@ Python direta dentro do processo Flask/pipe_tasks.
 import os
 import time
 import requests
-from datetime import datetime, date as date_cls
+from datetime import datetime, date as date_cls, timedelta
 from app import db
 from app.combustiveis.models import Posto, PrecoHistorico, EstadoAtualizacaoCombustiveis
 
@@ -59,6 +59,7 @@ NOMES_IGNORADOS = {
     'E.S. BRAGA PISCINAS I',
     'E.S. BRAGA PISCINAS II',
     'BP Braga João 21',
+    'DJB COMBUSTIVEIS',
 }
 
 # Comparação sem depender de caixa nem de espaços nas pontas devolvidos pela API.
@@ -70,6 +71,55 @@ def _nome_ignorado(nome):
     if not nome:
         return False
     return nome.strip().casefold() in _NOMES_IGNORADOS_NORMALIZADOS
+
+
+# Preços DGEG com mais de este nº de dias são considerados obsoletos: a API
+# ainda devolve o posto, mas a DGEG deixou de actualizá-lo — sinal típico de
+# posto encerrado ou com id reatribuído — e o valor ficado falseia o "mais
+# barato". São excluídos no ambiente de leitura (obter_precos_para_concelhos,
+# obter_tipos_combustivel_disponiveis e a contagem total_postos do dashboard),
+# porque estes postos continuam a vir em todas as recolhas (ciclos_ausente=0),
+# pelo que o arquivamento por ausência nunca os apanha. Station-level.
+MAX_DIAS_PRECO_ATIVO = 30
+
+
+def obter_ids_postos_obsoletos():
+    """Ids de postos a excluir dos resultados/dashboard.
+
+    Um posto é obsoleto se:
+    - o seu nome está em NOMES_IGNORADOS (duplicado com dados congelados que a
+      API continua a devolver), ou
+    - não tem nenhum preço registado, ou
+    - a sua data de actualização DGEG mais recente (data_atualizacao_dgeg) tem
+      mais de MAX_DIAS_PRECO_ATIVO dias.
+
+    A comparação usa o prefixo ISO `YYYY-MM-DD` da string (lexicográfica =
+    cronológica). Reverte-se a qualquer momento ajustando MAX_DIAS_PRECO_ATIVO
+    ou a lista NOMES_IGNORADOS.
+    """
+    from sqlalchemy import func
+    corte = (datetime.utcnow() - timedelta(days=MAX_DIAS_PRECO_ATIVO)).strftime('%Y-%m-%d')
+    ultima_por_posto = (
+        db.session.query(
+            PrecoHistorico.posto_id,
+            func.max(PrecoHistorico.data_atualizacao_dgeg).label('ult_dgeg')
+        )
+        .group_by(PrecoHistorico.posto_id)
+        .subquery()
+    )
+    linhas = (
+        db.session.query(Posto.id)
+        .outerjoin(ultima_por_posto, ultima_por_posto.c.posto_id == Posto.id)
+        .filter(
+            db.or_(
+                Posto.nome.in_(list(NOMES_IGNORADOS)),
+                ultima_por_posto.c.ult_dgeg.is_(None),
+                func.substr(ultima_por_posto.c.ult_dgeg, 1, 10) <= corte,
+            )
+        )
+        .all()
+    )
+    return [posto_id for (posto_id,) in linhas]
 
 
 def _headers():
@@ -280,6 +330,7 @@ def obter_tipos_combustivel_disponiveis(concelhos, tipos_utilizador=None):
         db.session.query(PrecoHistorico.tipo_combustivel)
         .join(Posto, Posto.id == PrecoHistorico.posto_id)
         .filter(Posto.concelho.in_(concelhos))
+        .filter(~Posto.id.in_(obter_ids_postos_obsoletos()))
     )
     if tipos_utilizador:
         query = query.filter(PrecoHistorico.tipo_combustivel.in_(tipos_utilizador))
@@ -307,6 +358,7 @@ def obter_precos_para_concelhos(concelhos, tipos_utilizador=None, tipo_seleciona
         ))
         .filter(Posto.concelho.in_(concelhos))
         .filter(Posto.ativo.is_(True))
+        .filter(~Posto.id.in_(obter_ids_postos_obsoletos()))
     )
     if tipos_utilizador:
         query = query.filter(PrecoHistorico.tipo_combustivel.in_(tipos_utilizador))
