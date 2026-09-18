@@ -444,7 +444,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 - **Backlog v1.x:** tela de detalhe do evento (read-only, acionada ao clicar no evento na Agenda ou Vista Mensal; botão "Editar" dentro do detalhe abre o modal existente)
 
 **Pendências gerais:**
-- **Assistente IA:** retry/fallback a melhorar (modelo e logging corrigidos em v1.4.0)
+- **Assistente IA:** ✅ resolvido em v1.4.6 — fila de modelos validada contra o catálogo do OpenRouter e fallback automático a funcionar (`OPENROUTER_MODEL` do `.env` corrigido; era a causa da lentidão)
 - **Módulos futuros:** arquitectura pronta — versão 1.x
 
 ---
