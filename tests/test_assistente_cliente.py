@@ -49,7 +49,7 @@ MODELO_DEFAULT = "inclusionai/ling-3.0-flash-fin:free"  # hardcoded para consist
 _MODELOS_FALLBACK_BRUTOS = [
     "nex-agi/nex-n2.5-mini:free",
     "inclusionai/ling-3.0-flash-sante:free",
-    "liquid/lfm2.5-2.6b:free",
+    "liquid/lfm-2.5-2.6b:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
 ]

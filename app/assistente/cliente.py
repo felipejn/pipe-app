@@ -10,10 +10,9 @@ OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 _MAX_TENTATIVAS = 3
 _ESPERA_RETRY = [2, 5, 10]  # segundos de backoff entre tentativas
 _MODELOS_FALLBACK = [
-    'inclusionai/ling-3.0-flash-fin:free',
     'nex-agi/nex-n2.5-mini:free',
     'inclusionai/ling-3.0-flash-sante:free',
-    'liquid/lfm2.5-2.6b:free',
+    'liquid/lfm-2.5-2.6b:free',
     'nvidia/nemotron-3-super-120b-a12b:free',
     'nvidia/nemotron-3-ultra-550b-a55b:free',
 ]
