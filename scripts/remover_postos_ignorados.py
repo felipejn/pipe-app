@@ -30,9 +30,37 @@ from app.combustiveis import services
 from app.combustiveis.models import Posto, PrecoHistorico
 
 
+def _verificar_schema(engine=None):
+    """True se a BD já tem as colunas novas do Posto (ativo/ciclos_ausente).
+
+    Sem estas colunas (BD do PA ainda não passou pelo reset v1.3.2/v1.3.3),
+    qualquer query a Posto rebenta — e este script não pode sequer ler os
+    postos para detectar duplicados. Nesse caso, orienta ao utilizador para
+    correr primeiro o script de reset, em vez de deixar um traceback opaco.
+    """
+    from sqlalchemy import inspect
+    if engine is None:
+        engine = db.engine
+    insp = inspect(engine)
+    try:
+        cols = {c['name'] for c in insp.get_columns('combustiveis_postos')}
+    except Exception:
+        cols = set()
+    if 'ativo' not in cols:
+        print('AVISO: a BD ainda não tem as colunas novas (ativo/ciclos_ausente).')
+        print('Não é possível listar/remover postos. Executa primeiro:')
+        print('    python scripts/reset_postos_combustiveis.py')
+        print('que recria as tabelas (db.create_all), reinicia o estado de actualização')
+        print('e força uma recolha — só depois corre este script.')
+        return False
+    return True
+
+
 def main():
     app = create_app()
     with app.app_context():
+        if not _verificar_schema():
+            return
         print('Nomes ignorados (services.NOMES_IGNORADOS):')
         for nome in sorted(services.NOMES_IGNORADOS):
             print(f'  - {nome}')
