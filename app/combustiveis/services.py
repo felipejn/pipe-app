@@ -41,6 +41,7 @@ PAGE_LIMIT = 100
 PAUSA_ENTRE_PEDIDOS = 0.21  # segundos, margem de segurança face ao rate limit
 TENTATIVAS_MAX = 3          # tentativas por página antes de desistir do combustível
 PAGINAS_MAX = 60            # corte de segurança contra loop infinito de paginação
+LIMIAR_CICLOS_AUSENTE = 2   # nº de recolhas em falta até arquivar
 # Distrito cujo nome é prefixo de todos os concelhos de interesse. A API
 # filtra por distrito (match por prefixo → inclui "Bragança", daí o filtro por
 # concelho é sempre aplicado de cliente para cliente em _paginar_fuel).
@@ -124,7 +125,8 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
     """
     Retorna dict com as chaves 'executado', 'sucesso',
     'postos_verificados', 'postos_atualizados' (nº de postos
-    verificados), 'precos_novos', 'postos_na_bd' e 'erro'.
+    verificados), 'precos_novos', 'postos_na_bd', 'postos_arquivados'
+    (nº de postos que passaram a ativo=False nesta chamada) e 'erro'.
 
     Fonte de dados: API Aberta (api.apiaberta.pt/v1/fuel/stations), autenticada
     via header X-API-Key (chave em APIABERTA_API_KEY). Sem chave, tier anónimo
@@ -134,19 +136,22 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
     hoje = hoje or date_cls.today()
 
     if not forcar and hoje.weekday() != 1:  # 1 = terça-feira
-        return {'executado': False, 'sucesso': True, 'postos_atualizados': 0, 'erro': None}
+        return {'executado': False, 'sucesso': True, 'postos_atualizados': 0,
+                'postos_arquivados': 0, 'erro': None}
 
     estado = _obter_estado()
 
     # Evita correr duas vezes na mesma terça-feira, caso a tarefa seja
     # disparada mais do que uma vez no mesmo dia
     if not forcar and estado.ultima_atualizacao and estado.ultima_atualizacao.date() == hoje:
-        return {'executado': False, 'sucesso': True, 'postos_atualizados': 0, 'erro': None}
+        return {'executado': False, 'sucesso': True, 'postos_atualizados': 0,
+                'postos_arquivados': 0, 'erro': None}
 
     session = requests.Session()
     erros = []
     postos_vistos = set()
     precos_gravados = 0
+    postos_arquivados = 0
 
     for fuel_slug in FUEL_SLUGS:
         try:
@@ -166,6 +171,14 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
             posto.concelho = r.get('municipality')
             db.session.add(posto)
             db.session.flush()
+
+            # Posto presente nesta recolha: fica (ou volta a ficar) activo e o
+            # contador de ausências é reiniciado. Cobre tanto o caso normal
+            # como a reactivação automática de um posto que tinha sido
+            # arquivado e voltou a aparecer na API. Tem de vir antes do bloco
+            # de deduplicação, para também correr no ramo do `continue`.
+            posto.ativo = True
+            posto.ciclos_ausente = 0
 
             # Deduplicação: só grava histórico quando há alteração real. A API
             # devolve updated_at (timestamp DGEG) + preço; se coincidirem com o
@@ -189,6 +202,26 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
             postos_vistos.add(posto_id)
 
     sucesso = len(erros) == 0
+
+    # Arquivamento automático: um posto activo que não veio nesta recolha
+    # acumula uma ausência; ao atingir LIMIAR_CICLOS_AUSENTE é marcado como
+    # inactivo — deixa de aparecer no dashboard e nos cálculos de "mais
+    # barato", mas todo o histórico associado é preservado. Só corre quando a
+    # recolha não teve erros: em caso de falha parcial (ex.: um combustível
+    # sem resposta) todos os postos desse combustível ficariam fora de
+    # `postos_vistos` e seriam contados como ausentes por engano.
+    if sucesso:
+        ids_vistos = postos_vistos
+        postos_ausentes = Posto.query.filter(
+            Posto.ativo.is_(True),
+            ~Posto.id.in_(ids_vistos)
+        ).all()
+        for posto in postos_ausentes:
+            posto.ciclos_ausente += 1
+            if posto.ciclos_ausente >= LIMIAR_CICLOS_AUSENTE:
+                posto.ativo = False
+                postos_arquivados += 1
+
     # Marca "correu hoje" só quando tudo correu bem: em caso de falha permite
     # retry na mesma terça-feira, em vez de perder o dia inteiro.
     if sucesso:
@@ -203,6 +236,7 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
         'postos_verificados': len(postos_vistos),
         'postos_atualizados': len(postos_vistos),  # compat. retroativa
         'precos_novos': precos_gravados,
+        'postos_arquivados': postos_arquivados,
         'postos_na_bd': Posto.query.count(),
         'erro': estado.mensagem_erro,
     }
@@ -238,6 +272,7 @@ def obter_precos_para_concelhos(concelhos, tipos_utilizador=None, tipo_seleciona
             PrecoHistorico.data_recolha == subq.c.max_data,
         ))
         .filter(Posto.concelho.in_(concelhos))
+        .filter(Posto.ativo.is_(True))
     )
     if tipos_utilizador:
         query = query.filter(PrecoHistorico.tipo_combustivel.in_(tipos_utilizador))

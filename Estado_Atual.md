@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.7
+# PIPE — Estado Actual do Projecto — v1.4.8
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -290,12 +290,12 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 
 ### Módulo Combustíveis (`app/combustiveis/`) ← NOVO — v1.3
 - **Schema:** tabelas `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel` e `combustiveis_estado_atualizacao`. FK de utilizador aponta para `utilizadores.id` (nome real da tabela). `db.create_all()` cria as tabelas no primeiro reload (sem Flask-Migrate).
-- **Modelo `Posto.id`** é o id da API Aberta; relacionamento `precos` lazy='dynamic'.
-- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`, marcador gravado apenas em execuções com sucesso, para permitir retry no mesmo dia após falha); o botão manual "Actualizar Dados" (`forcar=True`) ignora o dia. Faz paginação completa da API Aberta (`GET /v1/fuel/stations?fuel=<slug>&district=Braga&page=&limit=100`) por combustível (~12 pedidos, ~3-4 s por recolha), filtra do lado do cliente por `municipality` (Braga/Vila Verde/Amares) e grava em `Posto` + `PrecoHistorico` (chave `station_id`); só grava novo histórico quando `preco` ou `updated_at` mudam (deduplicação). Autenticação via header `X-API-Key` (var `APIABERTA_API_KEY`, opcional — sem chave = 30 pedidos/min; com chave = 300/min). `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo. Devolve `postos_verificados`, `precos_novos` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade).
+- **Modelo `Posto.id`** é o id da API Aberta; relacionamento `precos` lazy='dynamic'. Campos de arquivamento (v1.3.2): `ativo` (Boolean, `nullable=False`, default `True`) e `ciclos_ausente` (Integer, `nullable=False`, default `0`).
+- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`, marcador gravado apenas em execuções com sucesso, para permitir retry no mesmo dia após falha); o botão manual "Actualizar Dados" (`forcar=True`) ignora o dia. Faz paginação completa da API Aberta (`GET /v1/fuel/stations?fuel=<slug>&district=Braga&page=&limit=100`) por combustível (~12 pedidos, ~3-4 s por recolha), filtra do lado do cliente por `municipality` (Braga/Vila Verde/Amares) e grava em `Posto` + `PrecoHistorico` (chave `station_id`); só grava novo histórico quando `preco` ou `updated_at` mudam (deduplicação). Autenticação via header `X-API-Key` (var `APIABERTA_API_KEY`, opcional — sem chave = 30 pedidos/min; com chave = 300/min). `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo. Devolve `postos_verificados`, `precos_novos`, `postos_arquivados` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade).
 - **Rotas:**
   - `GET /combustiveis/` — dashboard: cards "Mais barato por combustível" + tabela (Posto | Concelho | Combustível | Preço (€/L) | Data); filtro GET `?combustivel=`; redirect para Definições se sem concelhos.
   - `GET/POST /combustiveis/definicoes` — checkboxes de concelhos + combustíveis; gravação em `UtilizadorConcelho` e `UtilizadorCombustivel` (delete+insert, como nas outras definições).
-  - `POST /combustiveis/atualizar` — força a actualização (rate limit 6/hora) e faz redirect, com flash honesto ("X postos verificados, Y registos novos" ou "sem alterações desde a última recolha").
+  - `POST /combustiveis/atualizar` — força a actualização (rate limit 6/hora) e faz redirect, com flash honesto ("X postos verificados, Y registos novos" ou "sem alterações desde a última recolha") e, desde a v1.3.2, com o sufixo "N posto(s) arquivado(s) (deixaram de aparecer na API)." quando a recolha arquivou pelo menos um posto (concordância singular/plural).
 - **Templates** em `app/templates/combustiveis/{dashboard,definicoes}.html` (arranjo do PIPE: `app/templates/<modulo>/`).
 - **CSS:** reutiliza as classes existentes (`pipe.css`) — `.cartao`, `.admin-tabela`, `.opcao-check`, `.btn`, `.campo-texto`, `.secao-*`. Dropdown usa `class="campo-texto"` e GET (sem CSRF).
 - **Scheduled task:** `tarefa_combustiveis` em `scripts/pipe_tasks.py` — chama `services.atualizar_precos_se_necessario(forcar=False)`; log "Actualização automática ignorada — hoje não é terça-feira." quando fora de terça e "— já actualizado hoje" quando já correu nessa terça; em execução, loga postos verificados, registos novos e total na BD.
@@ -303,10 +303,17 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
   - **Bug crítico de paginação corrigido** — o `return encontrados` de `_paginar_fuel` estava indentado *dentro* do `while True`, devolvendo logo após a página 1. A recolha via API Aberta via apenas 4 postos (de 95) e o botão manual respondia "Preços atualizados (4 postos)." em ~1 s. Corrigido (return ao nível da função) e adicionada guarda `PAGINAS_MAX = 60`.
   - **Filtro `district`** — a API honra `district` (não honra `municipality`, `municipio`, `concelho`, `q` ou `search`). Com `district=Braga` a paginação passa de ~96 para ~12 pedidos (~21 s → ~3 s). O match é por prefixo (devolve também Bragança), pelo que o filtro por concelho continua a ser aplicado do lado do cliente.
   - **Deduplicação de histórico** — só se grava `PrecoHistorico` quando `preco` ou `data_atualizacao_dgeg` (o `updated_at` da API) difere do último registo do mesmo posto+combustível. Evita linhas 100% duplicadas (as recolhas DGEG tinham triplicado o histórico).
-  - **Retorno honesto** — `atualizar_precos_se_necessario` devolve `postos_verificados`, `precos_novos` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade). O flash distingue "Preços actualizados — X postos verificados, Y registos novos." de "Preços verificados — X postos, sem alterações desde a última recolha."
+  - **Retorno honesto** — `atualizar_precos_se_necessario` devolve `postos_verificados`, `precos_novos` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade). O flash distingue "Preços actualizados — X postos verificados, Y registos novos." de "Preços verificados — X postos, sem alterações desde a última recolha." (em v1.3.2 o retorno ganhou ainda `postos_arquivados` — ver abaixo.)
   - **Estado visível** — o dashboard mostra "Última actualização: … · N postos na base de dados" e o erro da última recolha, se existir.
   - **`ultima_atualizacao` só é marcada em caso de sucesso** — uma falha na terça permite retry no mesmo dia (antes, a falha às 08:00 bloqueava o resto do dia).
   - **Rate limit** — `POST /combustiveis/atualizar` limitado a 6/hora (`@limiter.limit`).
+- **Arquivamento automático (v1.3.2):** um posto que deixe de aparecer nas respostas da API Aberta passa a ser arquivado em vez de ficar visível indefinidamente no dashboard com a última data em que foi visto — o caso dos `id` reatribuídos pela DGEG (ex.: "E.S. FERREIROS REPSOL" substituída por "Posto Ferreiros- ESO305 REPSOL" com id diferente), em que o posto antigo ficava "congelado" na BD e o id novo criava um registo em paralelo, com o dashboard a mostrar as duas entradas como se fossem postos distintos. Regras:
+  - Cada recolha incrementa `ciclos_ausente` dos postos activos que **não** vieram nessa resposta; ao atingir `LIMIAR_CICLOS_AUSENTE = 2` (constante junto de `PAGINAS_MAX` em `services.py`) o posto passa a `ativo=False`. O conjunto de ids vistos nesta chamada é o `postos_vistos` que a função já usava (não foi criada variável nova).
+  - **Reactivação automática:** qualquer posto presente numa recolha fica com `ativo=True` e `ciclos_ausente=0` — a atribuição é feita logo após o `flush()`, antes do bloco de deduplicação, para também correr no ramo do `continue` (postos cujo preço/timestamp não mudou).
+  - **Histórico preservado:** arquivar nunca apaga `PrecoHistorico`; o posto só deixa de aparecer no dashboard e nos cálculos de "mais barato".
+  - **Guarda contra falhas parciais:** o bloco de arquivamento só corre quando `len(erros) == 0`. Numa recolha com erro (ex.: um combustível sem resposta) todos os postos desse combustível ficariam fora do conjunto de ids vistos e seriam contados como ausentes por engano — com a guarda, `ciclos_ausente` fica intocado e `postos_arquivados` é 0.
+  - **Filtros:** `obter_precos_para_concelhos` e a contagem `total_postos` do dashboard (cabeçalho) filtram `Posto.ativo == True`, pelo que os arquivados desaparecem também dos cards de "mais barato por combustível". `obter_tipos_combustivel_disponiveis` **não** foi alterado.
+  - **Retorno/UI:** nova chave `postos_arquivados` no dict (0 nas execuções com erros, fora do dia ou já corridas); o flash do botão manual reporta-a quando é maior que zero.
 - **Primeira recolha:** correu uma vez manualmente via `services.atualizar_precos_se_necessario(forcar=True)` (equivalente a `scripts/popular_combustiveis.py`). Substitui o antigo `scripts/mapear_combustiveis_inicial.py` (removido — não era necessário com a API Aberta: a paginação por combustível já devolve os postos da zona directamente).
 - **Integração na Loja:** entrada em `MODULOS_DISPONIVEIS` com slug `combustiveis`, ícone ⛽, rota `combustiveis.dashboard`.
 
@@ -347,6 +354,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Módulo Combustíveis — definições com checkboxes de concelhos + combustíveis** ✅
 - **Módulo Combustíveis — `tarefa_combustiveis` às terças** ✅ (ignora fora de terça; força no botão manual)
 - **Módulo Combustíveis — paginação completa + deduplicação** (95 postos verificados num só ciclo, histórico sem linhas duplicadas, filtro `district`)
+- **Módulo Combustíveis — arquivamento automático (v1.3.2)** ✅ (reset local: 95 → 80 postos, 15 registos que já não vinham da API eliminados; 2.ª recolha real não subiu `ciclos_ausente` de nenhum posto; posto ausente arquivado exactamente ao 2.º ciclo com `postos_arquivados=1` e reactivado ao reaparecer, com `ciclos_ausente` reiniciado a 0; filtro do dashboard confirmado por lista de ids; render de `GET /combustiveis/` e flash de `POST /combustiveis/atualizar` validados; 22 testes `pytest` a passar)
 - **Tema claro/escuro — alternância via botão na navbar** ✅ (tema e ícone mudam; escolha persiste após reload via `localStorage`)
 - **Tema claro/escuro — anti-FOUC** ✅ (tema aplicado antes do primeiro paint, sem flash)
 - **Módulo Notas — paleta de cores Google Keep** ✅ (8 cores substituíram as cores escuras anteriores; aplicáveis em tema claro e escuro, sem alteração de BD — `Nota.CORES`, `_cartao.html`, `index.html` actualizados; `editar.html` usa a mesma fonte via `|tojson`)
@@ -362,6 +370,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **WSGI configurado** ✅
 - **Static files** configurados ✅
 - **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às 08:00 ✅
+- **Módulo Combustíveis — reset das tabelas (colunas `ativo`/`ciclos_ausente`) pendente no PA** ⚠️
 - **Módulo Calendário — deploy e migração de BD pendentes** ⚠️
 
 ### Configuração WSGI
@@ -399,6 +408,7 @@ APIABERTA_API_KEY=...
 - Módulo Passwords — sem BD ✅
 - **Módulo Calendário — tabela `evento` a criar no PA após deploy** ⚠️
 - **Módulo Combustíveis — 4 tabelas** (`combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao`) criadas por `db.create_all()` no primeiro reload; modelo `UtilizadorCombustivel` adicionado ao import de `db.create_all()` em `app/__init__.py` ✅
+- **Módulo Combustíveis — arquivamento de postos (v1.3.2)** ⚠️ no PA — `python scripts/reset_postos_combustiveis.py` (drop das tabelas de postos/histórico + `db.create_all()` + repovoamento; cria as colunas `ativo`/`ciclos_ausente` que o `create_all()` sozinho não acrescenta a uma BD existente)
 
 ### Comando de migração do Calendário (executar no PA após deploy)
 ```bash
@@ -407,6 +417,13 @@ python -c "from app import create_app; from app.extensions import db; from app.c
 
 ### Módulo Combustíveis (migração)
 As tabelas do módulo Combustíveis são criadas **automaticamente** pelo `db.create_all()` (já chamado no arranque da app e com os modelos importados em `app/__init__.py`), **sem necessidade de script de migração manual**. A primeira população de dados é feita uma única vez correndo `services.atualizar_precos_se_necessario(forcar=True)` — ou, por conveniência, `python scripts/popular_combustiveis.py` (script de ajuda, não obrigatório). No deploy do PA, basta o primeiro reload — as 4 tabelas + a linha seed `id=1` de `EstadoAtualizacaoCombustiveis` são criadas. **`api.apiaberta.pt` está na whitelist do PA** (é um domínio com documentação Swagger pública, diferentemente da DGEG que o substituiu).
+
+### Módulo Combustíveis (reset pós-v1.3.2 — colunas novas)
+As colunas `ativo` e `ciclos_ausente` foram acrescentadas ao modelo `Posto`. Como o `db.create_all()` **não faz `ALTER TABLE`**, uma BD já existente continuaria sem as colunas e qualquer query rebentaria com `no such column: combustiveis_postos.ativo`. O script `scripts/reset_postos_combustiveis.py` resolve isso de propósito: apaga por completo as tabelas `combustiveis_precos_historico` e `combustiveis_postos` (não só as linhas — ordem `PrecoHistorico` → `Posto`, por causa da FK), chama `db.create_all()` — que as recria já com as colunas novas —, repõe `EstadoAtualizacaoCombustiveis.ultima_atualizacao = None` e força uma recolha imediata (`atualizar_precos_se_necessario(forcar=True)`). **Não toca** em `combustiveis_utilizador_concelho` nem em `combustiveis_utilizador_combustivel` — as definições do utilizador mantêm-se. Traz o mesmo *bootstrap* dos restantes scripts (`sys.path.insert` + `load_dotenv`), com `from app import create_app, db` (o `db` **não** está em `app.extensions`, que só define o `limiter`).
+
+**Ordem de execução:** deploy do código → correr `python scripts/reset_postos_combustiveis.py` → **só depois** abrir o dashboard. Resultado local: 95 → 80 postos (15 registos que já não vinham da API foram eliminados), 228 registos de preços, ~3,6 s com `APIABERTA_API_KEY` definida.
+
+**Nota sobre duplicados da própria API:** o par `66475` "E.S. FERREIROS" (EN 14, Ferreiros) / `95233` "Posto Ferreiros- ESO305" (Rua Cidade do Porto, Braga) e os quatro "Santos da Cunha 6 - Logística e Transportes, Lda." (EN 14 / Largo de Madre Deus / EN 201 Merelim / EN 201 Prado) são **devolvidos hoje pela API como estações distintas**, com ids e moradas diferentes. Nesses casos o arquivamento não actua (ambos são vistos em todas as recolhas, `ciclos_ausente=0`) — só uma heurística de deduplicação por morada+concelho, ou arquivamento manual, os resolve.
 
 ---
 
@@ -433,6 +450,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
+**Versão v1.4.8** — módulo Combustíveis: arquivamento automático de postos (v1.3.2) e reinício das tabelas de postos/histórico. Um posto que deixe de aparecer nas respostas da API Aberta passa a ser arquivado em vez de ficar visível indefinidamente com dados desactualizados — o caso dos `id` reatribuídos pela DGEG, em que o posto antigo ficava "congelado" na BD e o id novo criava um registo em paralelo, com o dashboard a mostrar os dois como postos distintos. Novos campos `Posto.ativo` / `Posto.ciclos_ausente`, constante `LIMIAR_CICLOS_AUSENTE = 2`, reactivação automática ao reaparecer, arquivamento condicionado a recolhas sem erros, filtro `Posto.ativo == True` em `obter_precos_para_concelhos` e na contagem do dashboard, chave `postos_arquivados` no retorno e flash do botão manual. Reinício completo das tabelas de postos e histórico com `scripts/reset_postos_combustiveis.py`, preservando as definições do utilizador (95 → 80 postos). Validação: 22 testes `pytest` a passar + testes manuais (arquivamento exactamente ao 2.º ciclo, reactivação, 2.ª recolha sem subir contadores, render do dashboard e flash). **Alteração de BD** — exige correr o script de reset no PythonAnywhere após o deploy, antes de abrir o dashboard.
+
 **Versão v1.4.7** — Assistente IA com acesso a conversões de moeda. Nova ferramenta de leitura `get_cambio(user_id, origem, destino, valor)` (Wise v3 + fallback ExchangeRate-API, stateless, disponível em modo consulta e execução); refactor do Câmbio com serviço partilhado `app/cambio/service.py` sem alteração de comportamento da rota; prompts e chat actualizados. Validação: 22 testes `pytest` a passar + smoke test real (EUR→USD via Wise). Sem alteração de BD.
 
 **Versão v1.4.6** — correção da lentidão do Assistente IA. O `OPENROUTER_MODEL` do `.env` ainda apontava para `thinkingmachines/inkling-small:free`, modelo restrito a *agentic harnesses* que devolve HTTP 403 em aplicações comuns — cada pergunta perdia tempo nessa falha antes de cair no fallback. Substituído por `inclusionai/ling-3.0-flash-fin:free` (`.env` e `.env.example`) e removidos os modelos `thinkingmachines/*` da fila de fallback; corrigido o ID inválido `liquid/lfm2.5-2.6b:free` → `liquid/lfm-2.5-2.6b:free`. IDs validados contra o catálogo do OpenRouter e por smoke test real (resposta em 0.9s com tool use em PT-PT). 22 testes unitários a passar. Sem alteração de BD.
@@ -452,16 +471,19 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 **Pendências gerais:**
 - **Assistente IA:** ✅ resolvido em v1.4.6 — fila de modelos validada contra o catálogo do OpenRouter e fallback automático a funcionar (`OPENROUTER_MODEL` do `.env` corrigido; era a causa da lentidão)
+- **Combustíveis — duplicados na própria API:** "E.S. FERREIROS" (id `66475`, EN 14, Ferreiros) vs "Posto Ferreiros- ESO305" (id `95233`, Rua Cidade do Porto, Braga) e os quatro "Santos da Cunha 6 - Logística e Transportes, Lda." vêm **todos** da API Aberta, com ids e moradas diferentes — não são registos congelados, pelo que o arquivamento automático não os remove (chegam em todas as recolhas com `ciclos_ausente=0`). Só uma heurística de deduplicação por morada+concelho, ou arquivamento manual, os resolve
+- **Combustíveis — follow-up opcional:** filtrar `Posto.ativo` também em `obter_tipos_combustivel_disponiveis`, para o dropdown do dashboard não listar um combustível que só exista em postos arquivados
 - **Módulos futuros:** arquitectura pronta — versão 1.x
 
 ---
 
 ## Próximos passos imediatos
 
-1. Módulo Combustíveis — primeira recolha manual concluída ✅ (95 postos; as 1480 linhas existentes vieram da era DGEG — após a correcção v1.3.1 a recolha via API Aberta valida 80 postos por ciclo e o dedup impede linhas repetidas)
-2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as tabelas (funciona no primeiro reload, sem migração manual)
+1. Módulo Combustíveis — recolha manual concluída ✅ e reinício das tabelas (v1.3.2) concluído localmente ✅ (95 → 80 postos: o reset eliminou os registos que já não vinham da API; a recolha via API Aberta valida 80 postos por ciclo e o dedup impede linhas repetidas)
+2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as tabelas ✅ (criadas no primeiro reload, sem migração manual)
    - `api.apiaberta.pt` já está na whitelist do PA (documentação Swagger pública)
    - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min — com o filtro `district` a recolha desceu de ~25 s para ~3-4 s)
+   - ⚠️ **Correr `python scripts/reset_postos_combustiveis.py` no PA** — é o que cria as colunas `ativo`/`ciclos_ausente` (o `create_all()` não faz `ALTER TABLE`); correr **antes** de abrir o dashboard
 3. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
 4. Deploy do Calendário no PythonAnywhere
 5. Migração da tabela `evento` no PA

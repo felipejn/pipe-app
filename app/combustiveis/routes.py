@@ -35,7 +35,10 @@ def dashboard():
     # Estado da recolha — mostrado no cabeçalho para o utilizador perceber se os
     # preços são frescos ou se a última tentativa falhou.
     estado = EstadoAtualizacaoCombustiveis.query.get(1)
-    total_postos = Posto.query.count()
+    # Conta só postos activos: os arquivados já não aparecem na tabela de
+    # preços (filtro em obter_precos_para_concelhos), logo contá-los aqui
+    # daria um total incoerente com o que o utilizador vê.
+    total_postos = Posto.query.filter(Posto.ativo.is_(True)).count()
 
     return render_template('combustiveis/dashboard.html',
                             resultados=resultados,
@@ -93,14 +96,23 @@ def definicoes():
 def atualizar():
     resultado = services.atualizar_precos_se_necessario(forcar=True)
 
+    # Reporta os postos arquivados apenas quando existem, para não poluir a
+    # mensagem no caso normal (a maioria das recolhas não arquiva nada).
+    sufixo_arquivados = ''
+    if resultado['postos_arquivados']:
+        # Concordância singular/plural, como no cabeçalho do dashboard.
+        n = resultado['postos_arquivados']
+        s = 's' if n != 1 else ''
+        sufixo_arquivados = f" {n} posto{s} arquivado{s} (deixaram de aparecer na API)."
+
     if not resultado['sucesso']:
         flash(f"Actualização com erros ({resultado['postos_verificados']} postos "
               f"verificados antes da falha): {resultado['erro']}", 'warning')
     elif resultado['precos_novos']:
         flash(f"Preços actualizados — {resultado['postos_verificados']} postos "
-              f"verificados, {resultado['precos_novos']} registos novos.", 'success')
+              f"verificados, {resultado['precos_novos']} registos novos.{sufixo_arquivados}", 'success')
     else:
         flash(f"Preços verificados — {resultado['postos_verificados']} postos, "
-              "sem alterações desde a última recolha.", 'success')
+              f"sem alterações desde a última recolha.{sufixo_arquivados}", 'success')
 
     return redirect(url_for('combustiveis.dashboard'))

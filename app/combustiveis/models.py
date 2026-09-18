@@ -12,6 +12,17 @@ class Posto(db.Model):
     localidade = db.Column(db.String(150))
     cod_postal = db.Column(db.String(20))
     concelho = db.Column(db.String(100), nullable=False, index=True)
+    # Arquivamento automático: quando a API Aberta reatribui o `id` de uma
+    # estação (ex.: "E.S. FERREIROS REPSOL" substituída por "Posto Ferreiros-
+    # ESO305 REPSOL" com id diferente), o posto antigo fica "congelado" na BD
+    # com a última data em que foi visto. Em vez de ficar visível para sempre
+    # com dados desactualizados, é marcado como inactivo — mas o histórico
+    # associado é preservado.
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+    # Nº de recolhas consecutivas em que este posto não apareceu na resposta
+    # da API Aberta. Ao atingir LIMIAR_CICLOS_AUSENTE (services.py) o posto
+    # passa a ativo=False; volta a 0 assim que o posto reaparece.
+    ciclos_ausente = db.Column(db.Integer, nullable=False, default=0)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     precos = db.relationship('PrecoHistorico', backref='posto', lazy='dynamic')
