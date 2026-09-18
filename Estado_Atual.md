@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.6
+# PIPE — Estado Actual do Projecto — v1.4.7
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -105,7 +105,8 @@ pipe-app/
 │   │   └── routes.py        # /passwords/
 │   ├── cambio/              # Blueprint Câmbio
 │   │   ├── __init__.py
-│   │   └── routes.py        # /cambio/ — stateless, API ExchangeRate
+│   │   ├── service.py       # MOEDAS + obter_taxa (Wise v3 + fallback, partilhado com Assistente IA)
+│   │   └── routes.py        # /cambio/ — stateless, delega no service.py
 │   ├── cores/               # Blueprint Cores Flutter
 │   │   ├── __init__.py
 │   │   └── routes.py        # /cores/ — stateless, HEX/RGB/HSL/CMYK para Flutter
@@ -190,7 +191,7 @@ pipe-app/
 
 ### Módulo Câmbio (`app/cambio/`)
 - **Sem BD** — módulo stateless
-- **API externa:** Wise API v3 com fallback para ExchangeRate-API
+- **API externa:** Wise API v3 com fallback para ExchangeRate-API (lógica em `service.py`: `MOEDAS` + `obter_taxa()`; `routes.py` delega via `_obter_taxa()` por compatibilidade)
 - **Moedas:** EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
 - **Funcionalidades:** fees Wise detalhados, inverter moedas, botão copiar
 
@@ -231,7 +232,7 @@ pipe-app/
 
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
 - **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens)
-- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (5 tools de leitura: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`; 10 tools de escrita), `routes.py`
+- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (6 tools de leitura: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`; 10 tools de escrita), `routes.py`
 - **Modelo:** `inclusionai/ling-3.0-flash-fin:free` (1.11T tokens, 262K ctx) — configurado via `OPENROUTER_MODEL` env var. Fallbacks: `nex-agi/nex-n2.5-mini:free`, `inclusionai/ling-3.0-flash-sante:free`, `liquid/lfm-2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`
 - **Correção aplicada (v1.4.0):** o modelo anterior (`google/gemma-4-26b-a4b-it:free`) não suportava tool use, causando falhas silenciosas com a mensagem genérica de erro. Trocado para `google/gemma-4-31b-it:free`. Removidos modelos inválidos (`qwen/qwen3.6-plus:free`, `qwen/qwen3-coder:free`). Adicionado `import traceback` e `traceback.print_exc()` + `print(f'[Assistente ERRO] ...')` nos blocos `except Exception` de `contexto.py` para diagnóstico visível nos logs. Simplificado tratamento de HTTP 429 (break imediato para próximo modelo, sem parsing de `Retry-After` header)
 - **Correção de bug crítica (v1.4.4):** `processar_mensagem_assistente('cria um evento para amanhã: "Cortar cabelo" às 9 horas')` devolvia "Não consegui gerar uma resposta" em vez de criar o evento. Diagnóstico: o OpenRouter devolve HTTP 200 com corpo `{"error": ...}` quando o provider upstream falha; o código original só fazia `raise_for_status()` (200 passava como sucesso) e `raise_for_status()` estava fora do `try`, abortando a cadeia de fallback. Correção em `app/assistente/cliente.py`: classes `RateLimitError` e `ServicoIndisponivelError`, constante `_MODELOS_FALLBACK`, função `_classificar_resposta()` que valida HTTP e corpo da resposta (distinguindo `rate_limit` / `modelo_indisponivel` / `servico` / `ok`), `chamar_llm()` com fallback imediato em qualquer falha de provider e backoff apenas para exceções de rede. Reforço em `app/assistente/contexto.py`: parsing defensivo de `choices` (verificação de tipo), `tool_calls` com validação de tipo, `content` vazio aceite, `argumentos` aceita `str` ou `dict`, `ServicoIndisponivelError` tratado no ciclo. Validação: 21 testes unitários offline passaram; smoke test real contra OpenRouter com `cohere/north-mini-code:free` criou evento com sucesso (ID 4).
@@ -245,6 +246,9 @@ pipe-app/
     - **Fila final (ordem de preferência):** `inclusionai/ling-3.0-flash-fin:free` → `nex-agi/nex-n2.5-mini:free` → `inclusionai/ling-3.0-flash-sante:free` → `liquid/lfm-2.5-2.6b:free` → `nvidia/nemotron-3-super-120b-a12b:free` → `nvidia/nemotron-3-ultra-550b-a55b:free` (último recurso, mais lento).
     - **Validação:** IDs confirmados no catálogo do OpenRouter (`/api/v1/models`, 445 modelos) — todos gratuitos, contexto ≥65K e suporte a `tools`. Smoke test real: os 6 modelos responderam (0.7s–1.6s cada); no fluxo `chamar_llm(..., ferramentas=...)` o `inclusionai/ling-3.0-flash-fin:free` respondeu em **0.9s**, chamou a ferramenta correctamente e devolveu texto em PT-PT. 22 testes unitários passaram.
     - **Diagnóstico pós-deploy (iterações 1 e 2 contra a API real):** o `ling-3.0-flash-fin:free` responde bem (~1.2s, com tool call correcta) mas o fornecedor **limita-o intermitentemente por upstream (HTTP 429)**; nesses casos o fallback assume o pedido automaticamente — comportamento esperado, sem perder a resposta. O log `Modelo ... indisponivel: resposta sem conteudo nem tool calls` corresponde a respostas em que o *reasoning* consumiu o orçamento de tokens sem produzir `content` nem `tool_calls`; o classificador rejeita-as e passa ao modelo seguinte. **Testado e descartado:** desactivar o *reasoning* globalmente **não é viável** — o `liquid/lfm-2.5-2.6b:free` devolve HTTP 400 ("Reasoning is mandatory for this endpoint and cannot be disabled") e a taxa de tool calls piora nos restantes; por isso **não** se envia o parâmetro `reasoning` no payload.
+
+- **Implementação (v1.4.7):** adicionada ferramenta de leitura `get_cambio` ao Assistente IA — converte valores entre moedas com taxas em tempo real (Wise v3 + fallback ExchangeRate-API). Refactor do Câmbio: lógica extraída de `routes.py` para o serviço partilhado `app/cambio/service.py` (`MOEDAS` + `obter_taxa()`); rota `/cambio/api/convert` delega sem alteração de comportamento. Adicionados em `app/assistente/ferramentas.py`: schema JSON em `DEFINICOES_FERRAMENTAS_LEITURA` (`origem`, `destino`, `valor` — todos required), entrada em `REGISTO_FERRAMENTAS` e função `get_cambio(user_id, origem, destino, valor)` stateless (validação case-insensitive contra `MOEDAS`, `valor > 0`, erros em PT-PT). `SYSTEM_PROMPT_LEITURA`/`SYSTEM_PROMPT_ESCRITA` em `contexto.py` actualizados; subtítulo e boas-vindas do chat (`assistente/index.html`) mencionam câmbios.
+    - **Validação:** 22 testes `pytest` a passar; smoke test real via `executar_ferramenta('get_cambio', {EUR→USD, 5})` devolveu conversão Wise (`resultado 3.92`, `taxa 0.784`); casos de erro (moeda inválida, valor ≤ 0/não numérico, serviço indisponível) devolvem `{'erro': ...}` em PT-PT.
 
 ### Sistema de notificações (`app/notifications/`)
 - `NotificationService` — `notification_service.send(user, type, subject, body, data)`
@@ -334,6 +338,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Notas completo ✅
 - Módulo Passwords completo ✅
 - Módulo Câmbio — conversão EUR → BRL ✅
+- **Assistente IA — conversão de moeda (`get_cambio`)** ✅ (Wise + fallback, validado com smoke test real EUR→USD)
 - **Módulo Calendário — Vista Agenda** ✅ (criar, editar, apagar, agrupamento por data)
 - **Módulo Calendário — Vista Mensal** ✅ (grelha 7×N, navegação, pílulas coloridas, clique em slot)
 - **Módulo Calendário — Modal CRUD** ✅ (validação, selector de cor, toggles)
@@ -427,6 +432,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 ---
 
 ## Ponto onde estamos
+
+**Versão v1.4.7** — Assistente IA com acesso a conversões de moeda. Nova ferramenta de leitura `get_cambio(user_id, origem, destino, valor)` (Wise v3 + fallback ExchangeRate-API, stateless, disponível em modo consulta e execução); refactor do Câmbio com serviço partilhado `app/cambio/service.py` sem alteração de comportamento da rota; prompts e chat actualizados. Validação: 22 testes `pytest` a passar + smoke test real (EUR→USD via Wise). Sem alteração de BD.
 
 **Versão v1.4.6** — correção da lentidão do Assistente IA. O `OPENROUTER_MODEL` do `.env` ainda apontava para `thinkingmachines/inkling-small:free`, modelo restrito a *agentic harnesses* que devolve HTTP 403 em aplicações comuns — cada pergunta perdia tempo nessa falha antes de cair no fallback. Substituído por `inclusionai/ling-3.0-flash-fin:free` (`.env` e `.env.example`) e removidos os modelos `thinkingmachines/*` da fila de fallback; corrigido o ID inválido `liquid/lfm2.5-2.6b:free` → `liquid/lfm-2.5-2.6b:free`. IDs validados contra o catálogo do OpenRouter e por smoke test real (resposta em 0.9s com tool use em PT-PT). 22 testes unitários a passar. Sem alteração de BD.
 

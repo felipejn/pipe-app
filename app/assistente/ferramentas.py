@@ -13,6 +13,7 @@ from app.tarefas.models import Lista, Tarefa, TagTarefa
 from app.notas.models import ItemChecklist, Nota, EtiquetaNota
 from app.euromilhoes.models import Jogo
 from app.calendario.models import Evento
+from app.cambio.service import MOEDAS as MOEDAS_CAMBIO, obter_taxa as obter_taxa_cambio
 from app.passwords.generator import gerar_password, gerar_passphrase, gerar_pin
 from app import db
 
@@ -205,6 +206,31 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
             },
         },
     },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'get_cambio',
+            'description': 'Converte um valor entre moedas com taxas em tempo real (Wise + fallback).',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'origem': {
+                        'type': 'string',
+                        'description': 'Código da moeda de origem (ex: EUR, USD, BRL).',
+                    },
+                    'destino': {
+                        'type': 'string',
+                        'description': 'Código da moeda de destino (ex: BRL, EUR, USD).',
+                    },
+                    'valor': {
+                        'type': 'number',
+                        'description': 'Valor a converter (deve ser maior que zero).',
+                    },
+                },
+                'required': ['origem', 'destino', 'valor'],
+            },
+        },
+    },
 ]
 
 DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA = [
@@ -391,6 +417,7 @@ REGISTO_FERRAMENTAS = {
     'get_euromilhoes': 'get_euromilhoes',
     'get_resumo_geral': 'get_resumo_geral',
     'get_eventos': 'get_eventos',
+    'get_cambio': 'get_cambio',
     'criar_tarefa': 'criar_tarefa',
     'alternar_tarefa': 'alternar_tarefa',
     'apagar_tarefa': 'apagar_tarefa',
@@ -622,6 +649,58 @@ def get_eventos(user_id, data=None, futuros=False):
         }
         for e in resultados
     ]
+
+
+def get_cambio(user_id, origem=None, destino=None, valor=None):
+    """Converte um valor entre moedas com taxas em tempo real.
+
+    Ferramenta de leitura (stateless): não consulta a BD nem guarda nada.
+    O user_id é aceite por convenção do despachante, mas não é usado.
+
+    Args:
+        user_id: ID do utilizador (obrigatório por convenção, ignorado).
+        origem: código da moeda de origem (ex: EUR).
+        destino: código da moeda de destino (ex: BRL).
+        valor: montante a converter (deve ser maior que zero).
+
+    Returns:
+        Dict com origem, destino, valor, resultado, taxa, fonte e metadados,
+        ou dict com chave 'erro' quando os argumentos são inválidos ou o
+        serviço de cotações está indisponível.
+    """
+    if not origem or not destino or valor is None:
+        return {'erro': 'Indica a moeda de origem, a moeda de destino e o valor a converter.'}
+
+    origem = str(origem).strip().upper()
+    destino = str(destino).strip().upper()
+    if origem not in MOEDAS_CAMBIO:
+        return {'erro': f'Moeda de origem inválida: "{origem}". Moedas suportadas: {", ".join(sorted(MOEDAS_CAMBIO))}.'}
+    if destino not in MOEDAS_CAMBIO:
+        return {'erro': f'Moeda de destino inválida: "{destino}". Moedas suportadas: {", ".join(sorted(MOEDAS_CAMBIO))}.'}
+
+    try:
+        montante = float(valor)
+    except (TypeError, ValueError):
+        return {'erro': f'Valor inválido: "{valor}". Indica um número maior que zero.'}
+    if montante <= 0:
+        return {'erro': 'O valor a converter deve ser maior que zero.'}
+
+    resultado = obter_taxa_cambio(origem, destino, montante)
+    if resultado is None:
+        return {'erro': 'Não foi possível obter a cotação de momento. Tenta novamente mais tarde.'}
+
+    return {
+        'origem': origem,
+        'destino': destino,
+        'valor': montante,
+        'resultado': resultado['resultado'],
+        'taxa': resultado['taxa'],
+        'fonte': resultado['fonte'],
+        'data': resultado['data'],
+        'total_fees': resultado['total_fees'],
+        'rate': resultado['rate'],
+        'fees': resultado['fees'],
+    }
 
 
 # ── Tarefas — escrita ────────────────────────────────────────────────────
