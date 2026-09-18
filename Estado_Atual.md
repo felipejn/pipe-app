@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.8
+# PIPE — Estado Actual do Projecto — v1.4.9
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -58,7 +58,7 @@ pipe-app/
 │   ├── combustiveis/        # Blueprint Combustíveis ← NOVO
 │   │   ├── __init__.py
 │   │   ├── models.py        # Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis
-│   │   ├── services.py      # API Aberta (api.apiaberta.pt); atualizar_precos_se_necessario, obter_precos_para_concelhos, obter_tipos_combustivel_disponiveis
+│   │   ├── services.py      # API Aberta (api.apiaberta.pt); atualizar_precos_se_necessario, obter_precos_para_concelhos, obter_tipos_combustivel_disponiveis; NOMES_IGNORADOS (blocklist)
 │   │   ├── routes.py        # /combustiveis/, /combustiveis/definicoes, /combustiveis/atualizar
 │   │   └── templates/
 │   │       └── combustiveis/
@@ -314,6 +314,17 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
   - **Guarda contra falhas parciais:** o bloco de arquivamento só corre quando `len(erros) == 0`. Numa recolha com erro (ex.: um combustível sem resposta) todos os postos desse combustível ficariam fora do conjunto de ids vistos e seriam contados como ausentes por engano — com a guarda, `ciclos_ausente` fica intocado e `postos_arquivados` é 0.
   - **Filtros:** `obter_precos_para_concelhos` e a contagem `total_postos` do dashboard (cabeçalho) filtram `Posto.ativo == True`, pelo que os arquivados desaparecem também dos cards de "mais barato por combustível". `obter_tipos_combustivel_disponiveis` **não** foi alterado.
   - **Retorno/UI:** nova chave `postos_arquivados` no dict (0 nas execuções com erros, fora do dia ou já corridas); o flash do botão manual reporta-a quando é maior que zero.
+- **Blocklist de postos obsoletos (v1.3.3):** a API Aberta continua a devolver os `id` antigos de estações cujo `id` foi reatribuído, mas **com os preços congelados** — como vêm em todas as recolhas, o arquivamento automático nunca os apanha (`ciclos_ausente` fica a 0) e, sendo mais baratos do que os reais, ganhavam o card "Mais barato por combustível" com valores falsos. Resolvido com a constante `NOMES_IGNORADOS` em `services.py` (nomes exactos) e o auxiliar `_nome_ignorado()` (comparação normalizada, insensível a caixa e a espaços nas pontas). O filtro é a **primeira instrução** do ciclo de registos, antes de criar/actualizar `Posto`, gravar `PrecoHistorico` ou alimentar `postos_vistos` — os postos da lista nunca são criados, actualizados nem reactivados. Se ainda existirem na BD, como não contam como vistos, o arquivamento automático esconde-os ao 2.º ciclo (auto-curativo). Limpeza do que já estava gravado: `scripts/remover_postos_ignorados.py` (importa a lista de `services.NOMES_IGNORADOS` — não a duplica; apaga primeiro o histórico por causa da FK; idempotente).
+  - **Os 5 postos sem dados de hoje** (2026-09-18) que este diagnóstico isolou de entre os 80 — todos os outros 75 tinham dados do próprio dia:
+    | Nome obsoleto | id | Última fonte | Homólogo actual | Gasóleo simples |
+    |---|---|---|---|---|
+    | `E.S. FERREIROS` | 66475 | 2026-07-13 | Posto Ferreiros- ESO305 (95233) | 1,919 € → 2,239 € |
+    | `E.S. BRAGA PISCINAS I` | 66481 | 2026-07-13 | REPSOL - BRAGA - PISCINAS I (95237) | 1,929 € → 2,249 € |
+    | `E.S. BRAGA PISCINAS II` | 66482 | 2026-07-13 | REPSOL - BRAGA - PISCINAS II (95236) | 1,929 € → 2,249 € |
+    | `BP Braga João 21` | 94671 | 2026-06-10 | PA BP João XXI (95254) | 1,999 € → actual |
+    | `DJB COMBUSTIVEIS` | 69288 | 2026-04-09 | — (único DJB, provavelmente encerrado) | 2,128 € |
+  - **`DJB COMBUSTIVEIS` ficou de fora por decisão explícita** (não é duplicado — não existe outro posto equivalente). ⚠️ Consequência a ter em conta: é actualmente o **mais barato em "Gasolina simples 95" (1,935 €)** com dados de Abril/2026, ou seja, polui o card "Mais barato" exactamente como os anteriores. Para o remover basta acrescentar `'DJB COMBUSTIVEIS'` a `NOMES_IGNORADOS` e repetir `scripts/remover_postos_ignorados.py`.
+  - **Resultado:** 80 → 76 postos (4 postos e 12 registos de preço removidos). Recolha forçada a seguir: 76 → 76, com os 4 nomes a **não** voltarem a entrar e os homólogos frescos intactos (Ferreiros- ESO305, REPSOL PISCINAS I/II, PA BP João XXI, todos `ativo=True`). Card de gasóleo simples passou de um falso 1,919 € para 2,049 € (`Bxpress Braga`, fonte de hoje).
 - **Primeira recolha:** correu uma vez manualmente via `services.atualizar_precos_se_necessario(forcar=True)` (equivalente a `scripts/popular_combustiveis.py`). Substitui o antigo `scripts/mapear_combustiveis_inicial.py` (removido — não era necessário com a API Aberta: a paginação por combustível já devolve os postos da zona directamente).
 - **Integração na Loja:** entrada em `MODULOS_DISPONIVEIS` com slug `combustiveis`, ícone ⛽, rota `combustiveis.dashboard`.
 
@@ -355,6 +366,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Módulo Combustíveis — `tarefa_combustiveis` às terças** ✅ (ignora fora de terça; força no botão manual)
 - **Módulo Combustíveis — paginação completa + deduplicação** (95 postos verificados num só ciclo, histórico sem linhas duplicadas, filtro `district`)
 - **Módulo Combustíveis — arquivamento automático (v1.3.2)** ✅ (reset local: 95 → 80 postos, 15 registos que já não vinham da API eliminados; 2.ª recolha real não subiu `ciclos_ausente` de nenhum posto; posto ausente arquivado exactamente ao 2.º ciclo com `postos_arquivados=1` e reactivado ao reaparecer, com `ciclos_ausente` reiniciado a 0; filtro do dashboard confirmado por lista de ids; render de `GET /combustiveis/` e flash de `POST /combustiveis/atualizar` validados; 22 testes `pytest` a passar)
+- **Módulo Combustíveis — blocklist de postos obsoletos (v1.3.3)** ✅ (4 postos/12 preços removidos: 80 → 76; recolha forçada a seguir deu 76 verificados, 0 registos novos, 0 arquivados, com os 4 nomes a não voltarem a ser criados; homólogos frescos intactos; "mais barato" em gasóleo simples passou do falso 1,919 € para 2,049 € real)
 - **Tema claro/escuro — alternância via botão na navbar** ✅ (tema e ícone mudam; escolha persiste após reload via `localStorage`)
 - **Tema claro/escuro — anti-FOUC** ✅ (tema aplicado antes do primeiro paint, sem flash)
 - **Módulo Notas — paleta de cores Google Keep** ✅ (8 cores substituíram as cores escuras anteriores; aplicáveis em tema claro e escuro, sem alteração de BD — `Nota.CORES`, `_cartao.html`, `index.html` actualizados; `editar.html` usa a mesma fonte via `|tojson`)
@@ -409,6 +421,7 @@ APIABERTA_API_KEY=...
 - **Módulo Calendário — tabela `evento` a criar no PA após deploy** ⚠️
 - **Módulo Combustíveis — 4 tabelas** (`combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao`) criadas por `db.create_all()` no primeiro reload; modelo `UtilizadorCombustivel` adicionado ao import de `db.create_all()` em `app/__init__.py` ✅
 - **Módulo Combustíveis — arquivamento de postos (v1.3.2)** ⚠️ no PA — `python scripts/reset_postos_combustiveis.py` (drop das tabelas de postos/histórico + `db.create_all()` + repovoamento; cria as colunas `ativo`/`ciclos_ausente` que o `create_all()` sozinho não acrescenta a uma BD existente)
+- **Módulo Combustíveis — blocklist de postos obsoletos (v1.3.3)** ⚠️ no PA — `python scripts/remover_postos_ignorados.py` (apaga os postos de `services.NOMES_IGNORADOS` e o respectivo histórico; idempotente, pode correr antes ou depois do reset)
 
 ### Comando de migração do Calendário (executar no PA após deploy)
 ```bash
@@ -450,6 +463,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
+**Versão v1.4.9** — módulo Combustíveis: eliminação dos postos duplicados com preços desactualizados (v1.3.3). A API Aberta continua a devolver os `id` antigos de estações reatribuídas mas com valores congelados; como aparecem em todas as recolhas, o arquivamento automático não os apanha e, por serem mais baratos que os reais, ganhavam o card "Mais barato por combustível". Nova constante `NOMES_IGNORADOS` em `services.py` (E.S. FERREIROS, E.S. BRAGA PISCINAS I, E.S. BRAGA PISCINAS II, BP Braga João 21) com auxiliar `_nome_ignorado()` normalizado, aplicada antes de qualquer escrita na recolha (os postos nunca são criados, actualizados nem reactivados) e `scripts/remover_postos_ignorados.py` para limpar o que já estava gravado (80 → 76 postos, 12 registos de preço). Verificação: recolha forçada após a limpeza confirma 76 → 76 sem regressão dos nomes bloqueados e homólogos frescos intactos; card de gasóleo simples corrigido de 1,919 € (falso, Jul/2026) para 2,049 € (hoje). `DJB COMBUSTIVEIS` mantido por decisão explícita (não é duplicado), apesar de actualmente liderar o card de gasolina 95 com dados de Abril/2026. Validação: 22 testes `pytest` a passar. Sem alteração de BD.
+
 **Versão v1.4.8** — módulo Combustíveis: arquivamento automático de postos (v1.3.2) e reinício das tabelas de postos/histórico. Um posto que deixe de aparecer nas respostas da API Aberta passa a ser arquivado em vez de ficar visível indefinidamente com dados desactualizados — o caso dos `id` reatribuídos pela DGEG, em que o posto antigo ficava "congelado" na BD e o id novo criava um registo em paralelo, com o dashboard a mostrar os dois como postos distintos. Novos campos `Posto.ativo` / `Posto.ciclos_ausente`, constante `LIMIAR_CICLOS_AUSENTE = 2`, reactivação automática ao reaparecer, arquivamento condicionado a recolhas sem erros, filtro `Posto.ativo == True` em `obter_precos_para_concelhos` e na contagem do dashboard, chave `postos_arquivados` no retorno e flash do botão manual. Reinício completo das tabelas de postos e histórico com `scripts/reset_postos_combustiveis.py`, preservando as definições do utilizador (95 → 80 postos). Validação: 22 testes `pytest` a passar + testes manuais (arquivamento exactamente ao 2.º ciclo, reactivação, 2.ª recolha sem subir contadores, render do dashboard e flash). **Alteração de BD** — exige correr o script de reset no PythonAnywhere após o deploy, antes de abrir o dashboard.
 
 **Versão v1.4.7** — Assistente IA com acesso a conversões de moeda. Nova ferramenta de leitura `get_cambio(user_id, origem, destino, valor)` (Wise v3 + fallback ExchangeRate-API, stateless, disponível em modo consulta e execução); refactor do Câmbio com serviço partilhado `app/cambio/service.py` sem alteração de comportamento da rota; prompts e chat actualizados. Validação: 22 testes `pytest` a passar + smoke test real (EUR→USD via Wise). Sem alteração de BD.
@@ -484,6 +499,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
    - `api.apiaberta.pt` já está na whitelist do PA (documentação Swagger pública)
    - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min — com o filtro `district` a recolha desceu de ~25 s para ~3-4 s)
    - ⚠️ **Correr `python scripts/reset_postos_combustiveis.py` no PA** — é o que cria as colunas `ativo`/`ciclos_ausente` (o `create_all()` não faz `ALTER TABLE`); correr **antes** de abrir o dashboard
+   - ⚠️ **Correr `python scripts/remover_postos_ignorados.py` no PA** — remove os 4 postos duplicados com preços congelados (E.S. FERREIROS, E.S. BRAGA PISCINAS I/II, BP Braga João 21) e o respectivo histórico; idempotente
 3. Implementar `tarefa_calendario_hoje()` em `scripts/pipe_tasks.py`
 4. Deploy do Calendário no PythonAnywhere
 5. Migração da tabela `evento` no PA

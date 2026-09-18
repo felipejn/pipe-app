@@ -47,6 +47,30 @@ LIMIAR_CICLOS_AUSENTE = 2   # nº de recolhas em falta até arquivar
 # concelho é sempre aplicado de cliente para cliente em _paginar_fuel).
 DISTRITO_INTERESSE = 'Braga'
 
+# Nomes exactos de postos devolvidos pela API Aberta que devem ser ignorados
+# por completo. São entradas antigas da DGEG cujo `id` foi reatribuído e que
+# continuam a ser devolvidas com preços congelados — a API não as actualiza —
+# criando duplicados no dashboard e falseando o "mais barato por combustível"
+# (ex.: "E.S. FERREIROS" a 1,919 € de gasóleo desde Jul/2026, quando o mesmo
+# posto, já com o id novo, marca 2,239 €). Excluídos na origem: não são
+# criados, actualizados nem reactivados. Ver scripts/remover_postos_ignorados.py.
+NOMES_IGNORADOS = {
+    'E.S. FERREIROS',
+    'E.S. BRAGA PISCINAS I',
+    'E.S. BRAGA PISCINAS II',
+    'BP Braga João 21',
+}
+
+# Comparação sem depender de caixa nem de espaços nas pontas devolvidos pela API.
+_NOMES_IGNORADOS_NORMALIZADOS = {nome.strip().casefold() for nome in NOMES_IGNORADOS}
+
+
+def _nome_ignorado(nome):
+    """True se o nome devolvido pela API estiver em NOMES_IGNORADOS."""
+    if not nome:
+        return False
+    return nome.strip().casefold() in _NOMES_IGNORADOS_NORMALIZADOS
+
 
 def _headers():
     headers = {'User-Agent': 'PIPE-combustiveis/1.0 (uso pessoal)'}
@@ -132,6 +156,9 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
     via header X-API-Key (chave em APIABERTA_API_KEY). Sem chave, tier anónimo
     de 30 pedidos/min; com chave, 300/min. Rate limit respeitado com
     PAUSA_ENTRE_PEDIDOS (~0,21s) e retry em 429 respeitando Retry-After.
+
+    Os postos cujo nome conste de NOMES_IGNORADOS são descartados antes de
+    qualquer escrita (ver a constante, no topo do módulo).
     """
     hoje = hoje or date_cls.today()
 
@@ -161,6 +188,13 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
             continue
 
         for r in registos:
+            # Postos em NOMES_IGNORADOS são descartados na origem: não criam
+            # nem actualizam Posto, não gravam histórico e não contam como
+            # vistos (logo, se ainda existirem na BD, o arquivamento
+            # automático trata deles).
+            if _nome_ignorado(r.get('name')):
+                continue
+
             posto_id = r['station_id']
             posto = Posto.query.get(posto_id) or Posto(id=posto_id)
             posto.nome = r.get('name')
