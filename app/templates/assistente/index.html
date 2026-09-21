@@ -109,6 +109,71 @@
         return d.innerHTML;
     }
 
+    // ── Parser Markdown simplificado ─────────────────────
+    function markdownToHtml(texto) {
+        var linhas = texto.split('\n');
+        var resultado = [];
+        var emBlocoCodigo = false;
+        var codigoBuffer = [];
+
+        for (var i = 0; i < linhas.length; i++) {
+            var linha = linhas[i];
+
+            // Blocos de código delimitados por ```
+            if (linha.trim().startsWith('```')) {
+                if (!emBlocoCodigo) {
+                    emBlocoCodigo = true;
+                    codigoBuffer = [];
+                    resultado.push('<pre><code>');
+                    continue;
+                } else {
+                    emBlocoCodigo = false;
+                    resultado.push(codigoBuffer.join('\n') + '</code></pre>');
+                    continue;
+                }
+            }
+            if (emBlocoCodigo) {
+                codigoBuffer.push(linha);
+                continue;
+            }
+
+            // Saltar linhas vazias
+            if (linha.trim() === '') continue;
+
+            // Headers
+            if (linha.startsWith('# '))  { resultado.push('<h3>' + linha.substring(2) + '</h3>'); continue; }
+            if (linha.startsWith('## ')) { resultado.push('<h4>' + linha.substring(3) + '</h4>'); continue; }
+            if (linha.startsWith('### ')){ resultado.push('<h5>' + linha.substring(4) + '</h5>'); continue; }
+
+            // Blockquotes
+            if (linha.startsWith('> ')) { resultado.push('<blockquote>' + linha.substring(2) + '</blockquote>'); continue; }
+
+            // Listas
+            if (linha.startsWith('- ') || linha.startsWith('* ')) {
+                var marker = linha.startsWith('- ') ? '- ' : '* ';
+                resultado.push('<li>' + linha.substring(marker.length) + '</li>');
+                continue;
+            }
+
+            // Parágrafo
+            resultado.push('<p>' + linha + '</p>');
+        }
+
+        var html = resultado.join('\n');
+
+        // Envolver itens de lista consecutivos em <ul>
+        html = html.replace(/(<li>[\s\S]*?<\/li>)/g, function(match) { return match; });
+        html = html.replace(/(<li>.*?<\/li>(\s*<li>.*?<\/li>)*)/s, '<ul>$1</ul>');
+
+        // Processar inline (ordem importante: código primeiro, depois negrito/itálico)
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+        return html;
+    }
+
     function mostrarVazio(visivel) {
         vazioState.style.display = visivel ? '' : 'none';
     }
@@ -131,7 +196,7 @@
         var wrapper = document.createElement('div');
         wrapper.className = 'chat-bubble chat-bubble--' + (tipo === 'utilizador' ? 'user' : 'assistant');
 
-        var html = escaparHtml(texto).replace(/\n/g, '<br>');
+        var html = markdownToHtml(escaparHtml(texto));
         if (modelo) {
             html += '<div class="chat-modelo">Modelo: ' + escaparHtml(modelo) + '</div>';
         }
