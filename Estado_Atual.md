@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.10
+# PIPE — Estado Actual do Projecto — v1.4.12
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -116,14 +116,14 @@ pipe-app/
 │   │   └── routes.py        # /conversoes/ — HEIC→JPG + PNG/JPG→ICO
 │   ├── modulos/             # Blueprint Loja de Módulos
 │   │   ├── __init__.py
-│   │   ├── config.py        # MODULOS_DISPONIVEIS (inclui Calendário)
+│   │   ├── config.py        # MODULOS_DISPONIVEIS (inclui Calendário e Combustíveis)
 │   │   ├── models.py        # UserModulo
 │   │   └── routes.py        # /modulos/loja, /modulos/api/toggle
 │   ├── assistente/          # Blueprint Assistente IA
 │   │   ├── __init__.py
 │   │   ├── cliente.py       # OpenRouter API
 │   │   ├── contexto.py      # tool use orchestration
-│   │   ├── ferramentas.py   # tool functions
+│   │   ├── ferramentas.py   # tool functions (7 leitura + 10 escrita, incluindo get_combustiveis)
 │   │   └── routes.py        # /assistente
 │   └── calendario/          # Blueprint Calendário ← NOVO
 │       ├── __init__.py
@@ -136,11 +136,20 @@ pipe-app/
 │   ├── migrar_notificada_em.py
 │   ├── pipe_tasks.py        # única scheduled task
 │   ├── popular_combustiveis.py  # recolha manual de combustíveis (helper)
+│   ├── smoke_combustiveis.py    # smoke test da ferramenta get_combustiveis (v1.4.12)
+│   ├── remover_postos_ignorados.py  # limpeza dos postos em NOMES_IGNORADOS
+│   ├── reset_postos_combustiveis.py # reset das tabelas de postos/histórico
+│   ├── testar_assistente.py     # smoke test do Assistente IA contra a OpenRouter
 │   └── verificar_resultados.py  # mantido para referência histórica
+├── tests/
+│   ├── test_assistente_cliente.py       # OpenRouter: classificação de respostas e fallback
+│   ├── test_assistente_contexto.py      # orquestração do tool use
+│   └── test_assistente_combustiveis.py  # ferramenta get_combustiveis (v1.4.12)
 ├── instance/
 │   └── pipe.db              # SQLite (excluído do git)
 ├── .env
 ├── .env.example
+├── config.py                # Config / Development / Production / Testing
 ├── requirements.txt
 └── run.py
 ```
@@ -173,7 +182,7 @@ pipe-app/
 
 ### Módulo Loja de Módulos (`app/modulos/`)
 - Tabela `UserModulo` (`user_id` + `modulo_slug` + `ativo`)
-- `config.py` — dicionário `MODULOS_DISPONIVEIS` com 9 módulos (inclui Calendário)
+- `config.py` — dicionário `MODULOS_DISPONIVEIS` com 10 módulos (inclui Calendário e Combustíveis)
 - `models.py` — modelo `UserModulo` (PK composta) + helper `get_modulos_ativos(user_id)`
 - `routes.py` — `GET /modulos/loja`, `POST /modulos/api/toggle` (AJAX + CSRF)
 - Ícone 🛒 na navbar acessível a todos os utilizadores autenticados
@@ -232,7 +241,7 @@ pipe-app/
 
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
 - **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens)
-- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (6 tools de leitura: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`; 10 tools de escrita), `routes.py`
+- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (7 tools de leitura: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis`; 10 tools de escrita), `routes.py`
 - **Modelo:** `inclusionai/ling-3.0-flash-fin:free` (1.11T tokens, 262K ctx) — configurado via `OPENROUTER_MODEL` env var. Fallbacks: `nex-agi/nex-n2.5-mini:free`, `inclusionai/ling-3.0-flash-sante:free`, `liquid/lfm-2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`
 - **Correção aplicada (v1.4.0):** o modelo anterior (`google/gemma-4-26b-a4b-it:free`) não suportava tool use, causando falhas silenciosas com a mensagem genérica de erro. Trocado para `google/gemma-4-31b-it:free`. Removidos modelos inválidos (`qwen/qwen3.6-plus:free`, `qwen/qwen3-coder:free`). Adicionado `import traceback` e `traceback.print_exc()` + `print(f'[Assistente ERRO] ...')` nos blocos `except Exception` de `contexto.py` para diagnóstico visível nos logs. Simplificado tratamento de HTTP 429 (break imediato para próximo modelo, sem parsing de `Retry-After` header)
 - **Correção de bug crítica (v1.4.4):** `processar_mensagem_assistente('cria um evento para amanhã: "Cortar cabelo" às 9 horas')` devolvia "Não consegui gerar uma resposta" em vez de criar o evento. Diagnóstico: o OpenRouter devolve HTTP 200 com corpo `{"error": ...}` quando o provider upstream falha; o código original só fazia `raise_for_status()` (200 passava como sucesso) e `raise_for_status()` estava fora do `try`, abortando a cadeia de fallback. Correção em `app/assistente/cliente.py`: classes `RateLimitError` e `ServicoIndisponivelError`, constante `_MODELOS_FALLBACK`, função `_classificar_resposta()` que valida HTTP e corpo da resposta (distinguindo `rate_limit` / `modelo_indisponivel` / `servico` / `ok`), `chamar_llm()` com fallback imediato em qualquer falha de provider e backoff apenas para exceções de rede. Reforço em `app/assistente/contexto.py`: parsing defensivo de `choices` (verificação de tipo), `tool_calls` com validação de tipo, `content` vazio aceite, `argumentos` aceita `str` ou `dict`, `ServicoIndisponivelError` tratado no ciclo. Validação: 21 testes unitários offline passaram; smoke test real contra OpenRouter com `cohere/north-mini-code:free` criou evento com sucesso (ID 4).
@@ -252,6 +261,17 @@ pipe-app/
 
 - **Renderização Markdown no chat (v1.4.10):** o modelo responde com formatação Markdown (`**negrito**`, `*itálico*`, `# headers`, `- listas`, ```bloco de código```, `` `inline` ``, `> citações`, links) mas o `escaparHtml()` do template exibia tudo como texto plano. Adicionada a função `markdownToHtml()` inline em `app/templates/assistente/index.html` (~60 linhas de regex vanilla JS) que converte a sintaxe Markdown em HTML antes de `wrapper.innerHTML`. Fluxo: `escaparHtml(texto)` protege contra XSS → `markdownToHtml()` interpreta a sintaxe. Regras CSS adicionadas em `app/static/css/pipe.css` para `.chat-bubble strong`, `em`, `code`, `pre`, `ul`, `li`, `blockquote`, `h3/h4/h5`, `a` — respeitam tokens de tema claro/escuro.
     - **Validação:** código verificado inline; funciona com o padrão PIPE (sem dependências externas)
+
+- **Integração com Combustíveis + boas-vindas curtas (v1.4.12):** o módulo Combustíveis era o único módulo com BD ainda sem ferramenta de consulta no Assistente IA.
+    - **Nova ferramenta de leitura `get_combustiveis(user_id, tipo_combustivel=None, concelho=None, apenas_mais_barato=False, limite=20)`** em `app/assistente/ferramentas.py`: delega em `combustiveis_services.obter_precos_para_concelhos` (o mesmo serviço do dashboard, pelo que herda automaticamente a exclusão de postos arquivados e obsoletos — regra dos 30 dias e `NOMES_IGNORADOS`). Devolve preço em €/L com 3 casas, marca, morada, `data_dgeg` e `data_recolha`. Com `apenas_mais_barato=True` devolve o mínimo por combustível no formato do card 🏆 do dashboard. Esquema JSON em `DEFINICOES_FERRAMENTAS_LEITURA` e entrada em `REGISTO_FERRAMENTAS`.
+    - **Filtro por utilizador — ponto crítico:** ao contrário dos outros módulos, os `Posto` são globais e não têm `user_id`. O isolamento faz-se pelas preferências do utilizador (`UtilizadorConcelho` / `UtilizadorCombustivel`), que são lidas por `user_id` e passadas como filtro às queries; os argumentos do modelo (concelho, combustível) são sempre validados contra esse universo e nunca o substituem. Sem concelhos escolhidos a ferramenta devolve erro orientador para Combustíveis → Definições.
+    - **Normalização de acentos:** `_normalizar_texto()` (NFD + remoção de diacríticos) faz o match de concelhos e combustíveis. Sem isto, um pedido por `"gasoleo simples"` (sem acento, como os modelos escrevem frequentemente) era rejeitado como combustível inexistente — detectado no smoke test e corrigido antes do commit.
+    - **Frescura dos dados:** a resposta inclui sempre `recolha` (`ultima_atualizacao`, `ultima_execucao_sucesso`, `mensagem_erro`), para o modelo não apresentar preços de uma recolha falhada como se fossem actuais. Não se força recolha dentro do chat (são ~12 pedidos HTTP e ~3-4 s de espera) — o assistente informa e encaminha para o botão "Atualizar Dados".
+    - **`get_resumo_geral` alargado:** passa a incluir concelhos de combustíveis, nº de postos com preço e o mais barato por combustível (ou uma nota de que falta configurar o módulo).
+    - **Prompts:** `SYSTEM_PROMPT_LEITURA` e `SYSTEM_PROMPT_ESCRITA` mencionam combustíveis, com regra explícita de nunca inventar postos/preços/concelhos, apresentar em €/L com 3 casas e citar a data da recolha.
+    - **Boas-vindas do chat encurtadas:** a mensagem inicial tinha 7 linhas de lista + 2 parágrafos e ia crescer ainda mais com combustíveis. Passou a 3 linhas (saudação + estado do modo + "Em que posso ajudar?"); as capacidades ficam no subtítulo do cabeçalho, que passou a mencionar tarefas, notas, calendário, câmbios e combustíveis.
+    - **Testes:** novo `tests/test_assistente_combustiveis.py` (20 testes, SQLite em memória) — registo da ferramenta, isolamento por utilizador, filtros case/accent-insensitive, `apenas_mais_barato`, limites (default/truncamento/máximo), exclusão de postos obsoletos, frescura e `get_resumo_geral`. Nova classe `TestingConfig` em `config.py` (`testing`) para os testes isolarem a BD. Total: **42 testes** a passar (eram 22).
+    - **Validação:** smoke directo com `scripts/smoke_combustiveis.py` (novo) contra a BD real — 14 preços em Vila Verde, mais barato `PD VILA VERDE` a 2,113 €/L; e smoke de ponta a ponta contra a OpenRouter: *"Onde está o gasóleo mais barato nos meus concelhos?"* → tool call correcta e resposta com preço e data da recolha (18/09/2026); *"Qual o preço do gasóleo em Lisboa?"* → o modelo explica que o concelho não está configurado e encaminha para Combustíveis → Definições. Sem alteração de BD.
 
 ### Sistema de notificações (`app/notifications/`)
 - `NotificationService` — `notification_service.send(user, type, subject, body, data)`
@@ -344,6 +364,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 | Configuração IP PA | `X-Forwarded-For` no Limiter | `app/extensions.py` |
 
 ### Testes realizados
+- **Suite automatizada `pytest` — 42 testes** ✅ (22 anteriores + 20 novos em `tests/test_assistente_combustiveis.py`, v1.4.12)
 - Login e registo ✅
 - Dashboard com cards de módulos ✅
 - Módulo Loja de Módulos — activar/desactivar módulos ✅
@@ -360,6 +381,9 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - Módulo Passwords completo ✅
 - Módulo Câmbio — conversão EUR → BRL ✅
 - **Assistente IA — conversão de moeda (`get_cambio`)** ✅ (Wise + fallback, validado com smoke test real EUR→USD)
+- **Assistente IA — preços de combustíveis (`get_combustiveis`)** ✅ (v1.4.12; filtros por combustível/concelho, modo mais-barato, isolamento por concelhos do utilizador, comparação insensível a acentos; validado com smoke real + OpenRouter)
+- **Assistente IA — mensagem inicial curta** ✅ (v1.4.12; de 9 linhas para 3, capacidades no subtítulo do cabeçalho)
+- **Testes do Assistente IA** ✅ (v1.4.12; 42 testes `pytest` — cliente, orquestração e ferramenta `get_combustiveis`)
 - **Módulo Calendário — Vista Agenda** ✅ (criar, editar, apagar, agrupamento por data)
 - **Módulo Calendário — Vista Mensal** ✅ (grelha 7×N, navegação, pílulas coloridas, clique em slot)
 - **Módulo Calendário — Modal CRUD** ✅ (validação, selector de cor, toggles)
@@ -465,6 +489,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 ---
 
 ## Ponto onde estamos
+
+**Versão v1.4.12** — Assistente IA com acesso aos preços de combustíveis e mensagem inicial curta. O módulo Combustíveis era o único módulo com BD sem ferramenta de consulta no assistente (mesma lacuna que o Calendário em v1.4.5 e o Câmbio em v1.4.7). Nova ferramenta de leitura `get_combustiveis` (`ferramentas.py`) que delega em `combustiveis_services.obter_precos_para_concelhos` e filtra sempre pelos concelhos/combustíveis escolhidos pelo utilizador — os `Posto` são globais e sem `user_id`, pelo que este é o único mecanismo de isolamento. Suporta filtros por combustível e concelho, modo `apenas_mais_barato` (card 🏆) e limite de resultados; a comparação de nomes é insensível a acentos e caixa (o modelo escreve "gasoleo simples"). A resposta inclui sempre a frescura da recolha, para o modelo não apresentar preços antigos como actuais. `get_resumo_geral` passa a incluir combustíveis; os dois system prompts foram actualizados. A mensagem de boas-vindas do chat passou de 9 linhas para 3 (saudação + modo + "Em que posso ajudar?"), com as capacidades no subtítulo do cabeçalho. Novo `tests/test_assistente_combustiveis.py` (20 testes) e `TestingConfig` em `config.py`: 42 testes a passar (eram 22). Validação: smoke directo contra a BD real (Vila Verde, mais barato `PD VILA VERDE` a 2,113 €/L) e smoke de ponta a ponta contra a OpenRouter, incluindo o caminho de erro (concelho não configurado). **Sem alteração de BD** — não é necessário correr nenhum script no PythonAnywhere.
 
 **Versão v1.4.10** — módulo Combustíveis: regra geral de obsolescência, para além da blocklist por nomes. `DJB COMBUSTIVEIS` (id 69288) incluído em `services.NOMES_IGNORADOS` (dados DGEG de Abr/2026 que falseiam o card de gasolina 95 — antes 1,935 €) e nova constante `MAX_DIAS_PRECO_ATIVO = 30` com helper `obter_ids_postos_obsoletos()`, que exclui no ambiente de **leitura** (`obter_precos_para_concelhos`, `obter_tipos_combustivel_disponiveis` e a contagem `total_postos` do dashboard) qualquer posto cuja actualização DGEG mais recente tenha mais de 30 dias ou cujo nome esteja bloqueado. Esta abordagem (ignorar, não arquivar) é intencional: estes postos continuam a ser devolvidos pela API em todas as recolhas (`ciclos_ausente=0`), pelo que o arquivamento automático não os apanha e um `ativo=False` seria revertido na recolha seguinte; a regra também cobre futuros casos sem lista manual, é reversível (ajustando a constante) e preserva todo o histórico. `scripts/remover_postos_ignorados.py` agora também limpa o DJB (`id 69288`). Verificação: recolha forçada confirma 76 → 75 postos, sem regressão dos nomes bloqueados nem dos 4 homólogos frescos; mínimo gasolina 95 passa de 1,935 € (DJB, Abr/2026) para 1,959 € (PLENERGY - BRAGA I, hoje); a regra deteta um posto falso com dados de 8 meses e exclui-o, e um rollback confirma a BD inalterada. `git push` pendente de credencial (https, sem token/ssh neste ambiente). 22 testes `pytest` a passar. **Alteração de BD** — correr `python scripts/remover_postos_ignorados.py` no PA após o deploy, antes de abrir o dashboard.
 

@@ -38,8 +38,21 @@ class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True  # HTTPS obrigatório no PA
 
+class TestingConfig(Config):
+    """Configuração dos testes unitários — SQLite em memória e CSRF desligado.
+
+    A URI é reescrita por cada teste (`sqlite:///:memory:`), aqui só se garante
+    que nada toca no ambiente real e que as excepções não são engolidas.
+    """
+    TESTING = True
+    DEBUG = False
+    WTF_CSRF_ENABLED = False
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+
+
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,
     'default': DevelopmentConfig
 }

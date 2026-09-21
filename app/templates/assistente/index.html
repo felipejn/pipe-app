@@ -54,7 +54,7 @@
 {% block conteudo %}
 <div class="modulo-cabecalho">
     <h1>Assistente PIPE</h1>
-    <p class="modulo-desc">Conversa com o teu assistente pessoal. Usa linguagem natural para consultar tarefas, notas, jogos, calendário e câmbios de moeda.</p>
+    <p class="modulo-desc">Conversa em linguagem natural sobre tarefas, notas, calendário, câmbios e preços de combustíveis.</p>
 </div>
 
 <div class="modulo-nav" style="align-items: center; flex-wrap: wrap;">
@@ -288,20 +288,15 @@
     }
 
     // ── Mensagem de boas-vindas ─────────────────────────
+    // Deliberadamente curta: as capacidades estão no subtítulo do cabeçalho.
+    // Só a linha do modo é dinâmica, porque muda o que o assistente pode fazer.
     function boasVindas() {
         mostrarVazio(false);
         var modoEscrita = {{ 'true' if modo == 'escrita' else 'false' }};
-        var boas = 'Olá, {{ current_user.username }}! Sou o teu assistente PIPE.\n\n' +
-            'Posso ajudar-te com:\n' +
-            'Consultar as tuas tarefas e prazos\n' +
-            'Ler as tuas notas\n' +
-            'Ver os teus jogos do Euromilhões\n' +
-            'Ver os teus eventos do calendário\n' +
-            'Converter moedas com taxas em tempo real\n' +
-            'Dar-te um resumo geral da tua conta\n\n' +
+        var boas = 'Olá, {{ current_user.username }}! Sou o teu assistente PIPE.\n' +
             (modoEscrita
-                ? 'Estou em modo de execução — também posso criar, alterar e apagar dados.\n\n'
-                : 'Estou em modo de consulta — activa o modo de execução para eu poder alterar dados.\n\n') +
+                ? 'Estou em modo de execução — posso consultar e alterar dados.\n'
+                : 'Estou em modo de consulta — só leitura.\n') +
             'Em que posso ajudar?';
         adicionarMensagem(boas, 'assistente');
     }

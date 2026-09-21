@@ -15,6 +15,13 @@ from app.euromilhoes.models import Jogo
 from app.calendario.models import Evento
 from app.cambio.service import MOEDAS as MOEDAS_CAMBIO, obter_taxa as obter_taxa_cambio
 from app.passwords.generator import gerar_password, gerar_passphrase, gerar_pin
+from app.combustiveis.models import (
+    EstadoAtualizacaoCombustiveis,
+    Posto,
+    UtilizadorCombustivel,
+    UtilizadorConcelho,
+)
+from app.combustiveis import services as combustiveis_services
 from app import db
 
 
@@ -231,6 +238,49 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
             },
         },
     },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'get_combustiveis',
+            'description': (
+                'Consulta os preços de combustíveis (em €/L) nos postos dos concelhos que o '
+                'utilizador escolheu em Combustíveis → Definições. Devolve o preço mais recente '
+                'por posto e combustível. Sem argumentos, devolve os preços de todos os '
+                'combustíveis de interesse do utilizador nos seus concelhos.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'tipo_combustivel': {
+                        'type': 'string',
+                        'description': (
+                            'Combustível a filtrar, como aparece no PIPE (ex: "Gasóleo simples", '
+                            '"Gasolina simples 95"). Omitir ou usar "Todos" para todos.'
+                        ),
+                    },
+                    'concelho': {
+                        'type': 'string',
+                        'description': (
+                            'Concelho a filtrar (ex: "Braga"). Só são aceites concelhos que o '
+                            'utilizador tenha escolhido nas Definições.'
+                        ),
+                    },
+                    'apenas_mais_barato': {
+                        'type': 'boolean',
+                        'description': (
+                            'Se True, devolve apenas o preço mínimo por combustível (posto mais '
+                            'barato), como no destaque do dashboard. Ideal para perguntas do '
+                            'tipo "onde está mais barato?".'
+                        ),
+                    },
+                    'limite': {
+                        'type': 'integer',
+                        'description': 'Máximo de registos de preço a devolver (default: 20, máximo: 100).',
+                    },
+                },
+            },
+        },
+    },
 ]
 
 DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA = [
@@ -418,6 +468,7 @@ REGISTO_FERRAMENTAS = {
     'get_resumo_geral': 'get_resumo_geral',
     'get_eventos': 'get_eventos',
     'get_cambio': 'get_cambio',
+    'get_combustiveis': 'get_combustiveis',
     'criar_tarefa': 'criar_tarefa',
     'alternar_tarefa': 'alternar_tarefa',
     'apagar_tarefa': 'apagar_tarefa',
@@ -593,7 +644,7 @@ def get_resumo_geral(user_id):
 
     euromilhoes_jogos_total = Jogo.query.filter_by(user_id=user_id).count()
 
-    return {
+    resumo = {
         'tarefas_total': tarefas_total,
         'tarefas_em_atraso': tarefas_em_atraso,
         'tarefas_concluidas_hoje': tarefas_concluidas_hoje,
@@ -601,6 +652,29 @@ def get_resumo_geral(user_id):
         'notas_fixadas': notas_fixadas,
         'euromilhoes_jogos_total': euromilhoes_jogos_total,
     }
+
+    # Combustíveis: só faz sentido incluir se o utilizador tiver concelhos
+    # escolhidos — sem eles o módulo está por configurar e o modelo deve
+    # encaminhá-lo para as Definições em vez de reportar zeros.
+    concelhos = [uc.concelho for uc in
+                 UtilizadorConcelho.query.filter_by(user_id=user_id).all()]
+    if concelhos:
+        tipos = [uc.tipo_combustivel for uc in
+                 UtilizadorCombustivel.query.filter_by(user_id=user_id).all()]
+        resultados = combustiveis_services.obter_precos_para_concelhos(
+            concelhos, tipos, None
+        )
+        resumo['combustiveis_concelhos'] = sorted(concelhos)
+        resumo['combustiveis_postos_com_preco'] = len({posto.id for posto, _ in resultados})
+        mais_barato = _mais_barato_por_combustivel(resultados)
+        if mais_barato:
+            resumo['combustiveis_mais_barato'] = mais_barato
+        resumo['combustiveis_recolha'] = _estado_recolha_combustiveis()
+    else:
+        resumo['combustiveis'] = ('Sem concelhos escolhidos — o utilizador tem de configurar '
+                                  'o módulo em Combustíveis → Definições.')
+
+    return resumo
 
 
 def get_eventos(user_id, data=None, futuros=False):
@@ -701,6 +775,201 @@ def get_cambio(user_id, origem=None, destino=None, valor=None):
         'rate': resultado['rate'],
         'fees': resultado['fees'],
     }
+
+
+# ── Combustíveis — leitura ──────────────────────────────────────────────────
+
+LIMITE_COMBUSTIVEIS_DEFAULT = 20
+LIMITE_COMBUSTIVEIS_MAX = 100
+
+
+# Fonte de dados usada pela recolha — devolvida ao modelo para ele poder citá-la.
+FONTE_COMBUSTIVEIS = 'DGEG via API Aberta'
+
+
+def _normalizar_texto(texto):
+    """Minúsculas sem acentos, para comparar nomes de concelhos e combustíveis.
+
+    Necessário porque o modelo escreve muitas vezes "gasoleo simples" ou
+    "intermarche" sem acentos. Sem esta normalização, o filtro falhava e o
+    assistente respondia que o combustível não existia quando existia.
+    """
+    import unicodedata
+    if texto is None:
+        return ''
+    # NFD separa a letra do acento ('ó' → 'o' + U+0301); o filtro descarta
+    # os caracteres de combinação e ficamos só com a letra base.
+    decomposto = unicodedata.normalize('NFD', str(texto))
+    sem_acentos = ''.join(c for c in decomposto if not unicodedata.combining(c))
+    return ' '.join(sem_acentos.strip().casefold().split())
+
+
+def _mais_barato_por_combustivel(resultados):
+    """Reduce [(Posto, PrecoHistorico)] ao mínimo por tipo de combustível.
+
+    Mesma lógica do destaque "Mais barato por combustível" do dashboard
+    (`templates/combustiveis/dashboard.html`). A lista de entrada já vem
+    ordenada por tipo + preço ascendente, mas não se assume isso: compara-se
+    explicitamente para não depender da ordenação do serviço.
+    """
+    minimos = {}
+    for posto, preco in resultados:
+        atual = minimos.get(preco.tipo_combustivel)
+        if atual is None or preco.preco < atual['preco']:
+            minimos[preco.tipo_combustivel] = {
+                'tipo_combustivel': preco.tipo_combustivel,
+                'preco': round(preco.preco, 3),
+                'posto': posto.nome,
+                'marca': posto.marca,
+                'concelho': posto.concelho,
+                'fonte': FONTE_COMBUSTIVEIS,
+                'data_dgeg': preco.data_atualizacao_dgeg,
+            }
+    return sorted(minimos.values(), key=lambda m: m['tipo_combustivel'])
+
+
+def _estado_recolha_combustiveis():
+    """Frescura dos preços — o modelo precisa dela para não os apresentar como actuais.
+
+    Sem estes metadados o assistente diria "hoje está a X €" com base numa
+    recolha falhada ou com semanas. A recolha corre automaticamente às
+    terças-feiras, mas também pode ser forçada pelo botão do dashboard.
+    """
+    estado = EstadoAtualizacaoCombustiveis.query.get(1)
+    if not estado:
+        return {}
+    dados = {
+        'ultima_atualizacao': (estado.ultima_atualizacao.strftime('%Y-%m-%d %H:%M')
+                               if estado.ultima_atualizacao else None),
+        'ultima_execucao_sucesso': bool(estado.ultima_execucao_sucesso),
+    }
+    if estado.mensagem_erro:
+        dados['mensagem_erro'] = estado.mensagem_erro
+    if not estado.ultima_atualizacao:
+        dados['aviso'] = ('Ainda não há recolhas registadas — os preços podem estar '
+                          'desactualizados ou ausentes.')
+    return dados
+
+
+def get_combustiveis(user_id, tipo_combustivel=None, concelho=None,
+                      apenas_mais_barato=False, limite=LIMITE_COMBUSTIVEIS_DEFAULT):
+    """Consulta os preços de combustíveis nos concelhos escolhidos pelo utilizador.
+
+    Ferramenta de leitura: não cria, altera nem apaga nada.
+
+    FILTRO POR UTILIZADOR — inegociável: ao contrário dos outros módulos, os
+    postos (`Posto`) são globais e NÃO têm `user_id`. O isolamento faz-se pelas
+    preferências do utilizador: só se passam a `obter_precos_para_concelhos` os
+    concelhos de `UtilizadorConcelho` desse user_id. Sem isto, o modelo veria
+    preços de toda a região. As queries ao `Posto` são sempre limitadas por essa
+    lista, que vem da BD e nunca do modelo.
+
+    Args:
+        user_id: ID do utilizador (obrigatório, injetado pelo despachante).
+        tipo_combustivel: combustível a filtrar (ex: 'Gasóleo simples');
+            None ou 'Todos' devolve todos os do universo de interesse.
+        concelho: concelho a filtrar; tem de constar dos concelhos do utilizador.
+        apenas_mais_barato: se True, devolve só o mínimo por combustível.
+        limite: nº máximo de registos de preço a devolver (1-100).
+
+    Returns:
+        Dict com 'precos' (ou 'mais_barato_por_combustivel'), 'concelhos',
+        'tipos_combustivel', 'total' e os metadados de frescura da recolha
+        ('recolha'), ou dict com chave 'erro' quando não há concelhos
+        escolhidos ou o filtro não devolve resultados.
+    """
+    # ── Preferências do utilizador (origem do filtro de isolamento) ──
+    concelhos = [uc.concelho for uc in
+                 UtilizadorConcelho.query.filter_by(user_id=user_id).all()]
+    if not concelhos:
+        return {'erro': 'Ainda não escolheste nenhum concelho. Vai a Combustíveis → Definições, '
+                        'seleciona pelo menos um concelho e guarda — depois volta a perguntar-me.'}
+
+    tipos_utilizador = [uc.tipo_combustivel for uc in
+                        UtilizadorCombustivel.query.filter_by(user_id=user_id).all()]
+
+    # ── Filtro de concelho pedido pelo modelo: só dentro dos do utilizador ──
+    if concelho:
+        alvo = _normalizar_texto(concelho)
+        correspondencias = [c for c in concelhos if _normalizar_texto(c) == alvo]
+        if not correspondencias:
+            return {'erro': f'O concelho "{concelho}" não está nos teus concelhos. '
+                            f'Os teus concelhos são: {", ".join(sorted(concelhos))}. '
+                            'Para adicionar outros, vai a Combustíveis → Definições.'}
+        concelhos_filtrados = correspondencias
+    else:
+        concelhos_filtrados = concelhos
+
+    # ── Filtro por combustível: validado contra o universo disponível ──
+    tipo_pedido = _normalizar_texto(tipo_combustivel)
+    if tipo_pedido in ('todos', 'todas', 'all', ''):
+        tipo_pedido = None
+    tipo_selecionado = None
+    if tipo_pedido:
+        tipos_disponiveis = combustiveis_services.obter_tipos_combustivel_disponiveis(
+            concelhos_filtrados, tipos_utilizador
+        )
+        correspondencias = [t for t in tipos_disponiveis
+                            if _normalizar_texto(t) == tipo_pedido]
+        if not correspondencias:
+            return {'erro': f'O combustível "{tipo_combustivel}" não está disponível nos teus '
+                            f'concelhos. Disponíveis: {", ".join(tipos_disponiveis) or "nenhum"}. '
+                            'Podes ajustar os combustíveis de interesse em Combustíveis → Definições.'}
+        tipo_selecionado = correspondencias[0]
+
+    # ── Limite: normalizado antes de tocar na BD ──
+    try:
+        limite = int(limite)
+    except (TypeError, ValueError):
+        limite = LIMITE_COMBUSTIVEIS_DEFAULT
+    limite = max(1, min(limite, LIMITE_COMBUSTIVEIS_MAX))
+
+    # ── Consulta (o serviço exclui postos arquivados e obsoletos) ──
+    resultados = combustiveis_services.obter_precos_para_concelhos(
+        concelhos_filtrados, tipos_utilizador, tipo_selecionado
+    )
+    if not resultados:
+        return {'erro': 'Não há preços registados para esses filtros. Confirma os concelhos e os '
+                        'combustíveis de interesse em Combustíveis → Definições, ou actualiza os '
+                        'dados no módulo Combustíveis (botão "Atualizar Dados").'}
+
+    recolha = _estado_recolha_combustiveis()
+
+    if apenas_mais_barato:
+        return {
+            'mais_barato_por_combustivel': _mais_barato_por_combustivel(resultados),
+            'concelhos': sorted(concelhos_filtrados),
+            'recolha': recolha,
+        }
+
+    total = len(resultados)
+    precos = [
+        {
+            'posto': posto.nome,
+            'marca': posto.marca,
+            'concelho': posto.concelho,
+            'morada': posto.morada,
+            'tipo_combustivel': preco.tipo_combustivel,
+            'preco': round(preco.preco, 3),
+            'data_dgeg': preco.data_atualizacao_dgeg,
+            'data_recolha': (preco.data_recolha.strftime('%Y-%m-%d %H:%M')
+                             if preco.data_recolha else None),
+        }
+        for posto, preco in resultados[:limite]
+    ]
+
+    resposta = {
+        'precos': precos,
+        'concelhos': sorted(concelhos_filtrados),
+        'tipos_combustivel': sorted({p['tipo_combustivel'] for p in precos}),
+        'total': total,
+        'recolha': recolha,
+    }
+    if total > limite:
+        resposta['truncado'] = True
+        resposta['nota'] = (f'Mostrados {len(precos)} de {total} registos. '
+                            'Usa "apenas_mais_barato" ou filtra por combustível/concelho.')
+    return resposta
 
 
 # ── Tarefas — escrita ────────────────────────────────────────────────────
