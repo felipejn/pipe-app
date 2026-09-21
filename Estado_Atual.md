@@ -500,6 +500,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 **Versão v1.4.13** — Assistente IA com renderização de tabelas Markdown no chat. Adicionada a função `processarTabela()` inline em `app/templates/assistente/index.html` (~40 linhas de JS vanilla) que detecta blocos de tabela Markdown (`| cabeçalho | ... |`, `|---| ... |`, `| dados | ... |`) e converte em HTML `<table>` com `<thead>`/`<tbody>`. Regras CSS adicionadas em `app/static/css/pipe.css` para `.chat-bubble table`, `th`, `td`, `tr:hover` — respeitam tokens de tema claro/escuro. O parsing de tabelas ocorre antes do parsing de parágrafos no loop de `markdownToHtml()`, pelo que blocos de tabela são sempre capturados primeiro. Sem alteração de BD.
 
+**Versão v1.4.14 (fix)** — Correcção de cache estático no PythonAnywhere. O nginx do PA cacheia ficheiros estáticos ignorando query params do Flask. O `pipe.css` com as regras de tabela foi actualizado mas o `base.html` ainda usava cache-buster `?v=3`, pelo que o browser em produção carregava a versão antiga sem as regras CSS de tabela. Incrementado para `?v=4` em `app/templates/base.html` (tanto no `<link>` do CSS como no `<script>` do JS). Commit `70a8d12`. Sem alteração de BD.
+
 **Versão v1.4.11** — Assistente IA com renderização Markdown no chat.
 
 **Versão v1.4.7** — Assistente IA com acesso a conversões de moeda. Nova ferramenta de leitura `get_cambio(user_id, origem, destino, valor)` (Wise v3 + fallback ExchangeRate-API, stateless, disponível em modo consulta e execução); refactor do Câmbio com serviço partilhado `app/cambio/service.py` sem alteração de comportamento da rota; prompts e chat actualizados. Validação: 22 testes `pytest` a passar + smoke test real (EUR→USD via Wise). Sem alteração de BD.
