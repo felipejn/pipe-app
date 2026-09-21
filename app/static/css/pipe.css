@@ -2486,6 +2486,12 @@ input[type="date"] {
 .chat-bubble h3, .chat-bubble h4, .chat-bubble h5 { margin: 0.5rem 0; }
 .chat-bubble a { color: var(--cor-primaria); }
 
+/* ── Tabelas Markdown nos balões ────────────── */
+.chat-bubble table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.85rem; }
+.chat-bubble th { background: var(--cor-superficie-2); color: var(--cor-texto-suave); text-align: left; padding: 0.4rem 0.6rem; border-bottom: 2px solid var(--cor-primaria); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.chat-bubble td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--cor-borda); color: var(--cor-texto); }
+.chat-bubble tr:hover td { background: var(--cor-overlay-hover); }
+
 /* ---- Info convite (registo com token) ---- */
 .info-convite {
     background: rgba(245, 158, 11, 0.1);

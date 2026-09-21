@@ -110,6 +110,45 @@
     }
 
     // ── Parser Markdown simplificado ─────────────────────
+    function processarTabela(linhas, idx) {
+        if (idx + 1 >= linhas.length) return null;
+        var separador = linhas[idx + 1].trim();
+        if (!separador.match(/^\|[\s\-:|]+\|$/)) return null;
+
+        var fim = idx;
+        var linhasTabela = [];
+        for (var j = idx; j < linhas.length; j++) {
+            if (!linhas[j].trim().startsWith('|')) break;
+            linhasTabela.push(linhas[j]);
+            fim = j;
+        }
+        if (linhasTabela.length < 3) return null;
+
+        function parseCelulas(linha) {
+            return linha.trim().split('|').slice(1, -1).map(function(c) { return c.trim(); });
+        }
+
+        var ths = parseCelulas(linhasTabela[0]);
+        var corpo = linhasTabela.slice(2);
+
+        var html = '<table><thead><tr>';
+        for (var h = 0; h < ths.length; h++) {
+            html += '<th>' + ths[h] + '</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        for (var c = 0; c < corpo.length; c++) {
+            var cels = parseCelulas(corpo[c]);
+            html += '<tr>';
+            for (var k = 0; k < ths.length; k++) {
+                html += '<td>' + (cels[k] || '') + '</td>';
+            }
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        return { html: html, fim: fim };
+    }
+
     function markdownToHtml(texto) {
         var linhas = texto.split('\n');
         var resultado = [];
@@ -153,6 +192,18 @@
                 var marker = linha.startsWith('- ') ? '- ' : '* ';
                 resultado.push('<li>' + linha.substring(marker.length) + '</li>');
                 continue;
+            }
+
+            // Tabelas Markdown: | cabeçalho | cabeçalho |
+            //                          |---|---|
+            //                          | célula | célula |
+            if (linha.startsWith('|') && !emBlocoCodigo) {
+                var tabelaResultado = processarTabela(linhas, i);
+                if (tabelaResultado) {
+                    resultado.push(tabelaResultado.html);
+                    i = tabelaResultado.fim;
+                    continue;
+                }
             }
 
             // Parágrafo
