@@ -25,6 +25,8 @@ from app.assistente.ferramentas import (
 # Limite de mensagens no histórico — 10 trocas (utilizador + assistente)
 MAX_MENSAGENS = 20
 MAX_TOOL_ITERATIONS = 4
+MAX_CHARS_POR_MENSAGEM = 3000      # tecto por mensagem individual guardada em sessão
+MAX_CHARS_HISTORICO_TOTAL = 8000   # orçamento total do histórico guardado em sessão
 
 # Nomes dos dias da semana em português europeu. Não usamos strftime('%A')
 # porque depende da locale do sistema e devolveria inglês por omissão.
@@ -108,25 +110,87 @@ SYSTEM_PROMPT_ESCRITA = (
 )
 
 
+LIMITE_ITENS_LISTA_TOOL = 10       # nº máximo de itens em listas dentro do resultado
+LIMITE_CHARS_TOOL_RESULT = 2000    # tecto de segurança do JSON final
+
+
+def _truncar_listas(valor):
+    """Corta listas dentro do resultado de uma tool a LIMITE_ITENS_LISTA_TOOL itens,
+    marcando 'truncado': True. Evita cortar a string JSON a meio (o que geraria
+    JSON inválido) — o corte é feito na estrutura, antes de serializar."""
+    if isinstance(valor, dict):
+        novo = {}
+        for chave, item in valor.items():
+            if isinstance(item, list) and len(item) > LIMITE_ITENS_LISTA_TOOL:
+                novo[chave] = item[:LIMITE_ITENS_LISTA_TOOL]
+                novo['truncado'] = True
+                novo.setdefault('nota', f'Mostrados {LIMITE_ITENS_LISTA_TOOL} de {len(item)} registos. Usa filtros mais específicos para ver menos de cada vez.')
+            else:
+                novo[chave] = _truncar_listas(item)
+        return novo
+    if isinstance(valor, list):
+        return [_truncar_listas(v) for v in valor]
+    return valor
+
+
+def _serializar_resultado_tool(resultado):
+    """Serializa o resultado de uma tool para o histórico, com corte por itens
+    (estrutural) e um tecto final de caracteres como rede de segurança."""
+    if isinstance(resultado, str):
+        return resultado[:LIMITE_CHARS_TOOL_RESULT]
+
+    resultado_cortado = _truncar_listas(resultado)
+    texto = json.dumps(resultado_cortado, ensure_ascii=False)
+
+    if len(texto) > LIMITE_CHARS_TOOL_RESULT:
+        texto = json.dumps({
+            'aviso': 'Resultado demasiado grande para mostrar por completo.',
+            'total_aproximado': len(texto),
+            'sugestao': 'Pede um filtro mais específico (ex. um concelho, uma lista, um intervalo de datas).',
+        }, ensure_ascii=False)
+
+    return texto
+
+
 def _obter_historico():
     """Devolve o histórico actual de mensagens da sessão."""
     return session.get('chat_historico', [])
 
 
-def _guardar_historico(historico):
-    """Guarda o histórico na sessão, respeitando o limite de 20 mensagens."""
-    # Se excedeu o limite, remove as mais antigas (mantém as mais recentes)
-    if len(historico) > MAX_MENSAGENS:
-        historico = historico[-MAX_MENSAGENS:]
-    session['chat_historico'] = historico
-    session.modified = True
+def _tamanho_historico(historico):
+    """Soma o tamanho em caracteres do conteúdo de todas as mensagens."""
+    return sum(len(m.get('content') or '') for m in historico if isinstance(m, dict))
 
 
 def _limpar_historico(historico):
-    """Trunca o histórico se exceder o limite."""
+    """Corta o histórico para caber na sessão: por nº de mensagens, por tamanho
+    de cada mensagem individual e por um orçamento total em caracteres. A
+    mensagem já foi enviada ao modelo nesta chamada — este corte só afeta o
+    que fica guardado para os próximos pedidos, nunca a resposta actual."""
     if len(historico) > MAX_MENSAGENS:
-        return historico[-MAX_MENSAGENS:]
+        historico = historico[-MAX_MENSAGENS:]
+
+    cortado = []
+    for m in historico:
+        if not isinstance(m, dict):
+            continue
+        conteudo = m.get('content') or ''
+        if len(conteudo) > MAX_CHARS_POR_MENSAGEM:
+            conteudo = conteudo[:MAX_CHARS_POR_MENSAGEM] + '… (cortado no histórico guardado)'
+        cortado.append({**m, 'content': conteudo})
+    historico = cortado
+
+    while len(historico) > 1 and _tamanho_historico(historico) > MAX_CHARS_HISTORICO_TOTAL:
+        historico = historico[1:]
+
     return historico
+
+
+def _guardar_historico(historico):
+    """Guarda o histórico na sessão, já cortado por _limpar_historico."""
+    historico = _limpar_historico(historico)
+    session['chat_historico'] = historico
+    session.modified = True
 
 
 def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None, modo=None):
@@ -274,7 +338,7 @@ def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None, 
             mensagens.append({
                 'role': 'tool',
                 'tool_call_id': tc['id'],
-                'content': json.dumps(resultado, ensure_ascii=False) if not isinstance(resultado, str) else resultado,
+                'content': _serializar_resultado_tool(resultado),
             })
 
         time.sleep(2)

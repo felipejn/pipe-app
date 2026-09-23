@@ -150,6 +150,7 @@ def chamar_llm(mensagens, ferramentas=None):
 
     payload_base = {
         'messages': mensagens,
+        'max_tokens': 1000,
     }
     if ferramentas:
         payload_base['tools'] = ferramentas
