@@ -1,4 +1,5 @@
 import os
+import tempfile
 from dotenv import load_dotenv
 
 # Carrega variáveis do ficheiro .env (se existir)
@@ -27,8 +28,16 @@ class Config:
 
     # Sessões
     SESSION_COOKIE_HTTPONLY = True
+    # Lax por omissão (dev). Em produção passa a None, porque a extensão Chrome
+    # faz pedidos cross-site (origem chrome-extension://) e o browser não envia
+    # cookies Lax nesses pedidos — sem isto a extensão não fica autenticada.
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hora
+
+    # --- Cofre ---
+    COFRE_KDF_ITERATIONS = 600000
+    COFRE_SESSION_TIMEOUT = 900  # 15 minutos
+    COFRE_CORS_ORIGINS = os.environ.get('COFRE_CORS_ORIGINS', '')  # "chrome-extension://abc123,chrome-extension://def456"
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -37,17 +46,35 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True  # HTTPS obrigatório no PA
+    # SameSite=None é obrigatório para a extensão Chrome (pedidos cross-site a
+    # partir de chrome-extension://); exige Secure=True (HTTPS), garantido acima.
+    # O CSRF continua protegido pelo token do Flask-WTF em todos os POSTs.
+    SESSION_COOKIE_SAMESITE = 'None'
 
 class TestingConfig(Config):
-    """Configuração dos testes unitários — SQLite em memória e CSRF desligado.
+    """Configuração dos testes unitários — isolada da BD real.
 
-    A URI é reescrita por cada teste (`sqlite:///:memory:`), aqui só se garante
-    que nada toca no ambiente real e que as excepções não são engolidas.
+    IMPORTANTE: tudo o que é lido em `create_app()` por `db.init_app()` e por
+    `Session(app)` tem de estar definido AQUI. Configuração aplicada depois
+    dessas chamadas não tem qualquer efeito (o engine do SQLAlchemy e a
+    interface de sessão ficam fixados) — foi essa a causa de uma corrida de
+    testes com `db.drop_all()` ter apagado todas as tabelas de
+    `instance/pipe.db`.
+
+    Usa SQLite em memória e sessões Flask-Session numa pasta temporária, pelo
+    que nenhum teste escreve em `instance/`.
     """
     TESTING = True
     DEBUG = False
     WTF_CSRF_ENABLED = False
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+
+    # Cofre — sem extensões Chrome autorizadas nos testes
+    COFRE_CORS_ORIGINS = ''
+
+    # Sessões server-side isoladas (nunca em instance/flask_session/)
+    SESSION_TYPE = 'filesystem'
+    SESSION_FILE_DIR = tempfile.mkdtemp(prefix='pipe-test-session-')
 
 
 config = {

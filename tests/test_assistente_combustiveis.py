@@ -29,12 +29,10 @@ class _BaseCombustiveis(TestCase):
     """Cria uma app isolada com SQLite em memória e dados de teste."""
 
     def setUp(self):
+        # Toda a config de teste (SQLite em memória, CSRF desligado, sessões
+        # temporárias) vem do TestingConfig: atribuir app.config depois de
+        # create_app() não tem efeito e leva os testes a usar a BD real.
         self.app = create_app('testing')
-        self.app.config.update(
-            SQLALCHEMY_DATABASE_URI='sqlite:///:memory:',
-            WTF_CSRF_ENABLED=False,
-            TESTING=True,
-        )
         self.ctx = self.app.app_context()
         self.ctx.push()
         db.create_all()

@@ -1,10 +1,13 @@
+import os
 from datetime import timedelta
 from flask import Flask, app
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
+from flask_session import Session
+from flask_cors import CORS
 from app.extensions import limiter
-from config import config
+from config import config, BASE_DIR
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -19,10 +22,32 @@ def create_app(config_name='default'):
     app.config.from_object(config[config_name])
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
-    # Configurações de sessão para PWA
+    # Configurações de sessão para PWA.
+    # SESSION_COOKIE_SAMESITE / SESSION_COOKIE_SECURE vêm das classes de config
+    # (Development: Lax/False; Production: None/True) — a extensão Chrome faz
+    # pedidos cross-site e só recebe o cookie com SameSite=None (exige HTTPS),
+    # pelo que não podem ser fixados aqui.
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['SESSION_COOKIE_SECURE'] = True
+
+    # Sessões server-side para o cofre (chave nunca no browser).
+    # setdefault: a config carregada (ex.: TestingConfig) tem de poder fixar o
+    # seu próprio SESSION_FILE_DIR — estes valores são lidos por Session(app)
+    # logo a seguir e não podem ser sobrepostos.
+    app.config.setdefault('SESSION_TYPE', 'filesystem')
+    app.config.setdefault('SESSION_FILE_DIR', os.path.join(BASE_DIR, 'instance', 'flask_session'))
+    app.config.setdefault('SESSION_FILE_THRESHOLD', 500)
+    os.makedirs(app.config['SESSION_FILE_DIR'], exist_ok=True)
+    Session(app)
+
+    # Parse de COFRE_CORS_ORIGINS
+    _cofre_origins_env = app.config.get('COFRE_CORS_ORIGINS', '')
+    _cofre_origins = [o.strip() for o in _cofre_origins_env.split(',') if o.strip()] if _cofre_origins_env else []
+
+    if _cofre_origins:
+        CORS(app, resources={
+            r"/passwords/api/cofre/*": {"origins": _cofre_origins, "supports_credentials": True},
+            r"/passwords/api/csrf-token": {"origins": _cofre_origins, "supports_credentials": True},
+        })
 
     # Inicializar extensões
     db.init_app(app)
@@ -111,6 +136,7 @@ def create_app(config_name='default'):
 
     # Criar tabelas se não existirem
     with app.app_context():
+        from app.passwords.models import CofrePassword, CofreConfig
         from app.notifications.models import UserNotificationPreferences  # noqa: F401
         from app.tarefas.models import Lista, Tarefa, TagTarefa  # noqa: F401
         from app.notas.models import Nota, ItemChecklist, EtiquetaNota  # noqa: F401

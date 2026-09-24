@@ -23,9 +23,13 @@ def criar_admin():
 
         user = User(username=username, email=email)
         user.set_password(password)
+        # O script existe para criar o PRIMEIRO utilizador administrador; sem
+        # is_admin=True ficava-se sem acesso às páginas de administração e sem
+        # forma de gerar convites (o registo por convite exige um admin).
+        user.is_admin = True
         db.session.add(user)
         db.session.commit()
-        print(f'Utilizador "{username}" criado com sucesso.')
+        print(f'Utilizador "{username}" criado com sucesso (admin).')
 
 if __name__ == '__main__':
     criar_admin()

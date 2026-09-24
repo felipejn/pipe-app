@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PIPE Cofre</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #1a1a2e;
+      width: 340px;
+      min-height: 200px;
+      padding: 12px;
+      background: #f8f9fa;
+    }
+    h2 { font-size: 16px; margin-bottom: 10px; }
+    .section { margin-bottom: 14px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 7px 14px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 12px; font-weight: 600; transition: all .15s;
+    }
+    .btn-primary { background: #4361ee; color: #fff; }
+    .btn-primary:hover { background: #3a56d4; }
+    .btn-secondary { background: #e9ecef; color: #1a1a2e; }
+    .btn-secondary:hover { background: #dee2e6; }
+    .btn-block { width: 100%; }
+    input[type="password"], input[type="text"], input[type="url"] {
+      width: 100%; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 6px;
+      font-size: 13px; margin-bottom: 8px; outline: none;
+    }
+    input:focus { border-color: #4361ee; }
+    .status { padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 12px; }
+    .status-locked { background: #fff3cd; color: #664d03; }
+    .status-unlocked { background: #d4edda; color: #155724; }
+    .status-not-set { background: #e2e3e5; color: #383d41; }
+    #entries-list { max-height: 300px; overflow-y: auto; }
+    .entry-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 10px; background: #fff; border-radius: 6px; margin-bottom: 6px;
+      border: 1px solid #e9ecef;
+    }
+    .entry-item strong { display: block; font-size: 13px; }
+    .entry-item span { font-size: 11px; color: #6c757d; }
+    .entry-actions { display: flex; gap: 4px; }
+    .entry-actions button {
+      padding: 3px 8px; font-size: 11px; border-radius: 4px; border: none;
+      cursor: pointer; background: #e9ecef; color: #1a1a2e;
+    }
+    .entry-actions button:hover { background: #dee2e6; }
+    .hidden { display: none; }
+    .login-link { color: #4361ee; cursor: pointer; text-decoration: underline; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div id="state-container"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

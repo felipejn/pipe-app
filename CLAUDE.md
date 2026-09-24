@@ -5,7 +5,7 @@
 - **Owner:** Felipe (apelido "Pipe") — ortografia Portuguesa Europeia em TODO o código e mensagens
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
-- **Versão actual:** v1.0
+- **Versão actual:** v1.5.0 (Cofre de Passwords + extensão Chrome) — detalhe em `estado_atual.md`
 
 ## Referência principal
 **Ler `estado_atual.md`** para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.
@@ -17,6 +17,7 @@
 - **Padrão AJAX:** `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch; backend usa `request.get_json()`
 - Frontend usa **vanilla JS inline nos templates** — sem ficheiros JS externos por módulo
 - **Estado actual** em `estado_atual.md` — manter sempre actualizado após mudanças significativas
+- **Testes nunca tocam na BD real:** criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). Atribuir `app.config[...]` **depois** de `create_app()` não tem efeito — o engine do SQLAlchemy fica fixado em `db.init_app()` e o Flask-Session em `Session(app)`. Foi esse anti-padrão que apagou `instance/pipe.db`; `tests/conftest.py` agora bloqueia `db.drop_all()` com BD de ficheiro
 
 ## Módulos existentes
 | Blueprint | Rota | State |
@@ -25,7 +26,7 @@
 | `euromilhoes` | `/euromilhoes/` | Com BD (Jogo) |
 | `tarefas` | `/tarefas/` | Com BD (Lista, Tarefa, TagTarefa) |
 | `notas` | `/notas/` | Com BD (Nota, ItemChecklist, EtiquetaNota) |
-| `passwords` | `/passwords/` | Stateless |
+| `passwords` | `/passwords/` | Com BD (CofreConfig, CofrePassword) + gerador stateless |
 | `conversoes` | `/conversoes/` | Com BD (Conversao) |
 | `cambio` | `/cambio/` | Stateless (Wise API + fallback) |
 | `cores` | `/cores/` | Stateless |

@@ -3,8 +3,9 @@
 {% block titulo %}Passwords — PIPE{% endblock %}
 
 {% block conteudo %}
-<div class="pagina-conteudo" style="max-width: 580px;">
+<div class="pagina-conteudo" style="max-width: 640px;">
 
+  <!-- ═══════ GERADOR ═══════ -->
   <div class="cabecalho-pagina">
     <h2>🔑 Gerador de Passwords</h2>
     <p class="modulo-desc">Geração segura no servidor com <code style="background:var(--cor-superficie-2);padding:.1em .4em;border-radius:4px;font-size:.85em;">secrets</code></p>
@@ -33,15 +34,11 @@
         <span id="pw-copiar-txt">Copiar</span>
       </button>
     </div>
-
-    <!-- Barra de força -->
     <div style="margin-top:1rem;display:flex;align-items:center;gap:.75rem;">
       <div style="flex:1;height:5px;background:var(--cor-superficie-2);border-radius:3px;overflow:hidden;">
-        <div id="pw-forca-fill"
-             style="height:100%;width:0;border-radius:3px;transition:width .3s ease,background .3s ease;"></div>
+        <div id="pw-forca-fill" style="height:100%;width:0;border-radius:3px;transition:width .3s ease,background .3s ease;"></div>
       </div>
-      <span id="pw-forca-label"
-            style="font-size:.8rem;color:var(--cor-texto-suave);white-space:nowrap;min-width:80px;text-align:right;">—</span>
+      <span id="pw-forca-label" style="font-size:.8rem;color:var(--cor-texto-suave);white-space:nowrap;min-width:80px;text-align:right;">—</span>
     </div>
   </div>
 
@@ -49,8 +46,7 @@
   <div class="cartao pw-painel" id="painel-password" style="margin-bottom:1rem;">
     <div class="campo">
       <label class="campo-label">Comprimento: <strong style="color:var(--cor-texto);" id="val-comprimento">18</strong></label>
-      <input type="range" id="sl-comprimento" min="8" max="64" value="18"
-             style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
+      <input type="range" id="sl-comprimento" min="8" max="64" value="18" style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
     </div>
     <div style="display:flex;flex-direction:column;gap:.5rem;">
       <label class="opcao-check"><input type="checkbox" id="tog-maiusculas" checked> Maiúsculas (A–Z)</label>
@@ -65,138 +61,691 @@
   <div class="cartao pw-painel" id="painel-passphrase" style="margin-bottom:1rem;display:none;">
     <div class="campo">
       <label class="campo-label">Número de palavras: <strong style="color:var(--cor-texto);" id="val-palavras">4</strong></label>
-      <input type="range" id="sl-palavras" min="3" max="10" value="4"
-             style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
+      <input type="range" id="sl-palavras" min="3" max="10" value="4" style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
     </div>
-    <p style="font-size:.85rem;color:var(--cor-texto-suave);">
-      Separadas por hífen &mdash; ex:
-      <span style="color:var(--cor-primaria);">laranja-azulejo-montanha-feliz</span>
-    </p>
+    <p style="font-size:.85rem;color:var(--cor-texto-suave);">Separadas por hífen — ex: <span style="color:var(--cor-primaria);">laranja-azulejo-montanha-feliz</span></p>
   </div>
 
   <!-- Painel PIN -->
   <div class="cartao pw-painel" id="painel-pin" style="margin-bottom:1rem;display:none;">
     <div class="campo">
       <label class="campo-label">Comprimento: <strong style="color:var(--cor-texto);" id="val-pin">6</strong></label>
-      <input type="range" id="sl-pin" min="4" max="12" value="6"
-             style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
+      <input type="range" id="sl-pin" min="4" max="12" value="6" style="width:100%;accent-color:var(--cor-primaria);margin-bottom:.75rem;">
     </div>
     <p style="font-size:.85rem;color:var(--cor-texto-suave);">Apenas dígitos numéricos</p>
   </div>
 
-  <button id="pw-gerar" class="btn btn-primario btn-bloco" style="font-size:1rem;padding:.7rem;">
-    Gerar
-  </button>
+  <button id="pw-gerar" class="btn btn-primario btn-bloco" style="font-size:1rem;padding:.7rem;">Gerar</button>
+
+  <!-- ═══════ DIVISÓRIA DO COFRE ═══════ -->
+  <hr style="border:none;border-top:1px solid var(--cor-superficie-2);margin:2rem 0;">
+
+  <div class="cabecalho-pagina">
+    <h2>🔒 Cofre Seguro</h2>
+    <p class="modulo-desc">Encriptação AES-256-GCM com password mestra. A chave nunca sai do servidor.</p>
+  </div>
+
+  <!-- Estado do cofre -->
+  <div id="cofre-estado" style="margin-bottom:1rem;"></div>
+
+  <!-- ─── Não activado ─── -->
+  <div id="cofre-nao-activado" class="cartao">
+    <p style="margin-bottom:1rem;">O teu cofre ainda não está activado. Activao para guardar passwords com encriptação.</p>
+    <button id="btn-activar" class="btn btn-primario">Activar Cofre</button>
+  </div>
+
+  <!-- ─── Bloqueado ─── -->
+  <div id="cofre-bloqueado" class="cartao" style="display:none;">
+    <p style="margin-bottom:1rem;color:var(--cor-texto-suave);">Cofre bloqueado. Desbloqueia para aceder às tuas entradas.</p>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <input type="password" id="cofre-senha" class="campo-texto" placeholder="Password mestra"
+             style="width:100%;">
+    </div>
+    <button id="btn-desbloquear" class="btn btn-primario">Desbloquear</button>
+  </div>
+
+  <!-- ─── Desbloqueado ─── -->
+  <div id="cofre-desbloqueado" style="display:none;">
+    <!-- Barra de acções -->
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;">
+      <button id="btn-nova-entrada" class="btn btn-primario">+ Nova Entrada</button>
+      <button id="btn-importar-csv" class="btn btn-secundario">📥 Importar CSV</button>
+      <button id="btn-bloquear" class="btn btn-secundario">Bloquear</button>
+      <button id="btn-alterar-pw" class="btn btn-secundario">Alterar Password Mestra</button>
+    </div>
+
+    <!-- Busca -->
+    <div class="campo" style="margin-bottom:1rem;">
+      <input type="text" id="cofre-busca" class="campo-texto" placeholder="Buscar por domínio ou username…"
+             style="width:100%;">
+    </div>
+
+    <!-- Lista de entradas -->
+    <div id="cofre-lista"></div>
+
+    <!-- Vazio -->
+    <div id="cofre-vazio" class="cartao" style="display:none;text-align:center;padding:2rem;">
+      <p style="color:var(--cor-texto-suave);">Sem entradas. Cria a primeira!</p>
+    </div>
+  </div>
 
 </div>
 
+<!-- ═══════ MODAIS ═══════ -->
+
+<!-- Modal Activar -->
+<div id="modal-activar" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
+  <div class="cartao" style="max-width:420px;width:90%;">
+    <h3 style="margin-bottom:1rem;">Activar Cofre</h3>
+    <div class="alerta alerta-erro" style="margin-bottom:1rem;">
+      <strong>ATENÇÃO:</strong> Se esquecer a password mestra, os dados ficarão permanentemente inacessíveis. Não há recuperação — guarda esta password em segurança.
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Password mestra</label>
+      <input type="password" id="modal-activar-pw" class="campo-texto" placeholder="Mínimo 8 caracteres" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:1.5rem;">
+      <label class="campo-label">Confirmar password</label>
+      <input type="password" id="modal-activar-conf" class="campo-texto" placeholder="Confirma a password" style="width:100%;">
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+      <button id="modal-activar-cancelar" class="btn btn-secundario">Cancelar</button>
+      <button id="modal-activar-confirmar" class="btn btn-primario">Activar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Desbloquear (inline, não precisa de modal separado — usa o cofre-bloqueado) -->
+
+<!-- Modal Nova Entrada -->
+<div id="modal-nova-entrada" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
+  <div class="cartao" style="max-width:460px;width:90%;">
+    <h3 style="margin-bottom:1rem;">Nova Entrada</h3>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Título</label>
+      <input type="text" id="modal-entrada-titulo" class="campo-texto" placeholder="Ex: GitHub" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">URL</label>
+      <input type="url" id="modal-entrada-url" class="campo-texto" placeholder="https://github.com" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Username</label>
+      <input type="text" id="modal-entrada-user" class="campo-texto" placeholder="Seu username" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Password</label>
+      <div style="display:flex;gap:.5rem;">
+        <input type="password" id="modal-entrada-pw" class="campo-texto" placeholder="Password" style="flex:1;">
+        <button id="btn-gerar-entrada-pw" class="btn btn-secundario" style="flex-shrink:0;">Gerar</button>
+      </div>
+    </div>
+    <div class="campo" style="margin-bottom:1.5rem;">
+      <label class="campo-label">Notas (opcional)</label>
+      <textarea id="modal-entrada-notas" class="campo-texto" rows="2" placeholder="Notas..." style="width:100%;resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+      <button id="modal-entrada-cancelar" class="btn btn-secundario">Cancelar</button>
+      <button id="modal-entrada-guardar" class="btn btn-primario">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Entrada -->
+<div id="modal-editar-entrada" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
+  <div class="cartao" style="max-width:460px;width:90%;">
+    <h3 style="margin-bottom:1rem;">Editar Entrada</h3>
+    <input type="hidden" id="modal-editar-id">
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Título</label>
+      <input type="text" id="modal-editar-titulo" class="campo-texto" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">URL</label>
+      <input type="url" id="modal-editar-url" class="campo-texto" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Username</label>
+      <input type="text" id="modal-editar-user" class="campo-texto" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Password</label>
+      <div style="display:flex;gap:.5rem;">
+        <input type="password" id="modal-editar-pw" class="campo-texto" placeholder="Deixar em branco para manter" style="flex:1;">
+        <button id="btn-gerar-editar-pw" class="btn btn-secundario" style="flex-shrink:0;">Gerar</button>
+      </div>
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="opcao-check"><input type="checkbox" id="modal-editar-fav"> Favorito</label>
+    </div>
+    <div class="campo" style="margin-bottom:1.5rem;">
+      <label class="campo-label">Notas</label>
+      <textarea id="modal-editar-notas" class="campo-texto" rows="2" style="width:100%;resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+      <button id="modal-editar-cancelar" class="btn btn-secundario">Cancelar</button>
+      <button id="modal-editar-guardar" class="btn btn-primario">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Alterar Password Mestra -->
+<div id="modal-alterar-pw" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
+  <div class="cartao" style="max-width:420px;width:90%;">
+    <h3 style="margin-bottom:1rem;">Alterar Password Mestra</h3>
+    <div class="alerta alerta-erro" style="margin-bottom:1rem;">
+      <strong>ATENÇÃO:</strong> Esta operação re-cifrará TODAS as entradas com a nova chave. Se algo falhar, será feito rollback.
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Password actual</label>
+      <input type="password" id="modal-alterar-actual" class="campo-texto" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:.75rem;">
+      <label class="campo-label">Nova password</label>
+      <input type="password" id="modal-alterar-nova" class="campo-texto" placeholder="Mínimo 8 caracteres" style="width:100%;">
+    </div>
+    <div class="campo" style="margin-bottom:1.5rem;">
+      <label class="campo-label">Confirmar nova password</label>
+      <input type="password" id="modal-alterar-conf" class="campo-texto" placeholder="Confirma a nova password" style="width:100%;">
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+      <button id="modal-alterar-cancelar" class="btn btn-secundario">Cancelar</button>
+      <button id="modal-alterar-confirmar" class="btn btn-primario">Alterar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Importar CSV -->
+<div id="modal-importar-csv" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
+  <div class="cartao" style="max-width:420px;width:90%;">
+    <h3 style="margin-bottom:1rem;">Importar CSV</h3>
+    <p style="font-size:.85rem;color:var(--cor-texto-suave);margin-bottom:1rem;">Importa o ficheiro CSV exportado do Chrome (formato: name, url, username, password).</p>
+    <div class="campo" style="margin-bottom:1rem;">
+      <input type="file" id="csv-ficheiro" accept=".csv" style="width:100%;">
+    </div>
+    <div id="csv-resultado" style="margin-bottom:1rem;"></div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+      <button id="modal-importar-cancelar" class="btn btn-secundario">Cancelar</button>
+      <button id="modal-importar-confirmar" class="btn btn-primario">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ JAVASCRIPT DO COFRE ═══════ -->
 <script>
 (function () {
   'use strict';
 
-  const elValor     = document.getElementById('pw-valor');
-  const elCopiar    = document.getElementById('pw-copiar');
-  const elCopiarTxt = document.getElementById('pw-copiar-txt');
-  const elGerar     = document.getElementById('pw-gerar');
-  const elForcaFill = document.getElementById('pw-forca-fill');
-  const elForcaLbl  = document.getElementById('pw-forca-label');
+  // ─── Helpers ───
+  async function obterCsrfToken() {
+    // Preferir a meta tag (já assinada e presente em todas as páginas): evita
+    // um pedido extra por cada acção e depende sempre da sessão da página.
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) return meta.content;
 
-  let modoActual = 'password';
-
-  // Tabs
-  document.querySelectorAll('[data-modo]').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('[data-modo]').forEach(t => {
-        t.classList.remove('activo');
-        t.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('activo');
-      tab.setAttribute('aria-selected', 'true');
-      modoActual = tab.dataset.modo;
-      document.querySelectorAll('.pw-painel').forEach(p => p.style.display = 'none');
-      document.getElementById('painel-' + modoActual).style.display = 'block';
-      gerar();
-    });
-  });
-
-  // Sliders
-  function bindSlider(sliderId, labelId) {
-    const sl = document.getElementById(sliderId);
-    const lb = document.getElementById(labelId);
-    sl.addEventListener('input', () => { lb.textContent = sl.value; gerar(); });
+    const r = await fetch('{{ url_for("passwords.api_csrf_token") }}');
+    const d = await r.json();
+    if (!d.csrfToken) throw new Error('Não foi possível obter o token CSRF.');
+    return d.csrfToken;
   }
-  bindSlider('sl-comprimento', 'val-comprimento');
-  bindSlider('sl-palavras',    'val-palavras');
-  bindSlider('sl-pin',         'val-pin');
 
-  // Toggles
-  ['tog-maiusculas','tog-minusculas','tog-numeros','tog-simbolos','tog-ambiguos']
-    .forEach(id => document.getElementById(id).addEventListener('change', gerar));
+  async function cofreFetch(endpoint, method, body) {
+    const token = await obterCsrfToken();
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': token },
+      credentials: 'include',
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch('{{ url_for("passwords.index", _external=false) }}/api/' + endpoint, opts);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.erro || 'Erro de servidor');
+    }
+    return r.json();
+  }
 
-  // Copiar
-  elCopiar.addEventListener('click', () => {
-    const txt = elValor.textContent.trim();
-    if (!txt || txt === '—') return;
-    navigator.clipboard.writeText(txt).then(() => {
-      elCopiarTxt.textContent = 'Copiado!';
-      elCopiar.style.color = 'var(--cor-sucesso)';
-      elCopiar.style.borderColor = 'var(--cor-sucesso)';
-      setTimeout(() => {
-        elCopiarTxt.textContent = 'Copiar';
-        elCopiar.style.color = '';
-        elCopiar.style.borderColor = '';
-      }, 1500);
-    });
+  // ─── Estado ───
+  let cofreActivado = false;
+  let cofreDesbloqueado = false;
+  let entradas = [];
+
+  // ─── Verificar estado do cofre ───
+  async function verificarEstado() {
+    try {
+      const d = await cofreFetch('cofre/estado', 'GET');
+      cofreActivado = d.activado;
+      cofreDesbloqueado = d.desbloqueado;
+      actualizarUI();
+    } catch {
+      cofreActivado = false;
+      cofreDesbloqueado = false;
+      actualizarUI();
+    }
+  }
+
+  function actualizarUI() {
+    const naoAct = document.getElementById('cofre-nao-activado');
+    const bloq = document.getElementById('cofre-bloqueado');
+    const desb = document.getElementById('cofre-desbloqueado');
+    const estado = document.getElementById('cofre-estado');
+
+    naoAct.style.display = 'none';
+    bloq.style.display = 'none';
+    desb.style.display = 'none';
+
+    if (cofreDesbloqueado) {
+      estado.innerHTML = '<span style="color:var(--cor-sucesso);font-size:.85rem;">✅ Cofre activo e desbloqueado</span>';
+      desb.style.display = 'block';
+      carregarEntradas();
+    } else if (cofreActivado) {
+      estado.innerHTML = '<span style="color:var(--cor-info);font-size:.85rem;">🔒 Cofre activado — bloqueou ou expirou</span>';
+      bloq.style.display = 'block';
+      document.getElementById('cofre-senha').value = '';
+      document.getElementById('cofre-senha').focus();
+    } else {
+      estado.innerHTML = '<span style="color:var(--cor-texto-suave);font-size:.85rem;">Cofre não activado</span>';
+      naoAct.style.display = 'block';
+    }
+  }
+
+  // ─── Activar cofre ───
+  document.getElementById('btn-activar').addEventListener('click', () => {
+    document.getElementById('modal-activar').style.display = 'flex';
+    document.getElementById('modal-activar-pw').focus();
   });
 
-  // Gerar
-  elGerar.addEventListener('click', gerar);
+  document.getElementById('modal-activar-cancelar').addEventListener('click', () => {
+    document.getElementById('modal-activar').style.display = 'none';
+  });
 
-  function gerar() {
-    elGerar.disabled = true;
-    elValor.textContent = '…';
+  document.getElementById('modal-activar-confirmar').addEventListener('click', async () => {
+    const pw = document.getElementById('modal-activar-pw').value;
+    const conf = document.getElementById('modal-activar-conf').value;
+    if (pw.length < 8) {
+      alert('A password mestra deve ter pelo menos 8 caracteres.');
+      return;
+    }
+    if (pw !== conf) {
+      alert('As passwords não coincidem.');
+      return;
+    }
+    try {
+      await cofreFetch('cofre/activar', 'POST', { password: pw, confirmacao: conf });
+      document.getElementById('modal-activar').style.display = 'none';
+      verificarEstado();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
 
-    let payload = { modo: modoActual };
+  // ─── Desbloquear cofre ───
+  document.getElementById('btn-desbloquear').addEventListener('click', async () => {
+    const pw = document.getElementById('cofre-senha').value;
+    if (!pw) return;
+    try {
+      await cofreFetch('cofre/desbloquear', 'POST', { password: pw });
+      verificarEstado();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
 
-    if (modoActual === 'password') {
-      payload.comprimento      = parseInt(document.getElementById('sl-comprimento').value);
-      payload.maiusculas       = document.getElementById('tog-maiusculas').checked;
-      payload.minusculas       = document.getElementById('tog-minusculas').checked;
-      payload.numeros          = document.getElementById('tog-numeros').checked;
-      payload.simbolos         = document.getElementById('tog-simbolos').checked;
-      payload.excluir_ambiguos = document.getElementById('tog-ambiguos').checked;
-    } else if (modoActual === 'passphrase') {
-      payload.num_palavras = parseInt(document.getElementById('sl-palavras').value);
-    } else {
-      payload.comprimento = parseInt(document.getElementById('sl-pin').value);
+  document.getElementById('cofre-senha').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-desbloquear').click();
+  });
+
+  // ─── Bloquear cofre ───
+  document.getElementById('btn-bloquear').addEventListener('click', async () => {
+    try {
+      await cofreFetch('cofre/bloquear', 'POST');
+      cofreDesbloqueado = false;
+      actualizarUI();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  // ─── Nova entrada ───
+  document.getElementById('btn-nova-entrada').addEventListener('click', () => {
+    document.getElementById('modal-nova-entrada').style.display = 'flex';
+    document.getElementById('modal-entrada-titulo').focus();
+  });
+
+  document.getElementById('modal-entrada-cancelar').addEventListener('click', () => {
+    document.getElementById('modal-nova-entrada').style.display = 'none';
+  });
+
+  document.getElementById('btn-gerar-entrada-pw').addEventListener('click', async () => {
+    try {
+      const d = await cofreFetch('gerar', 'POST', { modo: 'password', comprimento: 18 });
+      document.getElementById('modal-entrada-pw').value = d.valor;
+    } catch (e) {
+      alert('Erro ao gerar password');
+    }
+  });
+
+  document.getElementById('modal-entrada-guardar').addEventListener('click', async () => {
+    const titulo = document.getElementById('modal-entrada-titulo').value.trim();
+    const url = document.getElementById('modal-entrada-url').value.trim();
+    const username = document.getElementById('modal-entrada-user').value.trim();
+    const password = document.getElementById('modal-entrada-pw').value;
+    const notas = document.getElementById('modal-entrada-notas').value.trim();
+
+    if (!titulo || !password) {
+      alert('Título e password são obrigatórios.');
+      return;
     }
 
-    fetch('{{ url_for("passwords.api_gerar") }}', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': '{{ csrf_token() }}'   // ← adicionar esta linha
-      },
-      body: JSON.stringify(payload),
-    })
+    try {
+      await cofreFetch('cofre/entradas', 'POST', { titulo, url, username, password, notas, favorito: false });
+      document.getElementById('modal-nova-entrada').style.display = 'none';
+      limparModal('modal-nova-entrada');
+      carregarEntradas();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
 
-    .then(r => r.json())
-    .then(data => {
-      elValor.textContent = data.valor;
-      actualizarForca(data.forca_score, data.forca_label);
-    })
-    .catch(() => { elValor.textContent = 'Erro ao gerar'; })
-    .finally(() => { elGerar.disabled = false; });
+  // ─── Editar entrada ───
+  document.getElementById('modal-editar-cancelar').addEventListener('click', () => {
+    document.getElementById('modal-editar-entrada').style.display = 'none';
+  });
+
+  document.getElementById('btn-gerar-editar-pw').addEventListener('click', async () => {
+    try {
+      const d = await cofreFetch('gerar', 'POST', { modo: 'password', comprimento: 18 });
+      document.getElementById('modal-editar-pw').value = d.valor;
+    } catch (e) {
+      alert('Erro ao gerar password');
+    }
+  });
+
+  document.getElementById('modal-editar-guardar').addEventListener('click', async () => {
+    const id = parseInt(document.getElementById('modal-editar-id').value);
+    const titulo = document.getElementById('modal-editar-titulo').value.trim();
+    const url = document.getElementById('modal-editar-url').value.trim();
+    const username = document.getElementById('modal-editar-user').value.trim();
+    const password = document.getElementById('modal-editar-pw').value;
+    const favorito = document.getElementById('modal-editar-fav').checked;
+    const notas = document.getElementById('modal-editar-notas').value.trim();
+
+    if (!titulo) { alert('Título é obrigatório.'); return; }
+
+    try {
+      const body = { titulo, url, username, favorito, notas };
+      if (password) body.password = password;
+      await cofreFetch('cofre/entradas/' + id, 'PUT', body);
+      document.getElementById('modal-editar-entrada').style.display = 'none';
+      carregarEntradas();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  // ─── Apagar entrada ───
+  async function apagarEntrada(id) {
+    if (!confirm('Eliminar esta entrada?')) return;
+    try {
+      await cofreFetch('cofre/entradas/' + id, 'DELETE');
+      carregarEntradas();
+    } catch (e) {
+      alert(e.message);
+    }
   }
 
-  const coresForca = ['', '#ef4444', '#f97316', '#fbbf24', '#84cc16', '#10b981'];
-  function actualizarForca(score, label) {
-    elForcaFill.style.width   = (score * 20) + '%';
-    elForcaFill.style.background = coresForca[score] || 'transparent';
-    elForcaLbl.textContent = label;
+  // ─── Alterar password mestra ───
+  document.getElementById('btn-alterar-pw').addEventListener('click', () => {
+    document.getElementById('modal-alterar-pw').style.display = 'flex';
+    document.getElementById('modal-alterar-actual').focus();
+  });
+
+  document.getElementById('modal-alterar-cancelar').addEventListener('click', () => {
+    document.getElementById('modal-alterar-pw').style.display = 'none';
+  });
+
+  document.getElementById('modal-alterar-confirmar').addEventListener('click', async () => {
+    const actual = document.getElementById('modal-alterar-actual').value;
+    const nova = document.getElementById('modal-alterar-nova').value;
+    const conf = document.getElementById('modal-alterar-conf').value;
+
+    if (nova.length < 8) { alert('A nova password deve ter pelo menos 8 caracteres.'); return; }
+    if (nova !== conf) { alert('As passwords não coincidem.'); return; }
+
+    try {
+      await cofreFetch('cofre/alterar-password', 'POST', { password_actual: actual, nova_password: nova, confirmacao: conf });
+      document.getElementById('modal-alterar-pw').style.display = 'none';
+      alert('Password mestra alterada com sucesso.');
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  // ─── Importar CSV ───
+  document.getElementById('btn-importar-csv').addEventListener('click', () => {
+    document.getElementById('modal-importar-csv').style.display = 'flex';
+  });
+
+  document.getElementById('modal-importar-cancelar').addEventListener('click', () => {
+    document.getElementById('modal-importar-csv').style.display = 'none';
+  });
+
+  document.getElementById('modal-importar-confirmar').addEventListener('click', async () => {
+    const ficheiro = document.getElementById('csv-ficheiro').files[0];
+    if (!ficheiro) { alert('Seleciona um ficheiro CSV.'); return; }
+
+    const formData = new FormData();
+    formData.append('ficheiro', ficheiro);
+
+    try {
+      const token = await obterCsrfToken();
+      const r = await fetch('{{ url_for("passwords.index", _external=false) }}/api/cofre/importar-csv', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': token },
+        body: formData,
+        credentials: 'include',
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || 'Erro na importação');
+      document.getElementById('modal-importar-csv').style.display = 'none';
+      document.getElementById('csv-ficheiro').value = '';
+      carregarEntradas();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  // ─── Carregar entradas ───
+  async function carregarEntradas() {
+    try {
+      const urlParam = document.getElementById('cofre-busca').value.trim();
+      const q = urlParam ? '?url=' + encodeURIComponent(urlParam) : '';
+      const r = await fetch('{{ url_for("passwords.index", _external=false) }}/api/cofre/entradas' + q, {
+        headers: { 'X-CSRFToken': await obterCsrfToken() },
+        credentials: 'include',
+      });
+
+      // 401 = cofre bloqueado ou chave expirada (COFRE_SESSION_TIMEOUT):
+      // volta ao ecrã de desbloqueio em vez de falhar em silêncio e deixar
+      // a lista antiga no ecrã.
+      if (r.status === 401) { verificarEstado(); return; }
+
+      entradas = await r.json();
+      renderizarCofre();
+    } catch (e) {
+      console.error('Erro ao carregar entradas:', e);
+    }
   }
 
-  gerar();
+  // ─── Renderizar cofre ───
+  function renderizarCofre() {
+    const lista = document.getElementById('cofre-lista');
+    const vazio = document.getElementById('cofre-vazio');
+
+    if (entradas.length === 0) {
+      lista.innerHTML = '';
+      vazio.style.display = 'block';
+      return;
+    }
+
+    vazio.style.display = 'none';
+    lista.innerHTML = entradas.map(e => `
+      <div class="cartao" style="margin-bottom:.75rem;display:flex;align-items:center;gap:1rem;">
+        <div style="flex:1;min-width:0;">
+          <strong style="color:var(--cor-texto);">${esc(e.titulo)}</strong>
+          <div style="font-size:.8rem;color:var(--cor-texto-suave);">${esc(e.dominio || '—')} · ${esc(e.username || '—')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0;">
+          <button class="btn btn-secundario" style="padding:.3rem .5rem;font-size:.75rem;" onclick="copiarTexto('${esc(e.password || '')}',this)" title="Copiar password">📋</button>
+          <button class="btn btn-secundario" style="padding:.3rem .5rem;font-size:.75rem;" onclick="abrirEditar(${e.id})" title="Editar">✏️</button>
+          <button class="btn btn-secundario" style="padding:.3rem .5rem;font-size:.75rem;" onclick="apagarEntrada(${e.id})" title="Apagar">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ─── Funções globais para onclick ───
+  window.abrirEditar = (id) => {
+    const e = entradas.find(x => x.id === id);
+    if (!e) return;
+    document.getElementById('modal-editar-id').value = id;
+    document.getElementById('modal-editar-titulo').value = e.titulo || '';
+    document.getElementById('modal-editar-url').value = e.url || '';
+    document.getElementById('modal-editar-user').value = e.username || '';
+    document.getElementById('modal-editar-fav').checked = e.favorito;
+    document.getElementById('modal-editar-notas').value = e.notas || '';
+    document.getElementById('modal-editar-pw').value = '';
+    document.getElementById('modal-editar-entrada').style.display = 'flex';
+  };
+
+  window.apagarEntrada = async (id) => {
+    if (!confirm('Eliminar esta entrada?')) return;
+    try {
+      await cofreFetch('cofre/entradas/' + id, 'DELETE');
+      carregarEntradas();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  // ─── Copiar texto (global para onclick) ───
+  window.copiarTexto = (texto, btn) => {
+    navigator.clipboard.writeText(texto).then(() => {
+      btn.textContent = '✅';
+      setTimeout(() => { btn.textContent = '📋'; }, 1500);
+    });
+  };
+
+  // ─── Busca ───
+  let buscaTimeout;
+  document.getElementById('cofre-busca').addEventListener('input', () => {
+    clearTimeout(buscaTimeout);
+    buscaTimeout = setTimeout(carregarEntradas, 400);
+  });
+
+  // ─── Utilidades ───
+  function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function limparModal(id) {
+    document.querySelectorAll('#modal-nova-entrada input,#modal-nova-entrada textarea').forEach(el => el.value = '');
+  }
+
+  // ─── Gerador ───
+  let currentModo = 'password';
+
+  // Trocar tabs
+  document.querySelectorAll('[data-modo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentModo = btn.dataset.modo;
+      document.querySelectorAll('[data-modo]').forEach(b => {
+        b.classList.remove('activo');
+        b.setAttribute('aria-selected', 'false');
+      });
+      btn.classList.add('activo');
+      btn.setAttribute('aria-selected', 'true');
+      document.querySelectorAll('.pw-painel').forEach(p => p.style.display = 'none');
+      document.getElementById('painel-' + currentModo).style.display = 'block';
+    });
+  });
+
+  // Actualizar labels dos sliders
+  const slComprimento = document.getElementById('sl-comprimento');
+  const slPalavras = document.getElementById('sl-palavras');
+  const slPin = document.getElementById('sl-pin');
+  slComprimento.addEventListener('input', () => {
+    document.getElementById('val-comprimento').textContent = slComprimento.value;
+  });
+  slPalavras.addEventListener('input', () => {
+    document.getElementById('val-palavras').textContent = slPalavras.value;
+  });
+  slPin.addEventListener('input', () => {
+    document.getElementById('val-pin').textContent = slPin.value;
+  });
+
+  // Botão Gerar principal
+  document.getElementById('pw-gerar').addEventListener('click', async () => {
+    const btn = document.getElementById('pw-gerar');
+    btn.textContent = 'A gerar…';
+    btn.disabled = true;
+    try {
+      const params = { modo: currentModo };
+      if (currentModo === 'password') {
+        params.comprimento = parseInt(slComprimento.value);
+        params.maiusculas = document.getElementById('tog-maiusculas').checked;
+        params.minusculas = document.getElementById('tog-minusculas').checked;
+        params.numeros = document.getElementById('tog-numeros').checked;
+        params.simbolos = document.getElementById('tog-simbolos').checked;
+        params.excluir_ambiguos = document.getElementById('tog-ambiguos').checked;
+      } else if (currentModo === 'passphrase') {
+        params.num_palavras = parseInt(slPalavras.value);
+      } else if (currentModo === 'pin') {
+        params.comprimento = parseInt(slPin.value);
+      }
+      const d = await cofreFetch('gerar', 'POST', params);
+      document.getElementById('pw-valor').textContent = d.valor;
+      actualizarForca(d.valor);
+    } catch (e) {
+      document.getElementById('pw-valor').textContent = 'Erro';
+    } finally {
+      btn.textContent = 'Gerar';
+      btn.disabled = false;
+    }
+  });
+
+  // Copiar resultado do gerador
+  document.getElementById('pw-copiar').addEventListener('click', () => {
+    const valor = document.getElementById('pw-valor').textContent;
+    if (valor && valor !== '—') {
+      navigator.clipboard.writeText(valor).then(() => {
+        const txt = document.getElementById('pw-copiar-txt');
+        txt.textContent = 'Copiado!';
+        setTimeout(() => { txt.textContent = 'Copiar'; }, 1500);
+      });
+    }
+  });
+
+  function actualizarForca(senha) {
+    const fill = document.getElementById('pw-forca-fill');
+    const label = document.getElementById('pw-forca-label');
+    let forca = 0;
+    if (senha.length >= 8) forca += 20;
+    if (senha.length >= 12) forca += 15;
+    if (/[a-z]/.test(senha) && /[A-Z]/.test(senha)) forca += 15;
+    if (/\d/.test(senha)) forca += 15;
+    if (/[^a-zA-Z0-9]/.test(senha)) forca += 20;
+    forca = Math.min(100, forca);
+    fill.style.width = forca + '%';
+    fill.style.background = forca < 40 ? 'var(--cor-risco)' : forca < 70 ? 'var(--cor-alerta)' : 'var(--cor-sucesso)';
+    label.textContent = forca < 40 ? 'Fraca' : forca < 70 ? 'Média' : 'Forte';
+  }
+
+  // ─── Inicialização ───
+  verificarEstado();
 })();
 </script>
 {% endblock %}

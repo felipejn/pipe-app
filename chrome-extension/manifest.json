@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "PIPE Cofre — Password Manager",
+  "version": "1.0.0",
+  "description": "Gestor de passwords seguro com cofre encriptado. Captura passwords de sites e preenche automaticamente.",
+  "permissions": ["activeTab", "storage", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PIPE Cofre"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

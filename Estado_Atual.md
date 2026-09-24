@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.4.12
+# PIPE — Estado Actual do Projecto — v1.5.0
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -30,7 +30,7 @@ pipe-app/
 │   │   └── js/
 │   │       └── pipe.js      # JS base (alertas + alternância de tema claro/escuro)
 │   ├── templates/
-│   │   ├── base.html        # navbar + alternador de tema 🌙/☀️ + anti-FOUC + barra secundária «Voltar/Home» (oculta no dashboard)
+│   │   ├── base.html        # navbar + alternador de tema 🌙/☀️ + anti-FOUC + barra secundária «Voltar/Home» (oculta no dashboard) + meta `csrf-token` (cofre/extensão)
 │   │   ├── dashboard.html   # cards de módulos dinâmicos (Loja de Módulos)
 │   │   ├── auth/
 │   │   ├── euromilhoes/
@@ -98,11 +98,13 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # Nota, ItemChecklist, EtiquetaNota
 │   │   └── routes.py        # /notas/
-│   ├── passwords/           # Blueprint Passwords
+│   ├── passwords/           # Blueprint Passwords (gerador + cofre)
 │   │   ├── __init__.py
+│   │   ├── crypto.py        # AES-256-GCM + PBKDF2-SHA256 (600 000 it.) + bcrypt da password mestra
+│   │   ├── models.py        # CofreConfig, CofrePassword + extrair_dominio() (dedup por domínio)
 │   │   ├── wordlist.py      # lista PT ~200 palavras para passphrases
 │   │   ├── generator.py     # geração com secrets + cálculo de força por entropia
-│   │   └── routes.py        # /passwords/
+│   │   └── routes.py        # /passwords/ + /passwords/api/cofre/* + /passwords/api/csrf-token
 │   ├── cambio/              # Blueprint Câmbio
 │   │   ├── __init__.py
 │   │   ├── service.py       # MOEDAS + obter_taxa (Wise v3 + fallback, partilhado com Assistente IA)
@@ -129,6 +131,15 @@ pipe-app/
 │       ├── __init__.py
 │       ├── models.py        # modelo Evento
 │       └── routes.py        # /calendario/ + /calendario/api/eventos (CRUD)
+├── chrome-extension/        # extensão Chrome MV3 do Cofre (⚠️ icon48/icon128 em falta)
+│   ├── manifest.json        # MV3 — activeTab, storage, tabs; host_permissions <all_urls>
+│   ├── background.js        # service worker — API do PIPE + captura (origem configurável)
+│   ├── popup.html / popup.js # popup — estado, desbloquear, listar/preencher
+│   ├── content.js           # content script — captura apenas em forms de login
+│   └── README.md            # instalação, permissões e fluxo de uso
+├── docs/
+│   ├── plano-cofre-passwords.md  # plano de correcção do Cofre (mantido no repositório)
+│   └── historico/           # briefings e relatórios antigos
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
@@ -140,12 +151,18 @@ pipe-app/
 │   ├── remover_postos_ignorados.py  # limpeza dos postos em NOMES_IGNORADOS
 │   ├── reset_postos_combustiveis.py # reset das tabelas de postos/histórico
 │   ├── testar_assistente.py     # smoke test do Assistente IA contra a OpenRouter
+│   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
 │   └── verificar_resultados.py  # mantido para referência histórica
 ├── tests/
+│   ├── conftest.py                      # guarda-civil: bloqueia drop_all com BD de ficheiro
 │   ├── test_assistente_cliente.py       # OpenRouter: classificação de respostas e fallback
 │   ├── test_assistente_contexto.py      # orquestração do tool use
-│   └── test_assistente_combustiveis.py  # ferramenta get_combustiveis (v1.4.12)
+│   ├── test_assistente_combustiveis.py  # ferramenta get_combustiveis (v1.4.12)
+│   ├── test_cofre.py                    # Cofre: crypto, modelos, API, dedup, sessão/KDF
+│   └── test_isolamento_bd.py            # regressão do isolamento dos testes
 ├── instance/
+│   ├── backups/             # cópias de segurança (backup_bd.py)
+│   ├── flask_session/       # sessões server-side do cofre (Flask-Session)
 │   └── pipe.db              # SQLite (excluído do git)
 ├── .env
 ├── .env.example
@@ -194,9 +211,21 @@ pipe-app/
 - **Funcionalidades:** grelha de cartões, criação inline, texto livre e checklist, 8 cores (paleta Google Keep — claro + escuro, texto forçado a preto sobre cores claras para contraste), fixar/arquivar, etiquetas, busca em tempo real, toggle checklist no cartão
 
 ### Módulo Passwords (`app/passwords/`)
-- **Sem BD** — módulo totalmente stateless
-- **Modos:** Password (8–64 chars), Passphrase (3–10 palavras PT), PIN (4–12 dígitos)
-- **Funcionalidades:** barra de força por entropia, botão copiar, geração automática ao carregar
+- **Gerador (stateless):** modos Password (8–64 chars), Passphrase (3–10 palavras PT), PIN (4–12 dígitos); barra de força por entropia, botão copiar, geração automática ao carregar
+- **Cofre (com BD — `cofre_configs`, `cofre_passwords`):** AES-256-GCM com chave derivada por PBKDF2-SHA256 (`COFRE_KDF_ITERATIONS`, 600 000) da password mestra (verificação por bcrypt); a chave existe apenas em sessão server-side (Flask-Session filesystem em `instance/flask_session/`) e nunca no cookie; expira ao fim de `COFRE_SESSION_TIMEOUT` (900 s), bloqueando apenas o cofre — a sessão de login mantém-se; entradas deduplicadas por domínio normalizado (`extrair_dominio()`, única fonte de verdade) + username; importação do CSV do Chrome; todas as queries filtradas por `user_id` (anti-IDOR)
+- **API:** `/passwords/api/cofre/*` (estado, activar, desbloquear, bloquear, alterar-password, CRUD de entradas, importar-csv) e `GET /passwords/api/csrf-token`, que devolve o token CSRF **assinado** (usado pelo JS do cofre e pela extensão Chrome — nunca `session['csrf_token']`, que é o valor cru); CORS restrito por `COFRE_CORS_ORIGINS`
+- **Ficheiros:** `crypto.py` (cifra/decifra + KDF), `models.py` (`CofreConfig`, `CofrePassword`, `extrair_dominio()`), `routes.py` (gerador + API do cofre), `wordlist.py`/`generator.py` (gerador stateless)
+- **Extensão Chrome (MV3):** `chrome-extension/` — popup (estado, desbloquear, listar/preencher) e content script com heurística de captura (só forms de login); origem do servidor configurável em `chrome.storage.local.pipeOrigin` (default: PythonAnywhere) → detalhe na secção própria abaixo
+- ⚠️ **Deploy:** exige `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` para criar `cofre_configs`/`cofre_passwords` e `COFRE_CORS_ORIGINS` definido no `.env`; a pasta `instance/flask_session/` é criada automaticamente pelo Flask-Session
+
+### Extensão Chrome — Cofre (`chrome-extension/`) ← NOVO — v1.5.0
+- **Manifest V3**, 6 ficheiros (sem build step): `manifest.json`, `background.js`, `popup.html`, `popup.js`, `content.js`, `README.md`
+- **Permissões:** `activeTab`, `storage`, `tabs` + `host_permissions: <all_urls>`; **sem** permissão `scripting` — o preenchimento é feito com `chrome.tabs.sendMessage` para o content script
+- **`background.js` (service worker):** origem do PIPE em `PIPE_ORIGIN_DEFAULT = 'https://felipejn.pythonanywhere.com'`, sobreponível por `chrome.storage.local.pipeOrigin` (ex.: `http://127.0.0.1:5000` em desenvolvimento); obtém o token CSRF em `GET /passwords/api/csrf-token` e envia-o no header `X-CSRFToken`
+- **`popup.*`:** estado do cofre (activado/desbloqueado), desbloqueio com a password mestra, listagem das entradas do domínio do separador activo e preenchimento do form; com sessão em falta mostra link para `/auth/login`
+- **`content.js`:** heurística de captura — apenas forms de **login** (campo password + username/email); ignora registo e alteração de password e não actua no próprio PIPE (`pythonanywhere.com`)
+- **Configuração obrigatória no servidor:** `COFRE_CORS_ORIGINS=chrome-extension://<ID>` (sem isto o browser bloqueia os `fetch` por CORS) e, em produção, `SESSION_COOKIE_SAMESITE='None'` + `Secure=True` (o cookie de sessão tem de viajar em pedidos cross-site)
+- ⚠️ **Bloqueio conhecido:** o `manifest.json` declara `icon48.png` e `icon128.png`, que **não existem** na pasta — o Chrome assinala ícone em falta ao carregar a extensão e a barra de ferramentas fica sem ícone; é preciso gerar/copiar os dois ficheiros (os ícones PWA em `app/static/icons/` servem de base) ou remover a chave `icons` do manifest
 
 ### Módulo Câmbio (`app/cambio/`)
 - **Sem BD** — módulo stateless
@@ -362,9 +391,13 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 | Password hashing | Werkzeug `generate_password_hash` / `check_password_hash` | `app/auth/models.py` |
 | Controlo de acesso | `@login_required` e `@admin_required` | rotas protegidas |
 | Configuração IP PA | `X-Forwarded-For` no Limiter | `app/extensions.py` |
+| CORS do cofre | `COFRE_CORS_ORIGINS` (apenas `chrome-extension://<ID>`): a origem autorizada recebe `Access-Control-Allow-Origin` + `Allow-Credentials`; origem errada não recebe o header e o browser bloqueia o pedido | `app/__init__.py`, `config.py` |
+| Cookie de sessão cross-site (extensão Chrome) | `SameSite=None` + `Secure` em produção (obrigatório para os `fetch` a partir de `chrome-extension://`); `Lax` em desenvolvimento. Os POSTs continuam protegidos pelo token CSRF do Flask-WTF | `config.py`, `app/__init__.py` |
+| Sessão do cofre | chave AES só em Flask-Session server-side (`instance/flask_session/`); expira em `COFRE_SESSION_TIMEOUT` (900 s) bloqueando **apenas** o cofre, sem apagar a sessão de login | `app/passwords/routes.py` |
 
 ### Testes realizados
-- **Suite automatizada `pytest` — 42 testes** ✅ (22 anteriores + 20 novos em `tests/test_assistente_combustiveis.py`, v1.4.12)
+- **Suite automatizada `pytest` — 74 testes** ✅ (42 anteriores + 31 do Cofre em `tests/test_cofre.py` + 1 de regressão do isolamento em `tests/test_isolamento_bd.py`)
+- ⚠️ **Incidente 2026-09-23 — BD local apagada por uma corrida de `pytest`:** `tests/test_cofre.py` criava a app com a config real e chamava `db.drop_all()`; reescrever `SQLALCHEMY_DATABASE_URI` **depois** de `create_app()` não tem efeito (o engine é fixado em `db.init_app()`), pelo que o `drop_all()` correu contra `instance/pipe.db` e apagou as 21 tabelas. Corrigido: os testes usam `create_app('testing')` (SQLite em memória + sessões em pasta temporária) e `tests/conftest.py` bloqueia `db.drop_all()` com BD de ficheiro. Dados locais perdidos (schema recriado; conta recriada com `scripts/criar_admin.py`, que agora define `is_admin=True`). Validação: `sha256` de `instance/pipe.db` inalterado antes/depois de duas corridas completas
 - Login e registo ✅
 - Dashboard com cards de módulos ✅
 - Módulo Loja de Módulos — activar/desactivar módulos ✅
@@ -379,6 +412,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - `pipe_tasks.py` com módulo Tarefas ✅
 - Módulo Notas completo ✅
 - Módulo Passwords completo ✅
+- **Cofre de Passwords — ciclo completo** ✅ (activar, desbloquear, criar/editar/apagar entradas, alterar password mestra, dedup por domínio normalizado, dedup na importação do CSV do Chrome, bloqueio por inactividade e isolamento entre utilizadores; 31 testes em `tests/test_cofre.py`) + 1 teste de regressão do isolamento de BD (`tests/test_isolamento_bd.py`)
 - Módulo Câmbio — conversão EUR → BRL ✅
 - **Assistente IA — conversão de moeda (`get_cambio`)** ✅ (Wise + fallback, validado com smoke test real EUR→USD)
 - **Assistente IA — preços de combustíveis (`get_combustiveis`)** ✅ (v1.4.12; filtros por combustível/concelho, modo mais-barato, isolamento por concelhos do utilizador, comparação insensível a acentos; validado com smoke real + OpenRouter)
@@ -411,6 +445,8 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 - **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às 08:00 ✅
 - **Módulo Combustíveis — reset das tabelas (colunas `ativo`/`ciclos_ausente`) pendente no PA** ⚠️
 - **Módulo Calendário — deploy e migração de BD pendentes** ⚠️
+- **Cofre de Passwords — deploy pendente no PA** ⚠️ — `pip install -r requirements.txt` (4 dependências novas: Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` para `cofre_configs`/`cofre_passwords`, `COFRE_CORS_ORIGINS` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` em produção
+- **Extensão Chrome do Cofre — ícones em falta** ⚠️ — o `manifest.json` declara `icon48.png`/`icon128.png` que não existem na pasta `chrome-extension/`
 
 ### Configuração WSGI
 ```python
@@ -437,6 +473,7 @@ MAILJET_API_SECRET=...
 MAILJET_FROM_EMAIL=...
 WISE_API_KEY=...
 APIABERTA_API_KEY=...
+COFRE_CORS_ORIGINS=chrome-extension://<ID da extensão>
 ```
 
 ### Migrações de BD executadas
@@ -444,10 +481,11 @@ APIABERTA_API_KEY=...
 - `scripts/migrar_notificada_em.py` ✅
 - Módulo Notas — tabelas criadas por `db.create_all()` ✅
 - Módulo Loja — tabela `user_modulos` criada por `db.create_all()` ✅
-- Módulo Passwords — sem BD ✅
+- Módulo Passwords — cofre: tabelas `cofre_configs` e `cofre_passwords` criadas por `db.create_all()` **localmente** ✅ — a criar no PA no primeiro reload após o deploy ⚠️
 - **Módulo Calendário — tabela `evento` a criar no PA após deploy** ⚠️
 - **Módulo Combustíveis — 4 tabelas** (`combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao`) criadas por `db.create_all()` no primeiro reload; modelo `UtilizadorCombustivel` adicionado ao import de `db.create_all()` em `app/__init__.py` ✅
 - **Módulo Combustíveis — arquivamento de postos (v1.3.2)** ⚠️ no PA — `python scripts/reset_postos_combustiveis.py` (drop das tabelas de postos/histórico + `db.create_all()` + repovoamento; cria as colunas `ativo`/`ciclos_ausente` que o `create_all()` sozinho não acrescenta a uma BD existente)
+- **Cópia de segurança da BD:** `python scripts/backup_bd.py` copia `instance/pipe.db` para `instance/backups/pipe-AAAAMMDD-HHMMSS.db` (mantém as últimas 10). Correr antes de operações de risco (reset de tabelas, migrações manuais); pode ser agendado no PA
 - **Módulo Combustíveis — blocklist de postos obsoletos (v1.3.3)** ⚠️ no PA — `python scripts/remover_postos_ignorados.py` (apaga os postos de `services.NOMES_IGNORADOS` e o respectivo histórico; idempotente, pode correr antes ou depois do reset)
 
 ### Comando de migração do Calendário (executar no PA após deploy)
@@ -490,6 +528,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
+**Versão v1.5.0** — Cofre de passwords com extensão Chrome. O módulo Passwords deixou de ser stateless: novas tabelas `cofre_configs` + `cofre_passwords` e novo `app/passwords/crypto.py` (AES-256-GCM; chave de 32 bytes derivada por PBKDF2-SHA256 com `COFRE_KDF_ITERATIONS` = 600 000 a partir da password mestra, cuja verificação é feita por bcrypt). A chave **nunca** entra no cookie: vive apenas em Flask-Session server-side (`SESSION_TYPE='filesystem'`, `instance/flask_session/`) e expira em `COFRE_SESSION_TIMEOUT` = 900 s — a expiração faz `session.pop` apenas das chaves do cofre (nunca `session.clear()`), pelo que bloqueia o cofre sem deslogar o utilizador. API em `/passwords/api/cofre/*` (estado, activar, desbloquear, bloquear, alterar-password, CRUD de entradas e importação do CSV do Chrome), sempre filtrada por `user_id` (anti-IDOR) e com deduplicação por domínio normalizado (`extrair_dominio()` em `models.py`, única fonte de verdade) + username. Novo `GET /passwords/api/csrf-token`, que devolve o token **assinado** (`generate_csrf()`) para o JS do cofre e para a extensão — o valor cru de `session['csrf_token']` não é utilizável; o `base.html` passou a expor o token por `<meta name="csrf-token">`. Segurança cross-site: CORS restrito por `COFRE_CORS_ORIGINS` (lista de `chrome-extension://<ID>`) em `app/__init__.py` e, em produção, `SESSION_COOKIE_SAMESITE='None'` + `Secure=True` (obrigatório para os `fetch` da extensão; em desenvolvimento mantém-se `Lax`/sem HTTPS). Extensão Chrome MV3 em `chrome-extension/` (manifest, service worker, popup e content script com heurística de captura só em forms de login; origem configurável em `chrome.storage.local.pipeOrigin`, default PythonAnywhere) — **os ícones declarados no manifest ainda não existem na pasta**. O plano de correcção que guiou a implementação fica em `docs/plano-cofre-passwords.md`, mantido no repositório. Incidente e correcção: uma corrida de `pytest` apagou `instance/pipe.db` porque o teste reescrevia `SQLALCHEMY_DATABASE_URI` **depois** de `create_app()` (o engine fica fixado em `db.init_app()`); o `TestingConfig` passou a definir tudo o que é lido em `create_app()` (SQLite em memória + `SESSION_FILE_DIR` temporário), `tests/conftest.py` bloqueia `db.drop_all()` com BD de ficheiro e `tests/test_isolamento_bd.py` é a regressão — `sha256` da BD verificado inalterado em duas corridas completas. `scripts/criar_admin.py` passa a criar o utilizador com `is_admin=True` (sem isso ficava-se sem acesso à área de admin e sem forma de gerar convites). Novo `scripts/backup_bd.py` (cópias em `instance/backups/`, mantém as últimas 10). **Suite: 74 testes `pytest` a passar** (eram 42). **Alteração de BD** — no PA é preciso `pip install -r requirements.txt`, `db.create_all()` (cria as duas tabelas do cofre no primeiro reload) e `COFRE_CORS_ORIGINS` no `.env`.
+
 **Versão v1.4.15** — limites de caracteres no histórico do Assistente IA. Adicionados dois tectos de caracteres ao histórico de sessão para evitar que o histórico ocupe demasiada memória: `MAX_CHARS_POR_MENSAGEM = 3000` (cada mensagem guardada é truncada a 3000 chars) e `MAX_CHARS_HISTORICO_TOTAL = 8000` (orçamento total do histórico em sessão, com remoção automática das mensagens antigas quando excedido). Adicionado `max_tokens: 1000` ao payload da chamada à OpenRouter para limitar a geração do modelo. Criadas as funções auxiliares `_truncar_listas()`, `_serializar_resultado_tool()`, `_limpar_historico()` e `_tamanho_historico()` em `contexto.py`, com corte estrutural de listas (evita JSON inválido) e tecto final de 2000 chars no JSON dos tool results — o corte só afeta o que fica guardado para os próximos pedidos, nunca a resposta actual. A `_limpar_historico()` passou a fazer 3 cortes sucessivos (por mensagem, por remoção antiga, por orçamento total). Sem alteração de BD.
 
 **Versão v1.4.12** — Assistente IA com acesso aos preços de combustíveis e mensagem inicial curta. O módulo Combustíveis era o único módulo com BD sem ferramenta de consulta no assistente (mesma lacuna que o Calendário em v1.4.5 e o Câmbio em v1.4.7). Nova ferramenta de leitura `get_combustiveis` (`ferramentas.py`) que delega em `combustiveis_services.obter_precos_para_concelhos` e filtra sempre pelos concelhos/combustíveis escolhidos pelo utilizador — os `Posto` são globais e sem `user_id`, pelo que este é o único mecanismo de isolamento. Suporta filtros por combustível e concelho, modo `apenas_mais_barato` (card 🏆) e limite de resultados; a comparação de nomes é insensível a acentos e caixa (o modelo escreve "gasoleo simples"). A resposta inclui sempre a frescura da recolha, para o modelo não apresentar preços antigos como actuais. `get_resumo_geral` passa a incluir combustíveis; os dois system prompts foram actualizados. A mensagem de boas-vindas do chat passou de 9 linhas para 3 (saudação + modo + "Em que posso ajudar?"), com as capacidades no subtítulo do cabeçalho. Novo `tests/test_assistente_combustiveis.py` (20 testes) e `TestingConfig` em `config.py`: 42 testes a passar (eram 22). Validação: smoke directo contra a BD real (Vila Verde, mais barato `PD VILA VERDE` a 2,113 €/L) e smoke de ponta a ponta contra a OpenRouter, incluindo o caminho de erro (concelho não configurado). **Sem alteração de BD** — não é necessário correr nenhum script no PythonAnywhere.
@@ -530,6 +570,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 - **Combustíveis — duplicados na própria API:** "E.S. FERREIROS" (id `66475`, EN 14, Ferreiros) vs "Posto Ferreiros- ESO305" (id `95233`, Rua Cidade do Porto, Braga) e os quatro "Santos da Cunha 6 - Logística e Transportes, Lda." vêm **todos** da API Aberta, com ids e moradas diferentes — não são registos congelados, pelo que o arquivamento automático não os remove (chegam em todas as recolhas com `ciclos_ausente=0`). Só uma heurística de deduplicação por morada+concelho, ou arquivamento manual, os resolve
 - **Combustíveis — follow-up opcional:** ✅ resolvido em v1.4.10 — `obter_tipos_combustivel_disponiveis` agora exclui, via `obter_ids_postos_obsoletos()`, não só postos arquivados como também os obsoletos (dados DGEG congelados, caso do DJB), mantendo o dropdown alinhado ao dashboard
 - **Módulos futuros:** arquitectura pronta — versão 1.x
+- **Cofre — deploy no PA:** ⚠️ pendente — `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` das tabelas do cofre, `COFRE_CORS_ORIGINS` no `.env` e Reload; correr `python scripts/backup_bd.py` antes
+- **Cofre — extensão Chrome:** ⚠️ pendente — faltam `icon48.png`/`icon128.png` (declarados no `manifest.json`) e o teste de ponta a ponta em produção (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS (403 para origin errado) e que a chave do cofre **não** aparece nos cookies do browser
 
 ---
 
@@ -545,6 +587,9 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 4. Deploy do Calendário no PythonAnywhere
 5. Migração da tabela `evento` no PA
 6. Testar notificações do Calendário em produção
+7. **Cofre de Passwords — deploy no PythonAnywhere:** `pip install -r requirements.txt`, `db.create_all()` (cria `cofre_configs`/`cofre_passwords`), `COFRE_CORS_ORIGINS=chrome-extension://<ID>` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção e correr `python scripts/backup_bd.py` antes
+8. **Extensão Chrome do Cofre:** gerar/copiar `icon48.png` e `icon128.png` (declarados no manifest, ausentes na pasta), instalar via «Load unpacked», anotar o ID da extensão e colocá-lo em `COFRE_CORS_ORIGINS`
+9. **Cofre — smoke manual de ponta a ponta em produção:** activar → criar → editar → apagar → alterar password mestra → esperar expiração (900 s) e confirmar que só o cofre bloqueia (a sessão de login mantém-se) → desbloquear pela extensão e preencher um form de login
 
 ---
 
@@ -554,6 +599,10 @@ Flask==3.0.3
 Flask-Login==0.6.3
 Flask-WTF==1.2.1
 Flask-SQLAlchemy==3.1.1
+Flask-Session==0.5.0
+flask-cors==5.0.0
+cryptography==43.0.1
+bcrypt==4.2.0
 Werkzeug==3.0.3
 WTForms==3.1.2
 python-dotenv==1.0.1
@@ -562,6 +611,7 @@ email-validator==2.2.0
 pyotp==2.9.0
 qrcode==7.4.2
 pillow==10.4.0
+pillow-heif==0.21.0
 Flask-Limiter==3.8.0
 ```
 
@@ -577,3 +627,5 @@ Flask-Limiter==3.8.0
 - Rate limiting: Flask-Limiter com `X-Forwarded-For` para PythonAnywhere
 - Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`
 - Login event logging: tentativas falhadas registadas com username e IP via `app.logger.warning`
+- Cofre de Passwords: AES-256-GCM (chave derivada por PBKDF2-SHA256, 600 000 iterações) + bcrypt para a password mestra; a chave existe apenas em sessão server-side (Flask-Session) — nunca no cookie do browser
+- Extensão Chrome (MV3) do Cofre: CORS restrito a `chrome-extension://<ID>` (`COFRE_CORS_ORIGINS`) e cookie de sessão `SameSite=None` + `Secure` em produção; planos e briefings antigos em `docs/` (o plano do Cofre mantém-se no repositório)
