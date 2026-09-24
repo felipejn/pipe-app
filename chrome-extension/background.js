@@ -56,10 +56,25 @@ async function apiFetch(endpoint, method = 'GET', body = null) {
 
   const res = await fetch(base + '/api/' + endpoint, opts);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.erro || 'Erro de servidor');
+    const dados = await res.json().catch(() => ({}));
+    // O status e o corpo ficam no erro: o popup precisa do 409 ("já existe",
+    // com o id da entrada) para oferecer actualizar em vez de só mostrar falha.
+    const erro = new Error(dados.erro || 'Erro de servidor (' + res.status + ')');
+    erro.status = res.status;
+    erro.dados = dados;
+    throw erro;
   }
   return res.json();
+}
+
+// ─── Resposta de erro normalizada para o popup ───
+function respostaErro(e) {
+  return {
+    success: false,
+    error: e && e.message ? e.message : 'Erro desconhecido',
+    status: (e && e.status) || 0,
+    dados: (e && e.dados) || null,
+  };
 }
 
 // ─── Message Handler ───
@@ -68,7 +83,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'GET_ENTRIES':
       apiFetch('cofre/entradas?url=' + encodeURIComponent(msg.url), 'GET')
         .then(d => sendResponse({ success: true, entries: d }))
-        .catch(e => sendResponse({ success: false, error: e.message }));
+        .catch(e => sendResponse(respostaErro(e)));
       return true;
 
     case 'GET_ENTRIES_BY_TAB':
@@ -80,31 +95,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         apiFetch('cofre/entradas?url=' + encodeURIComponent(tab.url), 'GET')
           .then(d => sendResponse({ success: true, entries: d, url: tab.url }))
-          .catch(e => sendResponse({ success: false, error: e.message }));
+          .catch(e => sendResponse(respostaErro(e)));
       });
       return true;
 
     case 'UNLOCK':
       apiFetch('cofre/desbloquear', 'POST', { password: msg.password })
         .then(d => sendResponse({ success: true }))
-        .catch(e => sendResponse({ success: false, error: e.message }));
+        .catch(e => sendResponse(respostaErro(e)));
       return true;
 
     case 'SAVE_ENTRY':
       apiFetch('cofre/entradas', 'POST', msg.entry)
         .then(d => sendResponse({ success: true, id: d.id }))
-        .catch(e => sendResponse({ success: false, error: e.message }));
+        .catch(e => sendResponse(respostaErro(e)));
+      return true;
+
+    case 'UPDATE_ENTRY':
+      // Actualizar a entrada existente (usado quando o POST devolve 409)
+      apiFetch('cofre/entradas/' + msg.id, 'PUT', msg.entry)
+        .then(d => sendResponse({ success: true }))
+        .catch(e => sendResponse(respostaErro(e)));
       return true;
 
     case 'GET_STATE':
       apiFetch('cofre/estado', 'GET')
         .then(d => sendResponse({ success: true, state: d }))
-        .catch(e => sendResponse({ success: false, error: e.message }));
+        .catch(e => sendResponse(respostaErro(e)));
       return true;
 
     case 'FORM_CAPTURE':
-      // Guarda a captura pendente no session storage para o popup ler
-      chrome.storage.local.set({ pendingCapture: msg.data });
+      // Guarda a captura pendente no storage local. O `ts` é usado pelo popup
+      // para expirar capturas antigas (COFRE_SESSION_TIMEOUT do lado do cofre).
+      chrome.storage.local.set({
+        pendingCapture: Object.assign({}, msg.data, { ts: Date.now() })
+      });
       chrome.action.setBadgeText({ text: '📝' });
       setTimeout(() => {
         chrome.action.setBadgeText({ text: '' });

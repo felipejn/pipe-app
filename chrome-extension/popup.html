@@ -36,6 +36,10 @@
     .status-locked { background: #fff3cd; color: #664d03; }
     .status-unlocked { background: #d4edda; color: #155724; }
     .status-not-set { background: #e2e3e5; color: #383d41; }
+    .status-erro { background: #f8d7da; color: #842029; }
+    .status-ok { background: #d4edda; color: #155724; }
+    #mensagem { display: none; }
+    .nota { font-size: 11px; color: #6c757d; padding: 4px 0; }
     #entries-list { max-height: 300px; overflow-y: auto; }
     .entry-item {
       display: flex; justify-content: space-between; align-items: center;
@@ -55,6 +59,9 @@
   </style>
 </head>
 <body>
+  <!-- Zona de mensagens fora do #state-container: sobrevive a cada re-render -->
+  <div id="mensagem" class="status"></div>
+
   <div id="state-container"></div>
 
   <script src="popup.js"></script>

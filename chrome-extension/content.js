@@ -5,10 +5,37 @@
 (function () {
   'use strict';
 
-  // ─── Ignorar se PAGE é PIPE (evitar loop) ───
-  if (window.location.hostname.includes('pythonanywhere.com') &&
-      window.location.pathname.includes('/passwords/')) {
-    return;
+  // ─── Ignorar as páginas do próprio PIPE ───
+  // Sem isto a extensão captura as credenciais do PIPE (login em /auth/login)
+  // e o popup fica para sempre com uma captura pendente do próprio Pipe.
+  const PIPE_ORIGEM_DEFAULT = 'https://felipejn.pythonanywhere.com';
+  let pipeOrigin = PIPE_ORIGEM_DEFAULT;
+
+  // Origem configurada (chrome.storage.local.pipeOrigin) — lida em paralelo; o
+  // submit só acontece muito depois desta leitura resolver.
+  try {
+    chrome.storage.local.get('pipeOrigin', (r) => {
+      if (r && r.pipeOrigin) pipeOrigin = String(r.pipeOrigin).replace(/\/+$/, '');
+    });
+  } catch (e) {
+    // storage indisponível — fica só o default
+  }
+
+  function ehPaginaDoPipe(url) {
+    try {
+      const u = new URL(url);
+      if (u.href.startsWith(pipeOrigin) || u.href.startsWith(PIPE_ORIGEM_DEFAULT)) {
+        return true;
+      }
+      // Servidor local (qualquer porta) nas rotas da própria app
+      if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+        return /^\/(auth|passwords)(\/|$)/.test(u.pathname);
+      }
+    } catch (e) {
+      // URL inválida (about:, chrome:, …) — não capturar
+      return true;
+    }
+    return false;
   }
 
   // ─── Verificar se o form é de registo ───
@@ -50,6 +77,8 @@
 
   // ─── Listener de submit (delegation) ───
   document.addEventListener('submit', (e) => {
+    if (ehPaginaDoPipe(window.location.href)) return;
+
     const form = e.target.closest('form');
     if (!form) return;
 

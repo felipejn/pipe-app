@@ -360,6 +360,49 @@ class TestFluxoEntradas:
         assert c.delete(f'/passwords/api/cofre/entradas/{entrada_id}').status_code == 200
         assert c.get('/passwords/api/cofre/entradas').get_json() == []
 
+    def test_duplicado_devolve_id_e_actualiza_pela_extensao(self, authenticated_client):
+        """Fluxo da extensão quando o login capturado já existe no cofre.
+
+        Regressão: o POST devolvia 409 **sem o `id`** da entrada existente, pelo
+        que o popup só conseguia mostrar o erro — a captura ficava pendente para
+        sempre e não havia caminho para actualizar a password guardada. Foi o que
+        aconteceu a guardar as credenciais do próprio PIPE (`127.0.0.1`): todas
+        as tentativas seguintes do mesmo domínio + username davam 409.
+        """
+        c = authenticated_client
+        assert c.post('/passwords/api/cofre/activar',
+                      json={'password': 'master1234',
+                            'confirmacao': 'master1234'}).status_code == 200
+
+        entrada = {
+            'titulo': '127.0.0.1:5000/auth/login',
+            'url': 'http://127.0.0.1:5000/auth/login',
+            'username': 'felipejn',
+            'password': 'antiga123',
+        }
+        assert c.post('/passwords/api/cofre/entradas', json=entrada).status_code == 200
+
+        # 2ª captura do mesmo domínio + username → 409 com o id da existente
+        r = c.post('/passwords/api/cofre/entradas',
+                   json=dict(entrada, password='nova456'))
+        assert r.status_code == 409
+        corpo = r.get_json()
+        assert corpo['id'] == c.get('/passwords/api/cofre/entradas').get_json()[0]['id']
+        assert corpo['dominio'] == '127.0.0.1'
+        assert corpo['username'] == 'felipejn'
+
+        # O popup usa esse id para actualizar (PUT) em vez de falhar
+        r = c.put(f"/passwords/api/cofre/entradas/{corpo['id']}", json={
+            'url': entrada['url'],
+            'username': 'felipejn',
+            'password': 'nova456',
+        })
+        assert r.status_code == 200, r.get_data(as_text=True)
+
+        guardadas = c.get('/passwords/api/cofre/entradas').get_json()
+        assert len(guardadas) == 1, 'actualizar não pode criar uma segunda entrada'
+        assert guardadas[0]['password'] == 'nova456'
+
 
 # ═══════ SESSÃO E CHAVE DO COFRE ═══════
 

@@ -256,7 +256,15 @@ def api_criar_entrada():
         user_id=current_user.id, dominio=dominio, username=username
     ).first()
     if existente:
-        return jsonify({'erro': 'Já existe uma entrada com o mesmo domínio e username.'}), 409
+        # O `id` vai na resposta para a extensão poder oferecer "actualizar a
+        # entrada existente" em vez de falhar sem alternativa (era o que
+        # acontecia: o popup só mostrava o erro e a captura ficava pendente).
+        return jsonify({
+            'erro': 'Já existe uma entrada com o mesmo domínio e username.',
+            'id': existente.id,
+            'dominio': existente.dominio,
+            'username': existente.username,
+        }), 409
 
     ct, iv, tag = cifrar(chave, password)
     entrada = CofrePassword(

@@ -25,21 +25,25 @@
 
 ## Fluxo de uso
 
-1. Inicia sessão no PIPE (`https://felipejn.pythonanywhere.com`)
+1. Inicia sessão no PIPE (`https://felipejn.pythonanywhere.com`, ou o servidor local configurado em `chrome.storage.local.pipeOrigin`)
 2. Activa o cofre na página de Passwords
 3. Clica no ícone da extensão → desbloqueia com password mestra
-4. Visita um site com login → o popup mostra as entradas guardadas
-5. Ao submeter um form de login, a extensão pergunta se queres guardar
+4. Visita um site com login → o popup mostra as entradas guardadas desse domínio
+5. Ao submeter um form de login, a extensão pergunta se queres guardar — **sabendo que a captura só é oferecida no site onde foi feita** (noutros sites aparece só como nota) e que expira ao fim de 15 minutos
+6. Se o domínio + utilizador já existir, o popup mostra «Já existe uma entrada» e oferece **Actualizar entrada** (o `POST /passwords/api/cofre/entradas` devolve 409 com o `id` da existente)
+7. Erros e confirmações aparecem **dentro do popup** (`#mensagem`) — o popup não usa `alert()`
+8. A extensão **não captura no próprio PIPE** (produção, `pipeOrigin` e rotas `/auth`|`/passwords` em `localhost`/`127.0.0.1`)
 
 ## Ficheiros
 
 | Ficheiro | Função |
 |---|---|
-| `manifest.json` | Configuração Manifest V3 |
-| `background.js` | Service worker — API calls e captura |
-| `popup.html` | Interface do popup |
-| `popup.js` | Lógica do popup |
-| `content.js` | Content script — captura de forms |
+| `manifest.json` | Configuração Manifest V3 (versão 1.0.1) |
+| `background.js` | Service worker — API calls, CSRF e captura |
+| `popup.html` | Interface do popup (inclui zona `#mensagem`) |
+| `popup.js` | Lógica do popup (estado, captura, guardar/actualizar) |
+| `content.js` | Content script — captura de forms (ignora o PIPE) |
+| `icon48.png` / `icon128.png` | Ícones gerados por `scripts/gerar_icones_extensao.py` |
 
 ## Segurança
 

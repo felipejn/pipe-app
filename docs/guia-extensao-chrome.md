@@ -16,7 +16,7 @@ Para o detalhe técnico ver `chrome-extension/README.md` e `docs/plano-cofre-pas
 | Conta no PIPE com sessão iniciada | https://felipejn.pythonanywhere.com/auth/login |
 | Cofre activado com password mestra | https://felipejn.pythonanywhere.com/passwords/ |
 | Acesso ao `.env` do servidor | PythonAnywhere (produção) ou `.env` local |
-| Os ícones `icon48.png` / `icon128.png` | Passo 2 ⚠️ |
+| Os ícones `icon48.png` / `icon128.png` | Já incluídos na pasta (Passo 2 só se faltarem) |
 
 > **Regra de ouro:** a extensão só consegue falar com o servidor se este a autorizar por CORS (`COFRE_CORS_ORIGINS`). Sem isso o popup mostra erro de rede/CORS — Passos 4 e 5.
 
@@ -34,9 +34,9 @@ Para o detalhe técnico ver `chrome-extension/README.md` e `docs/plano-cofre-pas
 
 ---
 
-## Passo 2 — Criar os ícones que faltam ⚠️
+## Passo 2 — Ícones (só se faltarem)
 
-O `manifest.json` declara `icon48.png` e `icon128.png`, mas esses ficheiros ainda não existem na pasta `chrome-extension/` — o Chrome assinala ícone em falta ao carregar a extensão. Escolhe **uma** das opções:
+Os ícones `icon48.png` e `icon128.png` estão **já incluídos** na pasta `chrome-extension/` (gerados por `scripts/gerar_icones_extensao.py`). Se existirem, **salta este passo**. Se faltarem, escolhe **uma** das opções:
 
 **Opção A (recomendada) — gerar os ícones** na raiz do projecto, com o venv activo:
 ```bash
@@ -101,10 +101,13 @@ A extensão faz pedidos a partir de `chrome-extension://`, que o Chrome consider
 ## Passo 7 — Usar
 
 1. Com a sessão do PIPE iniciada neste Chrome, clica no ícone **PIPE Cofre**.
-2. O popup mostra **Cofre bloqueado** → escreve a password mestra → **Desbloquear** (fica desbloqueado 15 minutos — `COFRE_SESSION_TIMEOUT`).
-3. Abre o site onde tens conta → clica no ícone → o popup lista as entradas guardadas desse domínio → **📋** copia a password.
-4. Ao submeteres um form de login, a extensão captura os dados (aparece um 📝 no ícone) e o popup pergunta «Guardar para *&lt;utilizador&gt;*?» → **Guardar**.
-5. Só forms de **login** são capturados — registos e alterações de password são ignorados, e a extensão ignora o próprio PIPE.
+2. O popup mostra **Cofre bloqueado** → escreve a password mestra → **Desbloquear** (fica desbloqueado 15 minutos — `COFRE_SESSION_TIMEOUT`). Erros aparecem dentro do popup (não há janelas/`alert`).
+3. Abre o site onde tens conta → clica no ícone → o popup lista as entradas guardadas desse domínio → **📋** copia a password («Password copiada.» aparece no topo do popup).
+4. Ao submeteres um form de login, a extensão captura os dados (aparece um 📝 no ícone) e o popup — **só quando estás no site da captura** — pergunta «Guardar para *&lt;utilizador&gt;*?» → **Guardar**.
+5. **Se já existir uma entrada** para esse domínio + utilizador, o popup não falha: mostra «Já existe uma entrada» e o botão **Actualizar entrada**, que grava a password capturada por cima da antiga.
+6. Só forms de **login** são capturados — registos e alterações de password são ignorados, e a extensão **não captura no próprio PIPE** (produção nem servidor local) para não guardar as credenciais do PIPE em si.
+7. Botões do popup: **↻ Actualizar lista** recarrega as entradas do site actual; **Não** descarta a captura pendente. Uma captura feita noutro site aparece só como nota («Abre esse site para o guardar») — nunca fica pendente para sempre: expira ao fim de 15 minutos.
+8. Em separadores que não são sites (`chrome://`, ficheiros, …) o popup diz «Este separador não é um site» — não há entradas a mostrar.
 
 ---
 
@@ -136,7 +139,7 @@ chrome.storage.local.remove('pipeOrigin')
 |---|---|---|
 | Servidor noutra porta (5000 ocupada) | a extensão fala com o sítio errado | usar a mesma porta no `pipeOrigin` |
 | `FLASK_ENV=production` no `.env` local | cookie `Secure` sobre HTTP → «Sem sessão» | manter `development` |
-| Link «Iniciar sessão» do popup | está fixo para o PythonAnywhere | abrir o login directamente em `http://127.0.0.1:5000/auth/login` |
+| Link «Iniciar sessão» do popup | segue o `pipeOrigin` configurado | já resolvido em v1.5.1 — abrir directamente em `http://127.0.0.1:5000/auth/login` se a extensão estiver apontada ao local |
 | Bloqueio de cookies de terceiros | o cookie não viaja (Passo 6) | permitir cookies para o site, ou HTTPS + `SameSite=None` |
 | Não captura o login | o content script só roda em páginas carregadas após o reload | recarregar a aba do site de teste |
 
@@ -160,8 +163,10 @@ chrome.storage.local.remove('pipeOrigin')
 | «Cofre não activado» | o cofre nunca foi activado (o cofre é **por utilizador**) | Passo 1 |
 | «Cofre bloqueado» | passaram 15 minutos desde o desbloqueio | desbloquear outra vez (a sessão de login mantém-se) |
 | «Password incorreta» | password mestra errada | — (não há recuperação possível) |
-| A extensão não carrega / ícone em falta | `icon48.png` / `icon128.png` ausentes | Passo 2 |
-| Não aparece a captura | form de registo, login dentro de iframe, ou página aberta antes do reload | secção «Actualizar a extensão»; guardar à mão no PIPE |
+| A extensão não carrega / ícone em falta | `icon48.png` / `icon128.png` ausentes (não deveria acontecer: já vêm na pasta) | Passo 2 |
+| A captura não aparece | feita noutro site; form de registo; login dentro de iframe; ou página aberta antes do reload | abrir **o site da captura**; secção «Actualizar a extensão»; guardar à mão no PIPE |
+| «Já existe uma entrada» | mesma password guardada duas vezes para o mesmo domínio + utilizador | clicar **Actualizar entrada** (grava a password capturada) |
+| A captura desapareceu | passaram 15 minutos (TTL da captura) | submeter o login outra vez |
 
 ---
 
