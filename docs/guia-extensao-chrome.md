@@ -20,6 +20,8 @@ Para o detalhe técnico ver `chrome-extension/README.md` e `docs/plano-cofre-pas
 
 > **Regra de ouro:** a extensão só consegue falar com o servidor se este a autorizar por CORS (`COFRE_CORS_ORIGINS`). Sem isso o popup mostra erro de rede/CORS — Passos 4 e 5.
 
+> **Testar primeiro, deploy depois:** podes experimentar tudo **localmente, sem deploy** — ver o Passo 8.
+
 ---
 
 ## Passo 1 — Activar o cofre no PIPE
@@ -80,14 +82,19 @@ COFRE_CORS_ORIGINS=chrome-extension://<ID copiado no Passo 4>
 
 ---
 
-## Passo 6 — Confirmar o cookie de sessão (só produção)
+## Passo 6 — Cookies de sessão (porque é que isto funciona)
 
-A extensão faz pedidos **cross-site** (`chrome-extension://` → servidor), pelo que o cookie de sessão tem de viajar com `SameSite=None` (que exige HTTPS). O `ProductionConfig` já traz:
-```python
-SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True
-```
-e o PythonAnywhere serve por HTTPS — **não é preciso mexer em nada**. Este passo serve apenas para saberes onde olhar se um dia o popup disser «Sem sessão no PIPE».
+A extensão faz pedidos a partir de `chrome-extension://`, que o Chrome considera um contexto diferente do servidor. Ainda assim o cookie de sessão chega à extensão, por dois mecanismos:
+
+1. **Host permissions (é o que faz funcionar em local).** O `chrome-extension/manifest.json` declara `"host_permissions": ["<all_urls>"]` e o Chrome trata os pedidos feitos por uma extensão como *same-site* quando esta tem host permissions para o destino — logo um cookie `SameSite=Lax` é enviado. Fonte: *Chrome for Developers → Storage and cookies* («Requests from an extension to a third-party are treated as same-site if the extension has host permissions for the third-party») e o *SameSite FAQ* do Chromium.
+2. **Em produção, explícito.** O `ProductionConfig` declara:
+   ```python
+   SESSION_COOKIE_SAMESITE = 'None'
+   SESSION_COOKIE_SECURE = True
+   ```
+   `None` é a forma documentada de autorizar um cookie cross-site e não depende da isenção do ponto 1. Exige HTTPS, que o PythonAnywhere já serve — **não é preciso mexer em nada**. O CSRF continua protegido pelo token assinado em todos os POSTs, incluindo os da extensão.
+
+⚠️ **Se o popup disser «Sem sessão no PIPE»:** confirma se tens **bloqueio de cookies de terceiros** activo nas definições do Chrome — nesse caso a isenção do ponto 1 não se aplica. Soluções: permitir cookies para o site do PIPE, ou servir o PIPE por HTTPS com `SameSite=None` (ver Passo 8).
 
 ---
 
@@ -101,21 +108,39 @@ e o PythonAnywhere serve por HTTPS — **não é preciso mexer em nada**. Este p
 
 ---
 
-## Passo 8 (opcional) — apontar a extensão para um servidor local
+## Passo 8 — Testar localmente (sem deploy)
 
-Por omissão a extensão fala com `https://felipejn.pythonanywhere.com`. Para a apontar a `http://127.0.0.1:5000`:
+**Não precisas de deploy para experimentar a extensão.** O servidor local tem tudo o que ela precisa: a BD (`instance/pipe.db`, cujas tabelas do cofre são criadas no arranque por `db.create_all()`), a API do cofre e o CORS (lido do `.env`).
 
-1. `chrome://extensions` → cartão da extensão → link **service worker** (abre o DevTools da extensão).
-2. Na consola do DevTools:
+Checklist (~5 minutos):
+
+1. **Ícones** — se ainda não fizeste o Passo 2: `python scripts/gerar_icones_extensao.py`.
+2. **Carrega a extensão** (Passo 3) e copia o **ID** (Passo 4).
+3. **`.env` local** — acrescenta o ID e reinicia o servidor com `python run.py` (fica em `http://127.0.0.1:5000`):
+   ```
+   COFRE_CORS_ORIGINS=chrome-extension://<ID>
+   ```
+   Confirma que o `.env` local tem `FLASK_ENV=development` — com `production`, o cookie sai com `Secure` e, sobre HTTP, o browser descarta-o (deixas de conseguir iniciar sessão).
+4. **Aponta a extensão ao servidor local** — `chrome://extensions` → cartão da extensão → link **service worker** (abre o DevTools) → consola:
    ```js
    chrome.storage.local.set({ pipeOrigin: 'http://127.0.0.1:5000' })
    ```
-3. Para voltar ao default:
-   ```js
-   chrome.storage.local.remove('pipeOrigin')
-   ```
+5. **Testa** — inicia sessão em `http://127.0.0.1:5000/auth/login`, abre `/passwords/` → secção Cofre, desbloqueia no popup com a password mestra e experimenta: listar/copiar entradas do domínio da aba e capturar um login num site de teste.
 
-⚠️ **Limitação importante:** em desenvolvimento o PIPE usa `SESSION_COOKIE_SAMESITE='Lax'` e o browser **não** envia cookies `Lax` em pedidos cross-site, pelo que o popup responde «Sem sessão no PIPE» mesmo com a sessão iniciada em `127.0.0.1:5000`. Para testar localmente seria preciso servir o PIPE por **HTTPS** com `SameSite=None` (ex.: túnel tipo ngrok/cloudflared). Na prática: **testa contra a produção**.
+**Voltar a produção** (a extensão volta a `https://felipejn.pythonanywhere.com`):
+```js
+chrome.storage.local.remove('pipeOrigin')
+```
+
+| Armadilha local | Efeito | O que fazer |
+|---|---|---|
+| Servidor noutra porta (5000 ocupada) | a extensão fala com o sítio errado | usar a mesma porta no `pipeOrigin` |
+| `FLASK_ENV=production` no `.env` local | cookie `Secure` sobre HTTP → «Sem sessão» | manter `development` |
+| Link «Iniciar sessão» do popup | está fixo para o PythonAnywhere | abrir o login directamente em `http://127.0.0.1:5000/auth/login` |
+| Bloqueio de cookies de terceiros | o cookie não viaja (Passo 6) | permitir cookies para o site, ou HTTPS + `SameSite=None` |
+| Não captura o login | o content script só roda em páginas carregadas após o reload | recarregar a aba do site de teste |
+
+> O **deploy** (definir `COFRE_CORS_ORIGINS` no `.env` de produção — Passo 5 —, `pip install -r requirements.txt` e `db.create_all()`) só é preciso para usar a extensão contra a **produção**. Para o cofre normal no browser (sem extensão), o deploy é o habitual da app.
 
 ---
 
@@ -131,7 +156,7 @@ Por omissão a extensão fala com `https://felipejn.pythonanywhere.com`. Para a 
 | Sintoma no popup | Causa provável | Solução |
 |---|---|---|
 | Erro de rede / CORS | ID em falta ou errado em `COFRE_CORS_ORIGINS`; servidor não recarregado | refazer Passos 4–5 (copiar o ID outra vez) e **Reload** da app / reiniciar o servidor |
-| «Sem sessão no PIPE» | sessão do PIPE terminada, ou servidor local com cookie `Lax` | iniciar sessão em `/auth/login`; testar contra a produção |
+| «Sem sessão no PIPE» | sessão terminada; `FLASK_ENV=production` no `.env` local (cookie `Secure` sobre HTTP); ou bloqueio de cookies de terceiros | iniciar sessão em `/auth/login`; ver Passos 6 e 8 |
 | «Cofre não activado» | o cofre nunca foi activado (o cofre é **por utilizador**) | Passo 1 |
 | «Cofre bloqueado» | passaram 15 minutos desde o desbloqueio | desbloquear outra vez (a sessão de login mantém-se) |
 | «Password incorreta» | password mestra errada | — (não há recuperação possível) |

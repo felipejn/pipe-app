@@ -28,9 +28,12 @@ class Config:
 
     # Sessões
     SESSION_COOKIE_HTTPONLY = True
-    # Lax por omissão (dev). Em produção passa a None, porque a extensão Chrome
-    # faz pedidos cross-site (origem chrome-extension://) e o browser não envia
-    # cookies Lax nesses pedidos — sem isto a extensão não fica autenticada.
+    # Lax por omissão (dev, HTTP). Nota: o Chrome trata os pedidos feitos por uma
+    # extensão como same-site quando a extensão tem host permissions para o
+    # destino (o manifest declara "<all_urls>"), pelo que os cookies Lax chegam à
+    # extensão mesmo em desenvolvimento — é o que permite testar sem HTTPS. Em
+    # produção passa a None explícito (ProductionConfig), que é a forma
+    # documentada de autorizar um cookie cross-site e não depende dessa isenção.
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hora
 
@@ -46,9 +49,11 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True  # HTTPS obrigatório no PA
-    # SameSite=None é obrigatório para a extensão Chrome (pedidos cross-site a
-    # partir de chrome-extension://); exige Secure=True (HTTPS), garantido acima.
-    # O CSRF continua protegido pelo token do Flask-WTF em todos os POSTs.
+    # None explícito (em vez do Lax herdado): é a forma documentada de permitir
+    # um cookie cross-site, sem depender da isenção de same-site que o Chrome
+    # aplica a pedidos de extensões com host permissions. Exige Secure=True
+    # (HTTPS), garantido acima. O CSRF continua protegido pelo token assinado do
+    # Flask-WTF em todos os POSTs, incluindo os da extensão.
     SESSION_COOKIE_SAMESITE = 'None'
 
 class TestingConfig(Config):

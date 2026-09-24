@@ -228,7 +228,7 @@ pipe-app/
 - **`content.js`:** heurística de captura — apenas forms de **login** (campo password + username/email); ignora registo e alteração de password e não actua no próprio PIPE (`pythonanywhere.com`)
 - **Configuração obrigatória no servidor:** `COFRE_CORS_ORIGINS=chrome-extension://<ID>` (sem isto o browser bloqueia os `fetch` por CORS) e, em produção, `SESSION_COOKIE_SAMESITE='None'` + `Secure=True` (o cookie de sessão tem de viajar em pedidos cross-site)
 - ⚠️ **Bloqueio conhecido:** o `manifest.json` declara `icon48.png` e `icon128.png`, que **não existem** na pasta — o Chrome assinala ícone em falta ao carregar a extensão e a barra de ferramentas fica sem ícone. Resolve-se com `python scripts/gerar_icones_extensao.py` (Pillow: quadrado azul `#4361ee` com cadeado branco; não precisa da app Flask) ou removendo a chave `icons` do manifest
-- **Guia de instalação e uso:** `docs/guia-extensao-chrome.md` — passo a passo (activar o cofre, ícones, «Load unpacked», copiar o ID, `COFRE_CORS_ORIGINS`, uso diário, servidor local, actualização após alterações, problemas comuns e verificação de segurança)
+- **Guia de instalação e uso:** `docs/guia-extensao-chrome.md` — passo a passo (activar o cofre, ícones, «Load unpacked», copiar o ID, `COFRE_CORS_ORIGINS`, uso diário, **testar localmente sem deploy** — o Chrome trata os pedidos de extensões com host permissions como same-site, pelo que o cookie `Lax` de desenvolvimento chega à extensão —, actualização após alterações, problemas comuns e verificação de segurança)
 
 ### Módulo Câmbio (`app/cambio/`)
 - **Sem BD** — módulo stateless
@@ -397,6 +397,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 | CORS do cofre | `COFRE_CORS_ORIGINS` (apenas `chrome-extension://<ID>`): a origem autorizada recebe `Access-Control-Allow-Origin` + `Allow-Credentials`; origem errada não recebe o header e o browser bloqueia o pedido | `app/__init__.py`, `config.py` |
 | Cookie de sessão cross-site (extensão Chrome) | `SameSite=None` + `Secure` em produção (obrigatório para os `fetch` a partir de `chrome-extension://`); `Lax` em desenvolvimento. Os POSTs continuam protegidos pelo token CSRF do Flask-WTF | `config.py`, `app/__init__.py` |
 | Sessão do cofre | chave AES só em Flask-Session server-side (`instance/flask_session/`); expira em `COFRE_SESSION_TIMEOUT` (900 s) bloqueando **apenas** o cofre, sem apagar a sessão de login | `app/passwords/routes.py` |
+| SameSite e extensões | o Chrome trata pedidos de uma extensão como *same-site* quando esta tem `host_permissions` para o destino (o manifest declara `<all_urls>`), pelo que o cookie `Lax` de desenvolvimento chega à extensão — é o que permite testar sem HTTPS; `ProductionConfig` mantém `None` explícito, que não depende dessa isenção | `config.py`, `chrome-extension/manifest.json` |
 
 ### Testes realizados
 - **Suite automatizada `pytest` — 74 testes** ✅ (42 anteriores + 31 do Cofre em `tests/test_cofre.py` + 1 de regressão do isolamento em `tests/test_isolamento_bd.py`)

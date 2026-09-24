@@ -15,6 +15,8 @@
    ```
 7. Reinicia o servidor PIPE
 
+> Para testar contra o servidor **local** (sem deploy): `docs/guia-extensao-chrome.md` → Passo 8.
+
 ## Permissões
 
 - `activeTab` — acesso à aba activa
