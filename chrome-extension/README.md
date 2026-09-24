@@ -1,5 +1,7 @@
 # PIPE Cofre — Extensão Chrome (Manifest V3)
 
+> **Instalação passo a passo (simplificada): `docs/guia-extensao-chrome.md`.** Este ficheiro é a referência técnica da pasta.
+
 ## Instalação
 
 1. Abra `chrome://extensions/`

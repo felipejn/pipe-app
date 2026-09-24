@@ -139,6 +139,7 @@ pipe-app/
 │   └── README.md            # instalação, permissões e fluxo de uso
 ├── docs/
 │   ├── plano-cofre-passwords.md  # plano de correcção do Cofre (mantido no repositório)
+│   ├── guia-extensao-chrome.md   # guia passo a passo da extensão (instalar e usar)
 │   └── historico/           # briefings e relatórios antigos
 ├── scripts/
 │   ├── criar_admin.py
@@ -152,6 +153,7 @@ pipe-app/
 │   ├── reset_postos_combustiveis.py # reset das tabelas de postos/histórico
 │   ├── testar_assistente.py     # smoke test do Assistente IA contra a OpenRouter
 │   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
+│   ├── gerar_icones_extensao.py # gera icon48/icon128 da extensão Chrome (Pillow, sem Flask)
 │   └── verificar_resultados.py  # mantido para referência histórica
 ├── tests/
 │   ├── conftest.py                      # guarda-civil: bloqueia drop_all com BD de ficheiro
@@ -225,7 +227,8 @@ pipe-app/
 - **`popup.*`:** estado do cofre (activado/desbloqueado), desbloqueio com a password mestra, listagem das entradas do domínio do separador activo e preenchimento do form; com sessão em falta mostra link para `/auth/login`
 - **`content.js`:** heurística de captura — apenas forms de **login** (campo password + username/email); ignora registo e alteração de password e não actua no próprio PIPE (`pythonanywhere.com`)
 - **Configuração obrigatória no servidor:** `COFRE_CORS_ORIGINS=chrome-extension://<ID>` (sem isto o browser bloqueia os `fetch` por CORS) e, em produção, `SESSION_COOKIE_SAMESITE='None'` + `Secure=True` (o cookie de sessão tem de viajar em pedidos cross-site)
-- ⚠️ **Bloqueio conhecido:** o `manifest.json` declara `icon48.png` e `icon128.png`, que **não existem** na pasta — o Chrome assinala ícone em falta ao carregar a extensão e a barra de ferramentas fica sem ícone; é preciso gerar/copiar os dois ficheiros (os ícones PWA em `app/static/icons/` servem de base) ou remover a chave `icons` do manifest
+- ⚠️ **Bloqueio conhecido:** o `manifest.json` declara `icon48.png` e `icon128.png`, que **não existem** na pasta — o Chrome assinala ícone em falta ao carregar a extensão e a barra de ferramentas fica sem ícone. Resolve-se com `python scripts/gerar_icones_extensao.py` (Pillow: quadrado azul `#4361ee` com cadeado branco; não precisa da app Flask) ou removendo a chave `icons` do manifest
+- **Guia de instalação e uso:** `docs/guia-extensao-chrome.md` — passo a passo (activar o cofre, ícones, «Load unpacked», copiar o ID, `COFRE_CORS_ORIGINS`, uso diário, servidor local, actualização após alterações, problemas comuns e verificação de segurança)
 
 ### Módulo Câmbio (`app/cambio/`)
 - **Sem BD** — módulo stateless
@@ -571,7 +574,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 - **Combustíveis — follow-up opcional:** ✅ resolvido em v1.4.10 — `obter_tipos_combustivel_disponiveis` agora exclui, via `obter_ids_postos_obsoletos()`, não só postos arquivados como também os obsoletos (dados DGEG congelados, caso do DJB), mantendo o dropdown alinhado ao dashboard
 - **Módulos futuros:** arquitectura pronta — versão 1.x
 - **Cofre — deploy no PA:** ⚠️ pendente — `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` das tabelas do cofre, `COFRE_CORS_ORIGINS` no `.env` e Reload; correr `python scripts/backup_bd.py` antes
-- **Cofre — extensão Chrome:** ⚠️ pendente — faltam `icon48.png`/`icon128.png` (declarados no `manifest.json`) e o teste de ponta a ponta em produção (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS (403 para origin errado) e que a chave do cofre **não** aparece nos cookies do browser
+- **Cofre — extensão Chrome:** ⚠️ pendente — correr `python scripts/gerar_icones_extensao.py` (gera `icon48.png`/`icon128.png`, declarados no `manifest.json` mas ausentes) e fazer o teste de ponta a ponta em produção seguindo `docs/guia-extensao-chrome.md` (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS (403 para origin errado) e que a chave do cofre **não** aparece nos cookies do browser
 
 ---
 
@@ -588,7 +591,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 5. Migração da tabela `evento` no PA
 6. Testar notificações do Calendário em produção
 7. **Cofre de Passwords — deploy no PythonAnywhere:** `pip install -r requirements.txt`, `db.create_all()` (cria `cofre_configs`/`cofre_passwords`), `COFRE_CORS_ORIGINS=chrome-extension://<ID>` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção e correr `python scripts/backup_bd.py` antes
-8. **Extensão Chrome do Cofre:** gerar/copiar `icon48.png` e `icon128.png` (declarados no manifest, ausentes na pasta), instalar via «Load unpacked», anotar o ID da extensão e colocá-lo em `COFRE_CORS_ORIGINS`
+8. **Extensão Chrome do Cofre:** seguir `docs/guia-extensao-chrome.md` — correr `python scripts/gerar_icones_extensao.py` (ícones declarados no manifest e ausentes), instalar via «Load unpacked», anotar o ID da extensão e colocá-lo em `COFRE_CORS_ORIGINS`
 9. **Cofre — smoke manual de ponta a ponta em produção:** activar → criar → editar → apagar → alterar password mestra → esperar expiração (900 s) e confirmar que só o cofre bloqueia (a sessão de login mantém-se) → desbloquear pela extensão e preencher um form de login
 
 ---
