@@ -5,7 +5,7 @@
 - **Owner:** Felipe (apelido "Pipe") — ortografia Portuguesa Europeia em TODO o código e mensagens
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
-- **Versão actual:** v1.5.0 (Cofre de Passwords + extensão Chrome) — detalhe em `estado_atual.md`
+- **Versão actual:** v1.5.2 (confirmação de entrega dos emails de convite via Mailjet) — detalhe em `estado_atual.md`
 
 ## Referência principal
 **Ler `estado_atual.md`** para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.

@@ -54,6 +54,7 @@
                         <th>Criado em</th>
                         <th>Expira em</th>
                         <th>Estado</th>
+                        <th>Email (Mailjet)</th>
                         <th>Acções</th>
                     </tr>
                 </thead>
@@ -70,6 +71,19 @@
                                 <span class="badge badge-activo">activo</span>
                             {% else %}
                                 <span class="badge badge-expirado">expirado</span>
+                            {% endif %}
+                        </td>
+                        <td id="email-estado-{{ c.id }}">
+                            {% if c.email_estado %}
+                            <span class="badge {{ c.estado_email()[1] }}"
+                                  title="Mailjet ID {{ c.mailjet_message_id }}{% if c.email_verificado_em %} · verificado em {{ c.email_verificado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}">{{ c.estado_email()[0] }}</span>
+                            {% else %}
+                            <span class="texto-subtil">—</span>
+                            {% endif %}
+                            {% if c.mailjet_message_id %}
+                            <button type="button" class="btn-acao"
+                                    title="Verificar estado no Mailjet"
+                                    onclick="verificarEstadoEmail({{ c.id }})">🔄</button>
                             {% endif %}
                         </td>
                         <td class="acoes-celula">
@@ -151,7 +165,8 @@ document.getElementById('btn-gerar').addEventListener('click', function() {
 
         if (data.email_enviado) {
             resultado.style.display = 'block';
-            resultado.innerHTML = '<span class="sucesso-msg">Convite enviado para ' + email + '.</span>' +
+            resultado.innerHTML = '<span class="sucesso-msg">Convite enviado para ' + email + ' (Mailjet: aceite).</span>' +
+                '<span class="texto-subtil" style="display:block;margin-top:0.25rem;">Confirma a entrega na tabela (botão 🔄) — recarrega a página para ver o convite.</span>' +
                 '<button class="btn btn-secundario btn-fechar" style="margin-top:0.5rem">Fechar</button>';
         } else {
             resultado.style.display = 'block';
@@ -169,6 +184,48 @@ document.getElementById('btn-gerar').addEventListener('click', function() {
         resultado.innerHTML = '<span class="erro-campo">Erro ao gerar convite. Tenta novamente.</span>';
     });
 });
+
+// ── Verificação de entrega dos convites no Mailjet ──────────────────────────
+// O «Convite enviado» só prova que a API aceitou o pedido; aqui consulta-se a
+// actividade real (entregue / falhou + motivo) e actualiza-se o badge na tabela.
+const urlEstadoEmail = '{{ url_for("admin.estado_email", convite_id="0") }}';
+
+function escaparHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function verificarEstadoEmail(id) {
+    const celula = document.getElementById('email-estado-' + id);
+    if (!celula) return;
+    const original = celula.innerHTML;
+
+    fetch(urlEstadoEmail.replace('/0/', '/' + id + '/'))
+        .then(r => r.json().then(d => ({ status: r.status, d })))
+        .then(({ status, d }) => {
+            if (status !== 200 || d.erro) {
+                celula.innerHTML = '<span class="erro-campo">' +
+                    escaparHtml(d.erro || 'Erro ao consultar o Mailjet.') +
+                    '</span> ' + original;
+                return;
+            }
+            const eventos = (d.eventos || [])
+                .map(e => e.quando + ' ' + e.tipo).join(' → ');
+            const titulo = 'Mailjet · verificado em ' + d.verificado_em +
+                (eventos ? '\n' + eventos : '') +
+                (d.motivo ? '\n' + d.motivo : '');
+            celula.innerHTML =
+                '<span class="badge ' + d.classe + '" title="' + escaparHtml(titulo) + '">' +
+                escaparHtml(d.rotulo) + '</span> ' +
+                '<button type="button" class="btn-acao" ' +
+                'title="Verificar estado no Mailjet" ' +
+                'onclick="verificarEstadoEmail(' + id + ')">🔄</button>';
+        })
+        .catch(() => {
+            celula.innerHTML = '<span class="erro-campo">Erro de rede ao verificar.</span> ' + original;
+        });
+}
 </script>
 <style>
 .form-convite {

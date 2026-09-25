@@ -163,9 +163,24 @@ def gerar_convite():
                 ),
             )
             current_app.logger.info(f'Resultado do envio: {enviado}')
+            res = getattr(canal, 'ultimo_resultado', None) or {}
+            current_app.logger.info(
+                f"[MAILJET] message_id={res.get('message_id')} erro={res.get('erro')}")
 
             if enviado:
-                return {'sucesso': True, 'link': link, 'email_enviado': True}
+                # Guardar a confirmação: o ID do Mailjet permite depois verificar
+                # a entrega real (entregue / falhou com o motivo) no painel.
+                convite.mailjet_message_id = (
+                    str(res['message_id']) if res.get('message_id') else None)
+                convite.email_estado = 'aceite'
+                db.session.commit()
+                return {'sucesso': True, 'link': link, 'email_enviado': True,
+                        'message_id': convite.mailjet_message_id}
+
+            convite.email_estado = 'falhou'
+            db.session.commit()
+            if res.get('erro'):
+                return {'erro': f"Falha no envio: {res['erro']}", 'link': link}, 500
             return {'erro': 'Falha no envio (Mailjet retornou false).', 'link': link}, 500
 
         except Exception as e:
@@ -176,6 +191,54 @@ def gerar_convite():
             return {'erro': 'Erro ao enviar email. Tenta novamente.', 'link': link}, 500
 
     return {'sucesso': True, 'link': link, 'email_enviado': False}
+
+
+@admin.route('/convites/<int:convite_id>/estado-email')
+@login_required
+@admin_required
+def estado_email(convite_id):
+    """Consulta ao Mailjet o estado real de entrega do email do convite.
+
+    O «Convite enviado» do painel só prova que a API aceitou o pedido; esta rota
+    mostra se a mensagem foi efectivamente entregue, rejeitada (com o motivo do
+    bounce — ex.: `550 5.7.40` do Gmail por falta de autenticação do domínio
+    remetente) ou se ainda não há confirmação. O resultado é guardado no convite.
+    """
+    convite = Convite.query.get_or_404(convite_id)
+
+    if not convite.mailjet_message_id:
+        return {'erro': 'Convite sem ID no Mailjet — não há mensagem para verificar '
+                        '(gerado sem envio de email, ou anterior ao registo de IDs; '
+                        'para convites antigos usa scripts/verificar_mailjet.py).'}, 400
+
+    api_key = current_app.config.get('MAILJET_API_KEY')
+    api_secret = current_app.config.get('MAILJET_API_SECRET')
+    if not (api_key and api_secret):
+        return {'erro': 'Mailjet não está configurado neste servidor.'}, 400
+
+    canal = EmailChannel(api_key=api_key, api_secret=api_secret,
+                         remetente=current_app.config.get('MAILJET_FROM_EMAIL'))
+    resultado = canal.consultar_estado(convite.mailjet_message_id)
+
+    if resultado.get('erro'):
+        return {'erro': f"Falha ao consultar o Mailjet: {resultado['erro']}"}, 502
+
+    if resultado.get('estado'):
+        convite.email_estado = resultado['estado']
+    convite.email_verificado_em = datetime.utcnow()
+    db.session.commit()
+
+    rotulo, classe = convite.estado_email() or (convite.email_estado or '?',
+                                                'badge-inactivo')
+    return {
+        'sucesso': True,
+        'estado': convite.email_estado,
+        'rotulo': rotulo,
+        'classe': classe,
+        'eventos': resultado.get('eventos', []),
+        'motivo': resultado.get('motivo'),
+        'verificado_em': convite.email_verificado_em.strftime('%d/%m/%Y %H:%M'),
+    }
 
 
 @admin.route('/convites/<int:convite_id>/revogar', methods=['POST'])

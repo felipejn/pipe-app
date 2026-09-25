@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.5.1
+# PIPE — Estado Actual do Projecto — v1.5.2
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -81,7 +81,7 @@ pipe-app/
 │   │   └── channels/
 │   │       ├── base.py
 │   │       ├── telegram.py  # TelegramChannel
-│   │       └── email.py     # EmailChannel (Mailjet)
+│   │       └── email.py     # EmailChannel (Mailjet) — envio + consulta de entrega (v1.5.2)
 │   ├── settings/            # Blueprint de definições
 │   │   ├── __init__.py
 │   │   └── routes.py        # /definicoes/
@@ -155,6 +155,8 @@ pipe-app/
 │   ├── testar_assistente.py     # smoke test do Assistente IA contra a OpenRouter
 │   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
 │   ├── gerar_icones_extensao.py # gera icon48/icon128 da extensão Chrome (Pillow, sem Flask)
+│   ├── migrar_convites_mailjet.py # ALTER TABLE: colunas do Mailjet em `convites` (v1.5.2, idempotente)
+│   ├── verificar_mailjet.py     # estado real dos emails no Mailjet + `--ligar-convites` (v1.5.2)
 │   └── verificar_resultados.py  # mantido para referência histórica
 ├── tests/
 │   ├── conftest.py                      # guarda-civil: bloqueia drop_all com BD de ficheiro
@@ -164,6 +166,7 @@ pipe-app/
 │   ├── test_cofre.py                    # Cofre: crypto, modelos, API, dedup, sessão/KDF (inclui 409 com id)
 │   ├── test_extensao_js.py              # corre tests/extensao_harness.js (Node) — JS da extensão
 │   ├── extensao_harness.js              # harness Node: content script + funções puras do popup
+│   ├── test_convites_email.py           # convites: MessageID, estado no Mailjet, endpoint de verificação (v1.5.2)
 │   └── test_isolamento_bd.py            # regressão do isolamento dos testes
 ├── instance/
 │   ├── backups/             # cópias de segurança (backup_bd.py)
@@ -272,8 +275,8 @@ pipe-app/
 - Blueprint em `/admin`, decorador `@admin_required`
 - Ícone 🛠️ na navbar visível apenas para admins
 - Dashboard com estatísticas, lista de utilizadores, toggle activo/admin, apagar utilizador
-- **Gestão de Convites:** `GET /admin/convites`, `POST /admin/convites/gerar`, `POST /admin/convites/<id>/revogar`
-- Reutiliza `EmailChannel` (Mailjet) para envio automático de convites
+- **Gestão de Convites:** `GET /admin/convites`, `POST /admin/convites/gerar`, `POST /admin/convites/<id>/revogar` e `GET /admin/convites/<id>/estado-email` (v1.5.2 — consulta ao Mailjet se o email foi entregue; coluna «Email (Mailjet)» com badge + 🔄 na tabela de convites)
+- Reutiliza `EmailChannel` (Mailjet) para envio automático de convites; desde v1.5.2 o `MessageID` da resposta é guardado no convite (`mailjet_message_id`) — **sem ID não há como verificar a entrega depois**, pelo que convites antigos se ligam com `scripts/verificar_mailjet.py --ligar-convites`
 
 ### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
 - **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens, 3000 chars por mensagem, 8000 chars total de histórico)
@@ -311,7 +314,7 @@ pipe-app/
 
 ### Sistema de notificações (`app/notifications/`)
 - `NotificationService` — `notification_service.send(user, type, subject, body, data)`
-- `TelegramChannel` ✅ e `EmailChannel` ✅ (Mailjet)
+- `TelegramChannel` ✅ e `EmailChannel` ✅ (Mailjet) — desde v1.5.2 o `enviar()` guarda o resultado em `ultimo_resultado` (`MessageID` + motivo de falha; o retorno bool mantém-se para os restantes chamadores) e há `consultar_estado(message_id)` (actividade: `sent`/`delivered`/`softbounced`/… + cronologia + motivo do bounce)
 - `UserNotificationPreferences` na BD; página de definições em `/definicoes`
 
 ### Scheduled task — `scripts/pipe_tasks.py`
@@ -404,7 +407,7 @@ Script unificado que corre 1x/dia no PA (08:00). Cada módulo é uma função in
 | SameSite e extensões | o Chrome trata pedidos de uma extensão como *same-site* quando esta tem `host_permissions` para o destino (o manifest declara `<all_urls>`), pelo que o cookie `Lax` de desenvolvimento chega à extensão — é o que permite testar sem HTTPS; `ProductionConfig` mantém `None` explícito, que não depende dessa isenção | `config.py`, `chrome-extension/manifest.json` |
 
 ### Testes realizados
-- **Suite automatizada `pytest` — 76 testes** ✅ (42 anteriores + 31 do Cofre em `tests/test_cofre.py` + 1 de regressão do isolamento em `tests/test_isolamento_bd.py` + 1 do 409 da extensão + 1 do harness JS em `tests/test_extensao_js.py`)
+- **Suite automatizada `pytest` — 90 testes** ✅ (42 anteriores + 31 do Cofre em `tests/test_cofre.py` + 1 de regressão do isolamento em `tests/test_isolamento_bd.py` + 1 do 409 da extensão + 1 do harness JS em `tests/test_extensao_js.py` + 14 de convites/Mailjet em `tests/test_convites_email.py`)
 - ⚠️ **Incidente 2026-09-23 — BD local apagada por uma corrida de `pytest`:** `tests/test_cofre.py` criava a app com a config real e chamava `db.drop_all()`; reescrever `SQLALCHEMY_DATABASE_URI` **depois** de `create_app()` não tem efeito (o engine é fixado em `db.init_app()`), pelo que o `drop_all()` correu contra `instance/pipe.db` e apagou as 21 tabelas. Corrigido: os testes usam `create_app('testing')` (SQLite em memória + sessões em pasta temporária) e `tests/conftest.py` bloqueia `db.drop_all()` com BD de ficheiro. Dados locais perdidos (schema recriado; conta recriada com `scripts/criar_admin.py`, que agora define `is_admin=True`). Validação: `sha256` de `instance/pipe.db` inalterado antes/depois de duas corridas completas
 - Login e registo ✅
 - Dashboard com cards de módulos ✅
@@ -494,6 +497,7 @@ COFRE_CORS_ORIGINS=chrome-extension://<ID da extensão>
 - **Módulo Combustíveis — 4 tabelas** (`combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao`) criadas por `db.create_all()` no primeiro reload; modelo `UtilizadorCombustivel` adicionado ao import de `db.create_all()` em `app/__init__.py` ✅
 - **Módulo Combustíveis — arquivamento de postos (v1.3.2)** ⚠️ no PA — `python scripts/reset_postos_combustiveis.py` (drop das tabelas de postos/histórico + `db.create_all()` + repovoamento; cria as colunas `ativo`/`ciclos_ausente` que o `create_all()` sozinho não acrescenta a uma BD existente)
 - **Cópia de segurança da BD:** `python scripts/backup_bd.py` copia `instance/pipe.db` para `instance/backups/pipe-AAAAMMDD-HHMMSS.db` (mantém as últimas 10). Correr antes de operações de risco (reset de tabelas, migrações manuais); pode ser agendado no PA
+- **Convites — colunas do Mailjet (v1.5.2)** ⚠️ no PA — `python scripts/migrar_convites_mailjet.py` (adiciona `mailjet_message_id`, `email_estado`, `email_verificado_em` a `convites`; idempotente — o `db.create_all()` **não faz `ALTER TABLE`** e sem as colunas as queries ao modelo rebentam com `no such column`)
 - **Módulo Combustíveis — blocklist de postos obsoletos (v1.3.3)** ⚠️ no PA — `python scripts/remover_postos_ignorados.py` (apaga os postos de `services.NOMES_IGNORADOS` e o respectivo histórico; idempotente, pode correr antes ou depois do reset)
 
 ### Comando de migração do Calendário (executar no PA após deploy)
@@ -535,6 +539,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 ---
 
 ## Ponto onde estamos
+
+**Versão v1.5.2** — confirmação de entrega dos emails de convite (Mailjet) e diagnóstico de deliverability. O painel de convites mostrava «Convite enviado» só com base na aceitação da API (200 + `success`) — sem prova de entrega, e o `MessageID` da resposta era deitado fora. `EmailChannel.enviar()` passa a guardar o resultado em `self.ultimo_resultado` (`MessageID` lido de `Messages[0].To[0]` + motivo de falha; o retorno bool mantém-se, pelo que 2FA/recuperação de password e testes de email não mudam) e ganha **`consultar_estado(message_id)`**, que consulta `/REST/messagehistory/{id}` + `/REST/message/{id}` e devolve estado, cronologia de eventos e o motivo do bounce. O modelo `Convite` ganhou 3 colunas (`mailjet_message_id`, `email_estado`, `email_verificado_em` — migração idempotente em `scripts/migrar_convites_mailjet.py`) + `estado_email()` (rótulo PT + classe de badge a partir do mapa `ESTADOS_EMAIL`). O envio grava ID + estado `aceite` (a falha grava `falhou` e devolve o motivo detalhado no JSON) e há novo endpoint **`GET /admin/convites/<id>/estado-email`** (400 sem ID, 502 se o Mailjet falhar, nunca destrói o estado anterior; guarda `email_verificado_em`); a tabela `/admin/convites` ganhou a coluna **«Email (Mailjet)»** com badge (enviado/entregue/falhou-transitório) e botão 🔄 que actualiza o estado e mostra no hover a cronologia + motivo (JS novo com escape HTML dos comentários do bounce). Convites antigos sem ID ligam-se retroactivamente com `scripts/verificar_mailjet.py --ligar-convites` (pareamento por email + proximidade temporal ≤ 2 h) — **os 2 convites existentes já estão ligados na BD local** (gardengate → `1152921544892419067`, yahoo → `288230416497838458`, ambos `sent`). Diagnóstico com a API real do Mailjet: **ambos os convites de 25/09 foram efectivamente enviados (`sent`, sem bounce) e caíram em spam** — causa raiz identificada: `MAILJET_FROM_EMAIL=pipe.notificacoes@outlook.com` não está alinhado com SPF/DKIM autenticados (não é domínio autenticável na conta) → DMARC falha → **Gmail rejeita à porta** (`550 5.7.40`; um 3.º email de 25/09 07:01 para o gmail **softbounced** por essa razão, verificado no `Comment` do evento) e os restantes destinatários caem em spam (diagnóstico Mailjet: «Your FROM domain is not authenticated»). Correcções de robustez no caminho: stdout UTF-8 nos scripts de migração/diagnóstico (a consola cp1252 do Windows rebentava com o `✓`, o mesmo bug do script de ícones) e `try/except` de rede no `_email_do_contacto`. **Suite: 90 testes `pytest` a passar** (eram 76; +14 em `tests/test_convites_email.py`: canal, geração de convite, endpoint, renderização da página e caminhos de falha) + `node --check` no JS extraído do template. **Alteração de BD** — no PA: correr `python scripts/migrar_convites_mailjet.py` após o deploy.
 
 **Versão v1.5.1** — correcções à extensão Chrome do Cofre, detectadas no primeiro teste de ponta a ponta (guardar as credenciais do próprio PIPE e depois abrir o popup em qualquer site). Quatro defeitos corrigidos. (1) **Captura presa em todos os separadores:** o `pendingCapture` ficava em `chrome.storage.local` sem prazo e o popup não comparava o site — passou a ser oferecida apenas no site onde foi feita (comparação por domínio via `dominioDeUrl()`), com TTL de 15 min (alinhado com `COFRE_SESSION_TIMEOUT`); noutros sites aparece só como nota informativa com opção de descartar. (2) **O PIPE era capturado:** o `content.js` só excluía `pythonanywhere.com`, pelo que o login local (`/auth/login`) era guardado — agora ignora a origem configurada (`pipeOrigin`), a produção e as rotas `/auth`|`/passwords` do servidor local (`localhost`/`127.0.0.1`, qualquer porta). (3) **«Guardar» falhava sem saída:** uma entrada já existente devolvia 409 **sem o `id`**, pelo que o popup só mostrava erro — `api_criar_entrada` passa a devolver `id`/`dominio`/`username` no 409 e o popup oferece «Actualizar entrada» (PUT, coberto por teste de regressão). (4) **`alert()` no popup** (a janela vazia «A extensão PIPE Cofre — Password Manager indica:»): todos os `alert()` foram substituídos por mensagens inline em `#mensagem` (o `alert()` fecha o popup da extensão e podia deixar um diálogo sem texto); aproveitou-se para corrigir o botão 📋 copiar, que usava `onclick` inline — bloqueado pela CSP das páginas de extensão MV3 — e interpolava a password em HTML, passando a listeners por JS com o id da entrada; o botão de refresh passou a «↻ Actualizar lista» (com «Actualizar» confundia-se com actualizar a entrada); separadores não-site (`chrome://`) deixam de dizer «Sem entradas»; os links de login seguem `chrome.storage.local.pipeOrigin`; `background.js` propaga `status`/`dados` dos erros da API (`respostaErro()`). `manifest.json` → **1.0.1**; incluídos os ícones `icon48.png`/`icon128.png` gerados por `scripts/gerar_icones_extensao.py`. **Suite: 76 testes `pytest` a passar** (eram 74) — inclui o novo teste de regressão do 409 (`test_duplicado_devolve_id_e_actualiza_pela_extensao`) e `tests/test_extensao_js.py`, que corre `tests/extensao_harness.js` com o Node (`vm` + stubs de `chrome`/`document`): 22 verificações sobre a abrangência do content script (onde captura/não captura) e as funções puras do popup — salta se não houver Node. **Sem alteração de BD** (apenas um campo novo no JSON do 409).
 
@@ -582,6 +588,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 - **Módulos futuros:** arquitectura pronta — versão 1.x
 - **Cofre — deploy no PA:** ⚠️ pendente — `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` das tabelas do cofre, `COFRE_CORS_ORIGINS` no `.env` e Reload; correr `python scripts/backup_bd.py` antes
 - **Cofre — extensão Chrome:** ⚠️ pendente — fazer o teste de ponta a ponta em produção seguindo `docs/guia-extensao-chrome.md` (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS (resposta inutilizável para origin errado) e que a chave do cofre **não** aparece nos cookies do browser (ícones ✅ e correcções de captura/409 feitas em v1.5.1; lembra: recarregar ⟳ o cartão da extensão em `chrome://extensions` depois das alterações)
+- **Mailjet — domínio remetente não autenticado** ⚠️ **ALTA (entregabilidade)** — `MAILJET_FROM_EMAIL=pipe.notificacoes@outlook.com` não é domínio autenticável na conta: o `From` não alinha com SPF/DKIM → DMARC falha → **Gmail rejeita à porta** (`550 5.7.40`; email de 25/09 07:01 softbounced) e os restantes caem em **spam** (os 2 convites de 25/09, confirmado pelo utilizador). Correcção: autenticar um domínio próprio no Mailjet (Account → Domains — registos DNS DKIM/SPF/DMARC) e mudar `MAILJET_FROM_EMAIL` para `pipe@<domínio-próprio>` (`.env` local + PA) e, depois de mudado, confirmar a entrega com `python scripts/verificar_mailjet.py --apenas-hoje` ou com o 🔄 do painel
+- **Convites — deploy da v1.5.2 no PA:** ⚠️ correr `python scripts/migrar_convites_mailjet.py` **depois** de fazer deploy do código (cria as 3 colunas do Mailjet em `convites`); sem isso as queries ao modelo rebentam com `no such column: convites.mailjet_message_id`
 
 ---
 
@@ -600,6 +608,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 7. **Cofre de Passwords — deploy no PythonAnywhere:** `pip install -r requirements.txt`, `db.create_all()` (cria `cofre_configs`/`cofre_passwords`), `COFRE_CORS_ORIGINS=chrome-extension://<ID>` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção e correr `python scripts/backup_bd.py` antes
 8. **Extensão Chrome do Cofre:** seguir `docs/guia-extensao-chrome.md` — instalar via «Load unpacked» (os ícones já vêm na pasta), anotar o ID da extensão e colocá-lo em `COFRE_CORS_ORIGINS`
 9. **Cofre — smoke manual de ponta a ponta em produção:** activar → criar → editar → apagar → alterar password mestra → esperar expiração (900 s) e confirmar que só o cofre bloqueia (a sessão de login mantém-se) → desbloquear pela extensão e preencher um form de login
+10. **Convites/Mailjet — v1.5.2 no PA:** correr `python scripts/migrar_convites_mailjet.py` após o deploy (colunas novas em `convites`) e **autenticar domínio próprio no Mailjet** + actualizar `MAILJET_FROM_EMAIL` (ver pendência «Mailjet — domínio remetente» — é o que separa os emails de spam da caixa de entrada); confirmar com `python scripts/verificar_mailjet.py --apenas-hoje`
 
 ---
 

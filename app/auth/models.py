@@ -92,6 +92,25 @@ class User(UserMixin, db.Model):
         return f'<User {self.username}>'
 
 
+# Estados de entrega do Mailjet → (rótulo, classe de badge) para a tabela de
+# convites. 'aceite' é o estado local gravado no envio (a API aceitou o pedido);
+# os restantes vêm da consulta de actividade em /admin/convites/<id>/estado-email.
+ESTADOS_EMAIL = {
+    'aceite':      ('enviado', 'badge-inactivo'),
+    'sent':        ('enviado', 'badge-inactivo'),
+    'delivered':   ('entregue', 'badge-activo'),
+    'expanded':    ('entregue', 'badge-activo'),
+    'opened':      ('lido', 'badge-activo'),
+    'clicked':     ('clicado', 'badge-activo'),
+    'falhou':      ('falhou', 'badge-expirado'),
+    'softbounced': ('falhou (transitório)', 'badge-expirado'),
+    'bounced':     ('falhou', 'badge-expirado'),
+    'failed':      ('falhou', 'badge-expirado'),
+    'blocked':     ('bloqueado', 'badge-expirado'),
+    'abuse':       ('queixa de spam', 'badge-expirado'),
+}
+
+
 class Convite(db.Model):
     __tablename__ = 'convites'
 
@@ -104,9 +123,23 @@ class Convite(db.Model):
     usado = db.Column(db.Boolean, default=False)
     usado_em = db.Column(db.DateTime, nullable=True)
 
+    # Envio do convite por email (Mailjet) — a confirmação da API no momento do
+    # envio não prova entrega; com o ID guarda-se o estado real, consultável em
+    # /admin/convites/<id>/estado-email (ver scripts/migrar_convites_mailjet.py).
+    mailjet_message_id = db.Column(db.String(20), nullable=True)
+    email_estado = db.Column(db.String(20), nullable=True)
+    email_verificado_em = db.Column(db.DateTime, nullable=True)
+
     def esta_valido(self):
         """Verifica se o convite não foi usado e não expirou."""
         return not self.usado and datetime.utcnow() < self.expira_em
+
+    def estado_email(self):
+        """(rótulo, classe de badge) do estado do email, ou None se não há envio."""
+        if not self.email_estado:
+            return None
+        return ESTADOS_EMAIL.get(self.email_estado,
+                                 (self.email_estado, 'badge-inactivo'))
 
 
 @login_manager.user_loader
