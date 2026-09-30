@@ -261,3 +261,86 @@ class ResumoGeralTests(_BaseCombustiveis):
                                      modo='leitura')
         self.assertIn('combustiveis', resumo)
         self.assertIn('Definições', resumo['combustiveis'])
+
+
+class FiltroPostoTests(_BaseCombustiveis):
+    """Filtro `posto`: era o que faltava para responder a perguntas sobre um posto.
+
+    Caso real (bug): "quanto está o gasóleo simples no Pingo Doce de Vila Verde?"
+    — a ferramenta só filtrava por concelho/combustível, a lista do concelho
+    excedia o tecto do tool result e o modelo recebia apenas um aviso.
+    """
+
+    def test_filtro_por_nome_do_posto(self):
+        resultado = get_combustiveis(self.user_id, posto='PD VILA VERDE')
+        self.assertNotIn('erro', resultado)
+        self.assertEqual(resultado['total'], 1)
+        self.assertEqual(resultado['precos'][0]['posto'], 'PD VILA VERDE')
+        self.assertEqual(resultado['precos'][0]['preco'], 2.113)
+
+    def test_filtro_por_marca_ignora_acentos_e_caixa(self):
+        """O utilizador diz 'Pingo Doce'; na BD o nome é 'PD VILA VERDE' e a marca 'PINGO DOCE'."""
+        resultado = get_combustiveis(self.user_id, posto='pingo doce')
+        self.assertNotIn('erro', resultado)
+        self.assertEqual([p['posto'] for p in resultado['precos']], ['PD VILA VERDE'])
+
+    def test_filtro_parcial_insensivel_a_acentos(self):
+        posto = self._criar_posto(3, 'INTERMARCHÉ DE VILA VERDE', 'INTERMARCHÉ', 'Vila Verde')
+        self._criar_preco(posto, 'Gasóleo simples', 2.115)
+        db.session.commit()
+
+        resultado = get_combustiveis(self.user_id, posto='intermarche')
+        self.assertNotIn('erro', resultado)
+        self.assertEqual([p['posto'] for p in resultado['precos']],
+                         ['INTERMARCHÉ DE VILA VERDE'])
+
+    def test_posto_inexistente_lista_os_disponiveis(self):
+        resultado = get_combustiveis(self.user_id, posto='Galp Inventado')
+        self.assertIn('erro', resultado)
+        self.assertIn('PD VILA VERDE', resultado['erro'])
+        self.assertIn('Vila Verde', resultado['erro'])
+
+    def test_posto_de_outro_concelho_nao_e_visivel(self):
+        """Isolamento: 'Bxpress Braga' existe na BD, mas Braga não é concelho deste utilizador."""
+        resultado = get_combustiveis(self.user_id, posto='Bxpress')
+        self.assertIn('erro', resultado)
+        # A mensagem repete o nome pedido, por isso valida-se só a lista de
+        # postos realmente disponíveis nos concelhos do utilizador.
+        disponiveis = resultado['erro'].split('Postos disponíveis:')[1]
+        self.assertIn('PD VILA VERDE', disponiveis)
+        self.assertNotIn('Bxpress', disponiveis)
+
+    def test_combina_com_filtro_de_combustivel(self):
+        resultado = get_combustiveis(self.user_id, posto='PD',
+                                     tipo_combustivel='gasoleo simples')
+        self.assertNotIn('erro', resultado)
+        self.assertEqual(len(resultado['precos']), 1)
+
+    def test_combina_com_apenas_mais_barato(self):
+        resultado = get_combustiveis(self.user_id, posto='PD', apenas_mais_barato=True)
+        self.assertNotIn('erro', resultado)
+        self.assertEqual(resultado['mais_barato_por_combustivel'][0]['posto'], 'PD VILA VERDE')
+
+    def test_posto_em_branco_nao_filtra(self):
+        sem_filtro = get_combustiveis(self.user_id)
+        com_espacos = get_combustiveis(self.user_id, posto='   ')
+        self.assertEqual(sem_filtro['total'], com_espacos['total'])
+
+    def test_payload_por_registo_e_enxuto(self):
+        """Sem 'morada'/'data_recolha' por registo, para o JSON caber no tecto do tool result."""
+        resultado = get_combustiveis(self.user_id)
+        self.assertEqual(
+            set(resultado['precos'][0]),
+            {'posto', 'marca', 'concelho', 'tipo_combustivel', 'preco', 'data_dgeg'},
+        )
+
+    def test_definicao_da_ferramenta_expoe_o_filtro_posto(self):
+        definicao = next(d for d in DEFINICOES_FERRAMENTAS_LEITURA
+                         if d['function']['name'] == 'get_combustiveis')
+        self.assertIn('posto', definicao['function']['parameters']['properties'])
+
+    def test_despachante_aceita_o_filtro(self):
+        resultado = executar_ferramenta('get_combustiveis', {'posto': 'Pingo Doce'},
+                                        self.user_id, modo='leitura')
+        self.assertEqual(resultado['precos'][0]['posto'], 'PD VILA VERDE')
+

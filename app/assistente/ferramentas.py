@@ -245,12 +245,23 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
             'description': (
                 'Consulta os preços de combustíveis (em €/L) nos postos dos concelhos que o '
                 'utilizador escolheu em Combustíveis → Definições. Devolve o preço mais recente '
-                'por posto e combustível. Sem argumentos, devolve os preços de todos os '
-                'combustíveis de interesse do utilizador nos seus concelhos.'
+                'por posto e combustível. Para perguntas sobre um posto concreto (ex.: "o Pingo '
+                'Doce de Vila Verde", "o Intermarché") usa o argumento "posto" — e "concelho", '
+                'se a pergunta o indicar. Sem filtros devolve todos os combustíveis de interesse '
+                'nos concelhos do utilizador; como a lista é extensa, filtra sempre que possas '
+                'por concelho, combustível e/ou posto.'
             ),
             'parameters': {
                 'type': 'object',
                 'properties': {
+                    'posto': {
+                        'type': 'string',
+                        'description': (
+                            'Nome, ou parte do nome, do posto a filtrar (ex: "Pingo Doce", "PD '
+                            'Vila Verde", "Intermarche"). Compara também com a marca e ignora '
+                            'acentos e maiúsculas. Usa-o sempre que a pergunta nomeie um posto.'
+                        ),
+                    },
                     'tipo_combustivel': {
                         'type': 'string',
                         'description': (
@@ -781,6 +792,9 @@ def get_cambio(user_id, origem=None, destino=None, valor=None):
 
 LIMITE_COMBUSTIVEIS_DEFAULT = 20
 LIMITE_COMBUSTIVEIS_MAX = 100
+# Nº de nomes de postos listados no erro do filtro `posto` — chega para o modelo
+# perceber o que existe no concelho sem inflacionar a mensagem de erro.
+LIMITE_POSTOS_SUGERIDOS = 15
 
 
 # Fonte de dados usada pela recolha — devolvida ao modelo para ele poder citá-la.
@@ -852,7 +866,8 @@ def _estado_recolha_combustiveis():
 
 
 def get_combustiveis(user_id, tipo_combustivel=None, concelho=None,
-                      apenas_mais_barato=False, limite=LIMITE_COMBUSTIVEIS_DEFAULT):
+                      apenas_mais_barato=False,
+                      limite=LIMITE_COMBUSTIVEIS_DEFAULT, posto=None):
     """Consulta os preços de combustíveis nos concelhos escolhidos pelo utilizador.
 
     Ferramenta de leitura: não cria, altera nem apaga nada.
@@ -871,12 +886,18 @@ def get_combustiveis(user_id, tipo_combustivel=None, concelho=None,
         concelho: concelho a filtrar; tem de constar dos concelhos do utilizador.
         apenas_mais_barato: se True, devolve só o mínimo por combustível.
         limite: nº máximo de registos de preço a devolver (1-100).
+        posto: nome (ou parte do nome) do posto a filtrar — compara com o nome
+            e com a marca, ignorando acentos e maiúsculas (ex: 'Pingo Doce',
+            'PD VILA VERDE'). É o filtro a usar quando a pergunta nomeia um
+            posto concreto, e mantém a resposta pequena o suficiente para
+            chegar ao modelo (o tecto do tool result é 2000 chars).
 
     Returns:
         Dict com 'precos' (ou 'mais_barato_por_combustivel'), 'concelhos',
         'tipos_combustivel', 'total' e os metadados de frescura da recolha
         ('recolha'), ou dict com chave 'erro' quando não há concelhos
-        escolhidos ou o filtro não devolve resultados.
+        escolhidos, o filtro não devolve resultados ou o posto pedido não
+        existe nos concelhos do utilizador.
     """
     # ── Preferências do utilizador (origem do filtro de isolamento) ──
     concelhos = [uc.concelho for uc in
@@ -933,6 +954,28 @@ def get_combustiveis(user_id, tipo_combustivel=None, concelho=None,
                         'combustíveis de interesse em Combustíveis → Definições, ou actualiza os '
                         'dados no módulo Combustíveis (botão "Atualizar Dados").'}
 
+    # ── Filtro por posto (nome ou marca, insensível a acentos e maiúsculas) ──
+    # Sem ele não havia forma de responder a "quanto está no Pingo Doce de Vila
+    # Verde": a ferramenta só filtrava por concelho/combustível e a lista de um
+    # concelho inteiro (14 postos ≈ 3,6 k chars) não cabe no tecto do tool
+    # result. Aplica-se antes de 'apenas_mais_barato', pelo que também funciona
+    # como "o mais barato no posto X".
+    alvo_posto = _normalizar_texto(posto)
+    if alvo_posto:
+        encontrados = [(p, pr) for p, pr in resultados
+                       if alvo_posto in _normalizar_texto(p.nome)
+                       or alvo_posto in _normalizar_texto(p.marca)]
+        if not encontrados:
+            nomes = sorted({p.nome for p, _ in resultados})
+            sugeridos = '; '.join(nomes[:LIMITE_POSTOS_SUGERIDOS])
+            if len(nomes) > LIMITE_POSTOS_SUGERIDOS:
+                sugeridos += '; …'
+            return {'erro': f'Não encontrei nenhum posto com "{posto}" em '
+                            f'{", ".join(sorted(concelhos_filtrados))}. '
+                            f'Postos disponíveis: {sugeridos}. '
+                            'Confirma o nome no módulo Combustíveis ou tenta sem o filtro "posto".'}
+        resultados = encontrados
+
     recolha = _estado_recolha_combustiveis()
 
     if apenas_mais_barato:
@@ -943,19 +986,21 @@ def get_combustiveis(user_id, tipo_combustivel=None, concelho=None,
         }
 
     total = len(resultados)
+    # Payload enxuto de propósito: 'morada' e 'data_recolha' por registo foram
+    # retirados porque 14 registos (um concelho) davam ~3,6 k chars de JSON e
+    # excediam o tecto do tool result (contexto.LIMITE_CHARS_TOOL_RESULT). A
+    # frescura global continua em 'recolha' e a data DGEG de cada preço em
+    # 'data_dgeg'. Não devolver 'morada' também evita que o modelo a repita.
     precos = [
         {
-            'posto': posto.nome,
-            'marca': posto.marca,
-            'concelho': posto.concelho,
-            'morada': posto.morada,
-            'tipo_combustivel': preco.tipo_combustivel,
-            'preco': round(preco.preco, 3),
-            'data_dgeg': preco.data_atualizacao_dgeg,
-            'data_recolha': (preco.data_recolha.strftime('%Y-%m-%d %H:%M')
-                             if preco.data_recolha else None),
+            'posto': p.nome,
+            'marca': p.marca,
+            'concelho': p.concelho,
+            'tipo_combustivel': pr.tipo_combustivel,
+            'preco': round(pr.preco, 3),
+            'data_dgeg': pr.data_atualizacao_dgeg,
         }
-        for posto, preco in resultados[:limite]
+        for p, pr in resultados[:limite]
     ]
 
     resposta = {

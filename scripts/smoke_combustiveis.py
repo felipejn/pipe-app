@@ -29,6 +29,11 @@ USER_ID = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 CASOS = [
     ('mais barato (sem filtros)', {'apenas_mais_barato': True}),
     ('gasóleo simples, limite 3', {'tipo_combustivel': 'gasoleo simples', 'limite': 3}),
+    ('posto concreto (Pingo Doce de Vila Verde)',
+     {'posto': 'Pingo Doce', 'concelho': 'Vila Verde'}),
+    ('posto concreto + combustível',
+     {'posto': 'Pingo Doce', 'concelho': 'Vila Verde', 'tipo_combustivel': 'gasoleo simples'}),
+    ('posto inexistente', {'posto': 'Galp Inventado'}),
     ('concelho inexistente', {'concelho': 'Lisboa'}),
     ('combustível inexistente', {'tipo_combustivel': 'Hidrogénio'}),
     ('limite inválido', {'limite': 'abc'}),

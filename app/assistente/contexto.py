@@ -112,44 +112,55 @@ SYSTEM_PROMPT_ESCRITA = (
 
 LIMITE_ITENS_LISTA_TOOL = 10       # nº máximo de itens em listas dentro do resultado
 LIMITE_CHARS_TOOL_RESULT = 2000    # tecto de segurança do JSON final
+# Degradação progressiva: quando o JSON excede LIMITE_CHARS_TOOL_RESULT, as
+# listas vão sendo encolhidas por esta ordem até caber. Antes devolvia-se apenas
+# o aviso genérico (o modelo ficava sem dados nenhuns naquele pedido) — foi o
+# que aconteceu com get_combustiveis: 14 registos = 2 853 chars, o modelo
+# recebia o aviso em vez dos preços e não conseguia responder à pergunta.
+LIMITES_ITENS_DEGRADACAO = (LIMITE_ITENS_LISTA_TOOL, 8, 5, 3, 1)
 
 
-def _truncar_listas(valor):
-    """Corta listas dentro do resultado de uma tool a LIMITE_ITENS_LISTA_TOOL itens,
+def _truncar_listas(valor, limite=LIMITE_ITENS_LISTA_TOOL):
+    """Corta listas dentro do resultado de uma tool a `limite` itens,
     marcando 'truncado': True. Evita cortar a string JSON a meio (o que geraria
     JSON inválido) — o corte é feito na estrutura, antes de serializar."""
     if isinstance(valor, dict):
         novo = {}
         for chave, item in valor.items():
-            if isinstance(item, list) and len(item) > LIMITE_ITENS_LISTA_TOOL:
-                novo[chave] = item[:LIMITE_ITENS_LISTA_TOOL]
+            if isinstance(item, list) and len(item) > limite:
+                novo[chave] = item[:limite]
                 novo['truncado'] = True
-                novo.setdefault('nota', f'Mostrados {LIMITE_ITENS_LISTA_TOOL} de {len(item)} registos. Usa filtros mais específicos para ver menos de cada vez.')
+                novo.setdefault('nota', f'Mostrados {limite} de {len(item)} registos. Usa filtros mais específicos para ver menos de cada vez.')
             else:
-                novo[chave] = _truncar_listas(item)
+                novo[chave] = _truncar_listas(item, limite)
         return novo
     if isinstance(valor, list):
-        return [_truncar_listas(v) for v in valor]
+        return [_truncar_listas(v, limite) for v in valor]
     return valor
 
 
 def _serializar_resultado_tool(resultado):
-    """Serializa o resultado de uma tool para o histórico, com corte por itens
-    (estrutural) e um tecto final de caracteres como rede de segurança."""
+    """Serializa o resultado de uma tool para a mensagem enviada ao modelo.
+
+    Corte estrutural de listas (evita JSON inválido) e tecto de caracteres.
+    Quando o JSON excede LIMITE_CHARS_TOOL_RESULT, as listas são encolhidas
+    progressivamente (LIMITES_ITENS_DEGRADACAO) para o modelo continuar a
+    receber dados — antes devolvia-se só o aviso, perdendo-se o resultado todo.
+    O aviso genérico fica como último recurso (nem com 1 item cabe).
+    """
     if isinstance(resultado, str):
         return resultado[:LIMITE_CHARS_TOOL_RESULT]
 
-    resultado_cortado = _truncar_listas(resultado)
-    texto = json.dumps(resultado_cortado, ensure_ascii=False)
+    for limite in LIMITES_ITENS_DEGRADACAO:
+        texto = json.dumps(_truncar_listas(resultado, limite), ensure_ascii=False)
+        if len(texto) <= LIMITE_CHARS_TOOL_RESULT:
+            return texto
 
-    if len(texto) > LIMITE_CHARS_TOOL_RESULT:
-        texto = json.dumps({
-            'aviso': 'Resultado demasiado grande para mostrar por completo.',
-            'total_aproximado': len(texto),
-            'sugestao': 'Pede um filtro mais específico (ex. um concelho, uma lista, um intervalo de datas).',
-        }, ensure_ascii=False)
-
-    return texto
+    return json.dumps({
+        'aviso': 'Resultado demasiado grande para mostrar por completo.',
+        'total_aproximado': len(json.dumps(resultado, ensure_ascii=False)),
+        'sugestao': 'Pede um filtro mais específico (ex. um concelho, uma lista, um intervalo de datas).',
+    }, ensure_ascii=False)
 
 
 def _obter_historico():
