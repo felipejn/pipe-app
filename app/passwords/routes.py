@@ -1,7 +1,11 @@
 import base64
+import io
+import json
 import time
+import zipfile
 from datetime import datetime
-from flask import render_template, request, jsonify, session, current_app
+from pathlib import Path
+from flask import render_template, request, jsonify, session, current_app, send_file
 from flask_login import login_required, current_user
 from flask_wtf.csrf import generate_csrf
 from app import db
@@ -46,6 +50,60 @@ def _obter_chave_cofre():
 @login_required
 def index():
     return render_template('passwords/index.html')
+
+
+# ─── Distribuição da extensão Chrome ────────────────────────────────────────
+
+# Pasta da extensão: <raiz do projecto>/chrome-extension/ (relativo a este
+# ficheiro em app/passwords/ → sobe duas pastas). Em produção (PythonAnywhere)
+# a pasta existe no disco porque vem do repositório com o push/deploy.
+_PASTA_EXTENSAO = Path(__file__).resolve().parents[2] / 'chrome-extension'
+
+
+@bp.route('/extensao/download')
+@login_required
+def extensao_download():
+    """ZIP da extensão Chrome do Cofre, para o utilizador descompactar e
+    carregar no Chrome («Load unpacked»).
+
+    Cada entrada leva o prefixo `chrome-extension/` para que, ao descompactar,
+    fique logo a pasta que contém o `manifest.json`. Sem alteração de BD.
+    """
+    manifesto = _PASTA_EXTENSAO / 'manifest.json'
+    if not manifesto.is_file():
+        return jsonify({
+            'erro': 'Extensão não encontrada no servidor.'
+        }), 404
+
+    try:
+        versao = json.loads(manifesto.read_text(encoding='utf-8')).get('version', '')
+    except (ValueError, OSError):
+        versao = ''
+
+    # Empacotar em memória (padrão do módulo Conversões) — só ficheiros da
+    # pasta da extensão, nunca pastas ocultas nem __pycache__.
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for ficheiro in sorted(_PASTA_EXTENSAO.iterdir()):
+            if ficheiro.is_file() and not ficheiro.name.startswith('.'):
+                zf.write(ficheiro, f'chrome-extension/{ficheiro.name}')
+    buf.seek(0)
+
+    sufixo = f'-{versao}' if versao else ''
+    return send_file(
+        buf,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'pipe-cofre-extensao{sufixo}.zip'
+    )
+
+
+@bp.route('/extensao/guia')
+@login_required
+def extensao_guia():
+    """Guia de instalação e uso da extensão, servido dentro do PIPE
+    (versão HTML de docs/guia-extensao-chrome.md)."""
+    return render_template('passwords/guia_extensao.html')
 
 
 @bp.route('/api/gerar', methods=['POST'])

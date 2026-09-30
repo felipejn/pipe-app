@@ -129,6 +129,25 @@
     </div>
   </div>
 
+  <!-- ═══════ DIVISÓRIA DA EXTENSÃO ═══════ -->
+  <hr style="border:none;border-top:1px solid var(--cor-superficie-2);margin:2rem 0;">
+
+  <div class="cabecalho-pagina">
+    <h2>🧩 Extensão Chrome</h2>
+    <p class="modulo-desc">Preenche e captura logins automaticamente no teu browser, directamente do teu cofre.</p>
+  </div>
+
+  <div class="cartao">
+    <p style="margin-bottom:1rem;color:var(--cor-texto-suave);font-size:.9rem;">
+      A extensão liga-se ao PIPE por CORS — precisa do cofre activado e do teu ID autorizado no servidor
+      (o guia explica tudo, passo a passo). Requer Chrome, Edge ou Brave.
+    </p>
+    <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
+      <a class="btn btn-primario" href="{{ url_for('passwords.extensao_download') }}">⬇️ Descarregar extensão (.zip)</a>
+      <a class="btn btn-secundario" href="{{ url_for('passwords.extensao_guia') }}">📖 Guia de instalação</a>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══════ MODAIS ═══════ -->

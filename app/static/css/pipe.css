@@ -2560,3 +2560,73 @@ input[type="date"] {
 }
 .btn-tema:hover { border-color: var(--cor-primaria); color: var(--cor-primaria); }
 
+/* ---- Guia da extensão Chrome (/passwords/extensao/guia) ---- */
+.guia-extensao h3 {
+    color: var(--cor-texto);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 2rem 0 .75rem;
+    padding-bottom: .35rem;
+    border-bottom: 1px solid var(--cor-borda);
+}
+.guia-extensao p,
+.guia-extensao li {
+    color: var(--cor-texto);
+    font-size: .92rem;
+    line-height: 1.6;
+}
+.guia-extensao li { margin-bottom: .4rem; }
+.guia-extensao ul,
+.guia-extensao ol { padding-left: 1.4rem; margin: .5rem 0 1rem; }
+.guia-extensao code {
+    background: var(--cor-superficie-2);
+    padding: .1em .4em;
+    border-radius: 4px;
+    font-size: .85em;
+    color: var(--cor-primaria);
+}
+.guia-extensao pre {
+    background: var(--cor-superficie-2);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-sm, 6px);
+    padding: .75rem 1rem;
+    margin: .75rem 0;
+    overflow-x: auto;
+}
+.guia-extensao pre code { background: none; padding: 0; color: var(--cor-texto); }
+.guia-extensao table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: .75rem 0 1rem;
+    font-size: .87rem;
+}
+.guia-extensao th {
+    background: var(--cor-superficie-2);
+    color: var(--cor-texto-suave);
+    text-align: left;
+    padding: .45rem .6rem;
+    border-bottom: 2px solid var(--cor-primaria);
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.guia-extensao td {
+    padding: .45rem .6rem;
+    border-bottom: 1px solid var(--cor-borda);
+    color: var(--cor-texto);
+    vertical-align: top;
+}
+.guia-extensao tr:hover td { background: var(--cor-superficie-2); }
+.guia-nota {
+    border-radius: var(--raio-sm, 6px);
+    padding: .75rem 1rem;
+    margin: 1rem 0;
+    font-size: .88rem;
+    line-height: 1.55;
+    border-left: 3px solid var(--cor-primaria);
+    background: var(--cor-superficie-2);
+    color: var(--cor-texto);
+}
+.guia-nota-aviso { border-left-color: #e9a23b; }
+
+

@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Guia da extensão — PIPE{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo guia-extensao" style="max-width:820px;">
+
+  <div class="cabecalho-pagina">
+    <h2>🧩 Guia da extensão do Cofre</h2>
+    <p class="modulo-desc">Passo a passo para instalar e usar a extensão Chrome no PIPE. Tempo estimado: ~10 minutos. Funciona também no Edge e no Brave (mudando <code>chrome://extensions</code> por <code>edge://extensions</code>).</p>
+  </div>
+
+  <!-- Acções principais -->
+  <div class="cartao" style="margin-bottom:1.5rem;">
+    <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
+      <a class="btn btn-primario" href="{{ url_for('passwords.extensao_download') }}">⬇️ Descarregar extensão (.zip)</a>
+      <a class="btn btn-secundario" href="{{ url_for('passwords.index') }}">← Voltar ao Cofre</a>
+    </div>
+    <p style="font-size:.85rem;color:var(--cor-texto-suave);margin-top:.75rem;">
+      O ZIP já contém os ícones. Ao descompactar, fica a pasta <code>chrome-extension/</code> pronta para o «Load unpacked».
+    </p>
+  </div>
+
+  <!-- Antes de começar -->
+  <h3>Antes de começar</h3>
+  <table>
+    <thead><tr><th>Precisas de</th><th>Onde</th></tr></thead>
+    <tbody>
+      <tr><td>Chrome actualizado</td><td>—</td></tr>
+      <tr><td>Conta no PIPE com sessão iniciada</td><td><code>/auth/login</code></td></tr>
+      <tr><td>Cofre activado com password mestra</td><td><code>/passwords/</code></td></tr>
+      <tr><td>Acesso ao <code>.env</code> do servidor</td><td>PythonAnywhere (produção) ou <code>.env</code> local</td></tr>
+      <tr><td>Os ícones <code>icon48.png</code> / <code>icon128.png</code></td><td>Já incluídos no ZIP</td></tr>
+    </tbody>
+  </table>
+
+  <div class="guia-nota guia-nota-aviso">
+    ⚠️ <strong>Regra de ouro:</strong> a extensão só consegue falar com o servidor se este a autorizar por CORS (<code>COFRE_CORS_ORIGINS</code>). Sem isso o popup mostra erro de rede/CORS — Passos 4 e 5.
+  </div>
+
+  <!-- Passo 1 -->
+  <h3 id="passo-1">Passo 1 — Activar o cofre no PIPE</h3>
+  <ol>
+    <li>Inicia sessão no PIPE.</li>
+    <li>Abre o módulo <strong>Passwords</strong> (dashboard → card Passwords) e desce até à secção <strong>Cofre</strong>.</li>
+    <li>Clica <strong>Activar cofre</strong> e define a <strong>password mestra</strong> (mínimo 8 caracteres).</li>
+    <li>⚠️ <strong>A password mestra não é recuperável.</strong> Não há botão de recuperação: se a esqueceres, o conteúdo cifrado perde-se.</li>
+    <li>Confirma que o card do cofre fica <strong>activado</strong> e <strong>desbloqueado</strong> (é desbloqueado automaticamente logo após a activação).</li>
+  </ol>
+
+  <!-- Passo 2 -->
+  <h3 id="passo-2">Passo 2 — Descompactar o ZIP</h3>
+  <p>Descarrega o ZIP com o botão em cima (<strong>⬇️ Descarregar extensão</strong>) e descompacta-o num local estável (por exemplo, a tua pasta de documentos). Fica a pasta <code>chrome-extension/</code> com 8 ficheiros: <code>manifest.json</code>, <code>background.js</code>, <code>popup.html</code>, <code>popup.js</code>, <code>content.js</code>, <code>icon48.png</code>, <code>icon128.png</code> e <code>README.md</code>.</p>
+  <p style="font-size:.85rem;color:var(--cor-texto-suave);">Alternative para quem tem o projecto: clonar o repositório e usar a pasta <code>chrome-extension/</code> de lá — é o mesmo conteúdo.</p>
+
+
+  <!-- Passo 3 -->
+  <h3 id="passo-3">Passo 3 — Carregar a extensão no Chrome</h3>
+  <ol>
+    <li>Escreve <code>chrome://extensions</code> na barra de endereço.</li>
+    <li>Liga o <strong>Modo de programador</strong> (canto superior direito).</li>
+    <li>Clica <strong>Load unpacked</strong> (<em>Carregar sem compactação</em>).</li>
+    <li>Escolhe a pasta <code>chrome-extension/</code> (é a que contém o <code>manifest.json</code>).</li>
+    <li>A extensão aparece na lista. Se o ícone não estiver na barra de ferramentas, clica no ícone de puzzle 🧩 → 📌 <strong>Fixar</strong>.</li>
+  </ol>
+
+  <!-- Passo 4 -->
+  <h3 id="passo-4">Passo 4 — Copiar o ID da extensão</h3>
+  <p>No cartão da extensão (em <code>chrome://extensions</code>) aparece <strong>ID:</strong> <code>abcdefghijklmnopabcdefghijklmnop</code>. Clica em copiar — é esse valor (e só esse) que o servidor tem de autorizar no passo seguinte.</p>
+
+  <!-- Passo 5 -->
+  <h3 id="passo-5">Passo 5 — Autorizar a extensão no servidor (obrigatório)</h3>
+  <p>Edita o <code>.env</code> do servidor e acrescenta a linha (a variável já existe vazia no <code>.env.example</code>):</p>
+  <pre><code>COFRE_CORS_ORIGINS=chrome-extension://&lt;ID copiado no Passo 4&gt;</code></pre>
+  <ul>
+    <li>Vários IDs (ex.: Chrome + Edge, ou vários PCs): separados por vírgula, sem espaços.</li>
+    <li><strong>Produção (PythonAnywhere):</strong> guardar o <code>.env</code> → aba <strong>Web</strong> → <strong>Reload</strong> <code>felipejn.pythonanywhere.com</code>.</li>
+    <li><strong>Servidor local:</strong> guardar o <code>.env</code> → reiniciar <code>python run.py</code>.</li>
+  </ul>
+
+  <!-- Passo 6 -->
+  <h3 id="passo-6">Passo 6 — Cookies de sessão (porque é que isto funciona)</h3>
+  <p>A extensão faz pedidos a partir de <code>chrome-extension://</code>, que o Chrome considera um contexto diferente do servidor. Ainda assim o cookie de sessão chega à extensão, por dois mecanismos:</p>
+  <ol>
+    <li><strong>Host permissions (é o que faz funcionar em local).</strong> O <code>manifest.json</code> declara <code>"host_permissions": ["&lt;all_urls&gt;"]</code> e o Chrome trata os pedidos feitos por uma extensão como <em>same-site</em> quando esta tem host permissions para o destino — logo um cookie <code>SameSite=Lax</code> é enviado.</li>
+    <li><strong>Em produção, explícito.</strong> O <code>ProductionConfig</code> declara <code>SESSION_COOKIE_SAMESITE = 'None'</code> e <code>SESSION_COOKIE_SECURE = True</code>. <code>None</code> é a forma documentada de autorizar um cookie cross-site. Exige HTTPS, que o PythonAnywhere já serve — <strong>não é preciso mexer em nada</strong>. O CSRF continua protegido pelo token assinado em todos os POSTs, incluindo os da extensão.</li>
+  </ol>
+  <div class="guia-nota guia-nota-aviso">
+    ⚠️ <strong>Se o popup disser «Sem sessão no PIPE»:</strong> confirma se tens <strong>bloqueio de cookies de terceiros</strong> activo nas definições do Chrome. Soluções: permitir cookies para o site do PIPE, ou servir o PIPE por HTTPS com <code>SameSite=None</code>.
+  </div>
+
+  <!-- Passo 7 -->
+  <h3 id="passo-7">Passo 7 — Usar</h3>
+  <ol>
+    <li>Com a sessão do PIPE iniciada neste Chrome, clica no ícone <strong>PIPE Cofre</strong>.</li>
+    <li>O popup mostra <strong>Cofre bloqueado</strong> → escreve a password mestra → <strong>Desbloquear</strong> (fica desbloqueado 15 minutos). Erros aparecem dentro do popup (não há janelas/<code>alert</code>).</li>
+    <li>Abre o site onde tens conta → clica no ícone → o popup lista as entradas guardadas desse domínio → <strong>📋</strong> copia a password.</li>
+    <li>Ao submeteres um form de login, a extensão captura os dados (aparece um 📝 no ícone) e o popup — <strong>só quando estás no site da captura</strong> — pergunta «Guardar para &lt;utilizador&gt;?» → <strong>Guardar</strong>.</li>
+    <li><strong>Se já existir uma entrada</strong> para esse domínio + utilizador, o popup não falha: mostra «Já existe uma entrada» e o botão <strong>Actualizar entrada</strong>, que grava a password capturada por cima da antiga.</li>
+    <li>Só forms de <strong>login</strong> são capturados — registos e alterações de password são ignorados, e a extensão <strong>não captura no próprio PIPE</strong> para não guardar as credenciais do PIPE em si.</li>
+    <li>Botões do popup: <strong>↻ Actualizar lista</strong> recarrega as entradas do site actual; <strong>Não</strong> descarta a captura pendente. Uma captura feita noutro site aparece só como nota («Abre esse site para o guardar») — nunca fica pendente para sempre: expira ao fim de 15 minutos.</li>
+    <li>Em separadores que não são sites (<code>chrome://</code>, ficheiros, …) o popup diz «Este separador não é um site» — não há entradas a mostrar.</li>
+  </ol>
+
+  <!-- Passo 8 -->
+  <h3 id="passo-8">Passo 8 — Testar localmente (sem deploy)</h3>
+  <p><strong>Não precisas de deploy para experimentar a extensão.</strong> O servidor local tem tudo o que ela precisa: a BD (<code>instance/pipe.db</code>), a API do cofre e o CORS (lido do <code>.env</code>).</p>
+  <ol>
+    <li><strong>Carrega a extensão</strong> (Passo 3) e copia o <strong>ID</strong> (Passo 4).</li>
+    <li><strong><code>.env</code> local</strong> — acrescenta o ID e reinicia o servidor com <code>python run.py</code> (fica em <code>http://127.0.0.1:5000</code>):
+      <pre><code>COFRE_CORS_ORIGINS=chrome-extension://&lt;ID&gt;</code></pre>
+      Confirma que o <code>.env</code> local tem <code>FLASK_ENV=development</code> — com <code>production</code>, o cookie sai com <code>Secure</code> e, sobre HTTP, o browser descarta-o.
+    </li>
+    <li><strong>Aponta a extensão ao servidor local</strong> — <code>chrome://extensions</code> → cartão da extensão → link <strong>service worker</strong> (abre o DevTools) → consola:
+      <pre><code>chrome.storage.local.set({ pipeOrigin: 'http://127.0.0.1:5000' })</code></pre>
+    </li>
+    <li><strong>Testa</strong> — inicia sessão em <code>http://127.0.0.1:5000/auth/login</code>, abre <code>/passwords/</code> → secção Cofre, desbloqueia no popup com a password mestra e experimenta: listar/copiar entradas do domínio da aba e capturar um login num site de teste.</li>
+  </ol>
+  <p><strong>Voltar a produção</strong> (a extensão volta a <code>https://felipejn.pythonanywhere.com</code>):</p>
+  <pre><code>chrome.storage.local.remove('pipeOrigin')</code></pre>
+
+  <!-- Actualizar -->
+  <h3>Actualizar a extensão depois de alterar o código</h3>
+  <ol>
+    <li><code>chrome://extensions</code> → cartão da extensão → botão <strong>Recarregar</strong> ⟳.</li>
+    <li>Recarrega também (F5) a aba do site em teste — o content script só é injectado em páginas carregadas depois do reload.</li>
+  </ol>
+
+  <!-- Problemas comuns -->
+  <h3>Problemas comuns</h3>
+  <table>
+    <thead><tr><th>Sintoma no popup</th><th>Causa provável</th><th>Solução</th></tr></thead>
+    <tbody>
+      <tr><td>Erro de rede / CORS</td><td>ID em falta ou errado em <code>COFRE_CORS_ORIGINS</code>; servidor não recarregado</td><td>Refazer Passos 4–5 e <strong>Reload</strong> da app</td></tr>
+      <tr><td>«Sem sessão no PIPE»</td><td>Sessão terminada; <code>FLASK_ENV=production</code> em local; bloqueio de cookies de terceiros</td><td>Iniciar sessão em <code>/auth/login</code>; ver Passos 6 e 8</td></tr>
+      <tr><td>«Cofre não activado»</td><td>O cofre nunca foi activado (é <strong>por utilizador</strong>)</td><td>Passo 1</td></tr>
+      <tr><td>«Cofre bloqueado»</td><td>Passaram 15 minutos desde o desbloqueio</td><td>Desbloquear outra vez (a sessão de login mantém-se)</td></tr>
+      <tr><td>«Password incorreta»</td><td>Password mestra errada</td><td>— (não há recuperação possível)</td></tr>
+      <tr><td>A extensão não carrega / ícone em falta</td><td><code>icon48.png</code> / <code>icon128.png</code> ausentes</td><td>Re-descompactar o ZIP (os ícones já vêm incluídos)</td></tr>
+      <tr><td>A captura não aparece</td><td>Feita noutro site; form de registo; página aberta antes do reload</td><td>Abrir o site da captura; recarregar a aba; guardar à mão no PIPE</td></tr>
+      <tr><td>«Já existe uma entrada»</td><td>Mesma password guardada duas vezes para o mesmo domínio + utilizador</td><td>Clicar <strong>Actualizar entrada</strong></td></tr>
+      <tr><td>A captura desapareceu</td><td>Passaram 15 minutos (TTL da captura)</td><td>Submeter o login outra vez</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Segurança -->
+  <h3>Verificação de segurança (2 minutos)</h3>
+  <ul>
+    <li><strong>Cookies:</strong> DevTools → Application → Cookies → não deve existir nenhum cookie com a chave do cofre (só o cookie <code>session</code>). A chave vive no servidor, em <code>instance/flask_session/</code>.</li>
+    <li><strong>CORS:</strong> DevTools → Network → <code>Access-Control-Allow-Origin</code> deve devolver <code>chrome-extension://&lt;ID&gt;</code> e <strong>nunca</strong> <code>*</code>.</li>
+    <li><strong>Origem não autorizada:</strong> tira temporariamente o ID do <code>.env</code> e confirma que o pedido falha (não deve haver resposta utilizável).</li>
+  </ul>
+
+  <!-- Desinstalar -->
+  <h3>Desinstalar</h3>
+  <ol>
+    <li><code>chrome://extensions</code> → <strong>Remove</strong>.</li>
+    <li>Retira o ID de <code>COFRE_CORS_ORIGINS</code> no <code>.env</code> e faz <strong>Reload</strong> do servidor.</li>
+  </ol>
+  <p style="font-size:.85rem;color:var(--cor-texto-suave);">As entradas continuam no PIPE — a extensão não guarda nada localmente além da captura pendente (<code>chrome.storage.local</code>).</p>
+
+  <div style="margin-top:2rem;display:flex;flex-wrap:wrap;gap:.75rem;">
+    <a class="btn btn-primario" href="{{ url_for('passwords.extensao_download') }}">⬇️ Descarregar extensão (.zip)</a>
+    <a class="btn btn-secundario" href="{{ url_for('passwords.index') }}">← Voltar ao módulo Passwords</a>
+  </div>
+
+</div>
+{% endblock %}
+

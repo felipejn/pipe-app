@@ -2,7 +2,7 @@
 
 Guia simplificado, passo a passo, para pôr a extensão `chrome-extension/` a funcionar no **Chrome** (o processo é igual no Edge/Brave, mudando apenas `chrome://extensions` por `edge://extensions`).
 
-**Tempo:** ~10 minutos. **Sem loja e sem build:** a extensão é carregada directamente da pasta do projecto («Load unpacked»).
+**Tempo:** ~10 minutos. **Sem loja e sem build:** o ZIP da extensão é descarregado do próprio PIPE (secção «🧩 Extensão Chrome» em `/passwords/`, ou directamente em `/passwords/extensao/download`) e carregado no Chrome («Load unpacked»). Quem tenha o projecto clonado pode usar a pasta `chrome-extension/` do repositório — é o mesmo conteúdo. O guia deste ficheiro está também disponível como página em **`/passwords/extensao/guia`**.
 
 Para o detalhe técnico ver `chrome-extension/README.md` e `docs/plano-cofre-passwords.md`.
 

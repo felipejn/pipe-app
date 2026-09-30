@@ -45,10 +45,10 @@ def _resposta_erro_servico():
     })
 
 
-MODELO_DEFAULT = "inclusionai/ling-3.0-flash-fin:free"  # hardcoded para consistência entre testes e cliente
+MODELO_DEFAULT = "inclusionai/ling-3.0-flash-sante:free"  # hardcoded para consistência entre testes e cliente
 _MODELOS_FALLBACK_BRUTOS = [
-    "nex-agi/nex-n2.5-mini:free",
     "inclusionai/ling-3.0-flash-sante:free",
+    "poolside/laguna-s-2.1:free",
     "liquid/lfm-2.5-2.6b:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
