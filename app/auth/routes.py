@@ -18,6 +18,7 @@ from app.auth.forms import (
 )
 from app.auth.models import User, Convite
 from app.extensions import limiter
+from app.tarefas.seed import semear_listas_predefinidas
 from app.notifications.channels.telegram import TelegramChannel
 from app.notifications.channels.email import EmailChannel
 from flask import current_app
@@ -268,6 +269,8 @@ def registo_com_convite(token):
         user = User(username=form.username.data, email=form.email.data.lower().strip())
         user.set_password(form.password.data)
         db.session.add(user)
+        db.session.flush()  # obtém user.id para semear as listas predefinidas
+        semear_listas_predefinidas(user.id)
 
         convite.usado = True
         convite.usado_em = datetime.utcnow()

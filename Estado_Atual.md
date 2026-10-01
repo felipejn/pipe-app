@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.5.6
+# PIPE — Estado Actual do Projecto — v1.5.7
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -94,6 +94,7 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # Lista, Tarefa, TagTarefa
 │   │   ├── forms.py         # ListaForm, TarefaForm
+│   │   ├── seed.py          # semear_listas_predefinidas (v1.5.7)
 │   │   └── routes.py        # /tarefas/
 │   ├── notas/               # Blueprint Notas
 │   │   ├── __init__.py
@@ -169,7 +170,8 @@ pipe-app/
 │   ├── test_extensao_js.py              # corre tests/extensao_harness.js (Node) — JS da extensão
 │   ├── extensao_harness.js              # harness Node: content script + funções puras do popup
 │   ├── test_convites_email.py           # convites: MessageID, estado no Mailjet, endpoint de verificação (v1.5.2)
-│   └── test_isolamento_bd.py            # regressão do isolamento dos testes
+│   ├── test_isolamento_bd.py            # regressão do isolamento dos testes
+│   └── test_tarefas_listas_predefinidas.py  # listas predefinidas no registo: seed + idempotência (v1.5.7)
 ├── instance/
 │   ├── backups/             # cópias de segurança (backup_bd.py)
 │   ├── flask_session/       # sessões server-side do cofre (Flask-Session)
@@ -206,6 +208,7 @@ pipe-app/
 - **Funcionalidades:** vista "Todas", busca em tempo real, filtros, secção de concluídas colapsável, modal de nova lista com selector de emoji
 - **Comportamento ao abrir:** vista "Todas" por defeito — parâmetro `lista` tem default `'todas'` em `routes.py`; secção de concluídas **oculta por defeito** (botão «▸ mostrar»), aberta automaticamente apenas quando `filtro == 'concluidas'` (v1.5.6)
 - **Mobile:** selector `<select>` acima da grelha, visível apenas em ecrãs ≤ 640px
+- **Listas predefinidas no registo (v1.5.7):** contas novas nascem com 4 listas — Pessoal 📌 (ordem 0), Casa 🏠, Trabalho 💼, Compras 🛒 — criadas por `app/tarefas/seed.py::semear_listas_predefinidas(user_id)` chamada por `registo_com_convite` no mesmo commit. Função idempotente: só semeia se o utilizador não tiver nenhuma lista (nunca apaga nem duplica) — o deploy não toca nas listas das contas existentes. Vista inicial mantém-se "Todas".
 
 ### Módulo Loja de Módulos (`app/modulos/`)
 - Tabela `UserModulo` (`user_id` + `modulo_slug` + `ativo`)
@@ -544,6 +547,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 ---
 
 ## Ponto onde estamos
+
+**Versão v1.5.7** — listas predefinidas no módulo de Tarefas para contas novas. Novo `app/tarefas/seed.py` com a constante `LISTAS_PREDEFINIDAS` (Pessoal 📌, Casa 🏠, Trabalho 💼, Compras 🛒 — `ordem` 0–3, ícones de um emoji no `String(8)`) e `semear_listas_predefinidas(user_id)`, chamada por `registo_com_convite` (`app/auth/routes.py`) logo a seguir ao `flush()` do utilizador e antes do `commit` — um único commit, tudo ou nada. A função é idempotente com condição de guarda explícita (só semeia se o utilizador não tiver **nenhuma** lista): nunca apaga nem duplica, pelo que o deploy não toca nas listas das contas já existentes — decisão do utilizador: semear **apenas no registo**. Frontend sem alterações: vista inicial continua «Todas» («Pessoal» é só a primeira lista da sidebar) e o fallback `Geral` do assistente (`_obter_ou_criar_lista`) ficou intacto — só dispara em contas sem listas — na prática, contas antigas. Testes em `tests/test_tarefas_listas_predefinidas.py` (registo ponta a ponta via convite + guarda de não-alteração de listas existentes + idempotência); **122 testes a passar** no total. Spec: `docs/superpowers/specs/2026-10-01-listas-predefinidas-tarefas-design.md`.
 
 **Versão v1.5.2** — confirmação de entrega dos emails de convite (Mailjet) e diagnóstico de deliverability. O painel de convites mostrava «Convite enviado» só com base na aceitação da API (200 + `success`) — sem prova de entrega, e o `MessageID` da resposta era deitado fora. `EmailChannel.enviar()` passa a guardar o resultado em `self.ultimo_resultado` (`MessageID` lido de `Messages[0].To[0]` + motivo de falha; o retorno bool mantém-se, pelo que 2FA/recuperação de password e testes de email não mudam) e ganha **`consultar_estado(message_id)`**, que consulta `/REST/messagehistory/{id}` + `/REST/message/{id}` e devolve estado, cronologia de eventos e o motivo do bounce. O modelo `Convite` ganhou 3 colunas (`mailjet_message_id`, `email_estado`, `email_verificado_em` — migração idempotente em `scripts/migrar_convites_mailjet.py`) + `estado_email()` (rótulo PT + classe de badge a partir do mapa `ESTADOS_EMAIL`). O envio grava ID + estado `aceite` (a falha grava `falhou` e devolve o motivo detalhado no JSON) e há novo endpoint **`GET /admin/convites/<id>/estado-email`** (400 sem ID, 502 se o Mailjet falhar, nunca destrói o estado anterior; guarda `email_verificado_em`); a tabela `/admin/convites` ganhou a coluna **«Email (Mailjet)»** com badge (enviado/entregue/falhou-transitório) e botão 🔄 que actualiza o estado e mostra no hover a cronologia + motivo (JS novo com escape HTML dos comentários do bounce). Convites antigos sem ID ligam-se retroactivamente com `scripts/verificar_mailjet.py --ligar-convites` (pareamento por email + proximidade temporal ≤ 2 h) — **os 2 convites existentes já estão ligados na BD local** (gardengate → `1152921544892419067`, yahoo → `288230416497838458`, ambos `sent`). Diagnóstico com a API real do Mailjet: **ambos os convites de 25/09 foram efectivamente enviados (`sent`, sem bounce) e caíram em spam** — causa raiz identificada: `MAILJET_FROM_EMAIL=pipe.notificacoes@outlook.com` não está alinhado com SPF/DKIM autenticados (não é domínio autenticável na conta) → DMARC falha → **Gmail rejeita à porta** (`550 5.7.40`; um 3.º email de 25/09 07:01 para o gmail **softbounced** por essa razão, verificado no `Comment` do evento) e os restantes destinatários caem em spam (diagnóstico Mailjet: «Your FROM domain is not authenticated»). Correcções de robustez no caminho: stdout UTF-8 nos scripts de migração/diagnóstico (a consola cp1252 do Windows rebentava com o `✓`, o mesmo bug do script de ícones) e `try/except` de rede no `_email_do_contacto`. **Suite: 90 testes `pytest` a passar** (eram 76; +14 em `tests/test_convites_email.py`: canal, geração de convite, endpoint, renderização da página e caminhos de falha) + `node --check` no JS extraído do template. **Alteração de BD** — no PA: correr `python scripts/migrar_convites_mailjet.py` após o deploy.
 
