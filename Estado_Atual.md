@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.5.8
+# PIPE — Estado Actual do Projecto — v1.5.9
 
 ## O que é o PIPE
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
@@ -55,7 +55,7 @@ pipe-app/
 │   │   ├── modulos/
 │   │   │   └── loja.html
 │   │   └── calendario/
-│   │       └── index.html   # vistas Agenda + Mensal, modal CRUD, JS inline
+│   │       └── index.html   # vistas Agenda + Mensal, modal CRUD + modal de detalhe (read-only), JS inline
 │   ├── combustiveis/        # Blueprint Combustíveis ← NOVO
 │   │   ├── __init__.py
 │   │   ├── models.py        # Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis
@@ -272,6 +272,7 @@ pipe-app/
   - **Vista Mensal — inicial desde a v1.5.6** — grelha 7×N (Seg–Dom), navegação mês anterior/seguinte/Hoje, pílulas coloridas com título, dia actual destacado (âmbar), clique em slot vazio pré-preenche data no modal; tab «Mensal» activa no HTML, `vistaActual = 'mensal'` e init `mudarVista('mensal')`
   - **Vista Agenda** — lista cronológica a partir de hoje, agrupada por data, com hora início–fim, cor, localização; botões editar e apagar por evento (tab «Agenda»)
   - **Modal único** (criar e editar) — título, descrição, localização, datetime início/fim, toggle dia inteiro, toggle notificar, selector de 11 cores (círculos clicáveis), validação data_fim ≥ data_inicio, mensagem de erro inline
+  - **Modal de detalhe (read-only, v1.5.9)** — acionado ao **clicar** num evento (pílula na vista Mensal ou linha na vista Agenda) em vez de abrir o modal de edição; mostra barra de cor, título, data (pt-PT, dois dias se multi-dia), intervalo `HH:MM – HH:MM` ou «Dia inteiro», localização e descrição (condicionais) e badge de notificação; botões **Editar** (abre o modal existente), **Apagar** (com `confirm`) e **Fechar**. Os botões rápidos ✏️/🗑️ da linha da Agenda mantêm-se com `event.stopPropagation()` (acesso directo, sem disparar o detalhe). Sem novo endpoint — os dados vêm da API existente; paridade tema claro/escuro mantida
   - Frontend vanilla JS inline — padrão PIPE; CSRF via `X-CSRFToken` em todos os fetch
 - **Integração na Loja de Módulos** — entrada em `MODULOS_DISPONIVEIS` com slug `calendario`
 - **CSS** — 11 classes `.evento-<cor>` adicionadas ao `pipe.css` + 11 overrides `[data-theme="light"] .cal-pilula.evento-<cor>` (fundo tintado claro + texto escuro da mesma cor, estilo Google Calendar; só afectam as pílulas — a barra `.agenda-cor` e os círculos `.cor-opcao` mantêm as cores sólidas — v1.5.6)
@@ -548,6 +549,8 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 ## Ponto onde estamos
 
+**Versão v1.5.9** — janela de visualização (detalhe) do evento no Calendário. Antes, clicar num evento abria directamente o modal de edição; agora abre um **novo modal read-only** (`#modal-detalhe`, no `app/templates/calendario/index.html`): barra de cor, título, data formatada pt-PT (duas datas se multi-dia), intervalo `HH:MM – HH:MM` ou «Dia inteiro», localização e descrição (condicionais) e badge de notificação; botões **Editar** (fecha o detalhe e abre o modal de edição existente via `abrirModalEditar`), **Apagar** (`confirm` + `DELETE`, actualiza a vista activa) e **Fechar**. Novas funções inline `abrirDetalhe()`, `editarEDetalhe()`, `apagarEDetalhe()`, `fecharDetalhe()`/`fecharDetalheOverlay()` e helpers `formatarDataDetalhe()`/`formatarHoraDetalhe()`, com estado `eventoDetalheId`/`eventoDetalhe`. Gatilhos trocados: a pílula da vista Mensal e a linha da vista Agenda passam a abrir o detalhe; os botões rápidos ✏️/🗑️ da Agenda mantêm-se com `event.stopPropagation()` (acesso directo, sem disparar o detalhe). CSS `.detalhe-*` no tema escuro + overrides `[data-theme="light"]` (paleta Google Calendar `#fff`/`#dadce0`/`#3c4043`/`#70757a`), reutilizando `.btn-guardar`/`.btn-apagar`/`.btn-cancelar`. **Sem novo endpoint** — os dados vêm da API `GET /calendario/api/eventos` (já traz `cor`, `notificar`, `dia_inteiro`, `localizacao`, `descricao`); **sem alteração de BD** (deploy = só o push, o template é servido pelo Flask). Sem bump de cache-buster (`?v=` no `base.html`) porque as alterações são no `<style>`/`<script>` inline do template, não no `pipe.css`/`pipe.js` estáticos. Validação: **135 testes `pytest` a passar** (sem regressão) + renderização de `GET /calendario/` (autenticado, `create_app('testing')`) com os marcadores do modal presentes + `node --check` no JS inline (exit 0).
+
 **Versão v1.5.8** — notificações diárias alargadas. `tarefa_tarefas()` passa a avisar também **no dia do prazo** (`data_limite <= hoje`) e depois em todos os dias de atraso até concluir, numa única mensagem por utilizador com as secções «⏰ Vencem hoje» e «⚠ Em atraso» (`type='tarefa_lembrete'`). Nova `tarefa_calendario()` em `pipe_tasks.py` — lembretes de eventos **no dia anterior** («Amanhã») e **no dia** («Hoje»), agrupados por utilizador (`type='evento_lembrete'`), ignorando eventos já iniciados (excepto dia inteiro) e respeitando o toggle `notificar` — completa a pendência desde a v1.4.2 **sem migração de BD** (o campo único `Evento.notificado_em` cobre os dois avisos: véspera grava D−1, dia do evento grava D). Refacto: `app = create_app()` movido para dentro de `if __name__ == '__main__'` — importar o script já não cria a app com a BD real (pré-requisito dos testes). Hora real da scheduled task corrigida em todo lado: **07:00** (o docstring dizia 23:00 e o `Estado_Atual.md` 08:00). Testes: novo `tests/test_pipe_tasks.py` (13 testes, `notification_service.send` mockado). Fora de âmbito (decisão do utilizador): toggle de preferências para eventos/tarefas e aviso na criação de tarefa. Spec: `docs/superpowers/specs/2026-10-01-notificacoes-tarefas-calendario-design.md`.
 
 **Versão v1.5.7** — listas predefinidas no módulo de Tarefas para contas novas. Novo `app/tarefas/seed.py` com a constante `LISTAS_PREDEFINIDAS` (Pessoal 📌, Casa 🏠, Trabalho 💼, Compras 🛒 — `ordem` 0–3, ícones de um emoji no `String(8)`) e `semear_listas_predefinidas(user_id)`, chamada por `registo_com_convite` (`app/auth/routes.py`) logo a seguir ao `flush()` do utilizador e antes do `commit` — um único commit, tudo ou nada. A função é idempotente com condição de guarda explícita (só semeia se o utilizador não tiver **nenhuma** lista): nunca apaga nem duplica, pelo que o deploy não toca nas listas das contas já existentes — decisão do utilizador: semear **apenas no registo**. Frontend sem alterações: vista inicial continua «Todas» («Pessoal» é só a primeira lista da sidebar) e o fallback `Geral` do assistente (`_obter_ou_criar_lista`) ficou intacto — só dispara em contas sem listas — na prática, contas antigas. Testes em `tests/test_tarefas_listas_predefinidas.py` (registo ponta a ponta via convite + guarda de não-alteração de listas existentes + idempotência); **122 testes a passar** no total. Spec: `docs/superpowers/specs/2026-10-01-listas-predefinidas-tarefas-design.md`.
@@ -598,7 +601,7 @@ Cada módulo é um Flask Blueprint independente. A navegação é feita pelos ca
 
 **Pendências do Calendário:**
 - Deploy no PythonAnywhere + migração da tabela `evento`
-- **Backlog v1.x:** tela de detalhe do evento (read-only, acionada ao clicar no evento na Agenda ou Vista Mensal; botão "Editar" dentro do detalhe abre o modal existente)
+- ✅ **Backlog v1.x: tela de detalhe do evento** — resolvido em **v1.5.9** (modal read-only ao clicar no evento; botões Editar/Apagar/Fechar; botões rápidos ✏️/🗑️ mantidos com `stopPropagation`)
 
 **Pendências gerais:**
 - **Assistente IA:** ✅ resolvido em v1.4.6 — fila de modelos validada contra o catálogo do OpenRouter e fallback automático a funcionar (`OPENROUTER_MODEL` do `.env` corrigido; era a causa da lentidão)

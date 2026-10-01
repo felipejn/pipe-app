@@ -5,7 +5,7 @@
 - **Owner:** Felipe (apelido "Pipe") — ortografia Portuguesa Europeia em TODO o código e mensagens
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
-- **Versão actual:** v1.5.8 (tarefas avisam no dia do prazo + atraso; Calendário avisa no dia anterior e no dia) — detalhe em `Estado_Atual.md`
+- **Versão actual:** v1.5.9 (Calendário: janela de detalhe read-only ao clicar no evento, com botões Editar/Apagar/Fechar) — detalhe em `Estado_Atual.md`
 
 ## Referência principal
 **Ler `estado_atual.md`** para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.

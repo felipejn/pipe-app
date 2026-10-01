@@ -100,6 +100,42 @@
   </div>
 </div>
 
+<!-- ───── MODAL DE DETALHE (read-only) ───── -->
+<div id="modal-detalhe" class="modal-overlay" style="display:none;" onclick="fecharDetalheOverlay(event)">
+  <div class="modal-caixa detalhe-caixa">
+    <div class="detalhe-corbar" id="det-corbar"></div>
+    <h3 id="det-titulo"></h3>
+
+    <div class="detalhe-linha">
+      <span class="detalhe-ico">📅</span>
+      <span id="det-data"></span>
+    </div>
+    <div class="detalhe-linha">
+      <span class="detalhe-ico">🕙</span>
+      <span id="det-hora"></span>
+    </div>
+    <div class="detalhe-linha" id="det-local-linha" style="display:none;">
+      <span class="detalhe-ico">📍</span>
+      <span id="det-local"></span>
+    </div>
+
+    <div id="det-desc-linha" style="display:none;">
+      <div class="detalhe-rotulo">Descrição</div>
+      <p id="det-desc" class="detalhe-desc"></p>
+    </div>
+
+    <div class="detalhe-badges">
+      <span class="detalhe-badge" id="det-notificar"></span>
+    </div>
+
+    <div class="modal-acoes">
+      <button class="btn-guardar" onclick="editarEDetalhe()">✏️ Editar</button>
+      <button class="btn-apagar" onclick="apagarEDetalhe()">🗑️ Apagar</button>
+      <button class="btn-cancelar" onclick="fecharDetalhe()">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <style>
 /* ── Layout geral ── */
 .cal-container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
@@ -263,6 +299,25 @@
 }
 .btn-cancelar:hover { color: #e0e0e0; border-color: #666; }
 
+/* ── Modal de detalhe (read-only) ── */
+.detalhe-caixa { max-width: 440px; }
+.detalhe-corbar { height: 6px; width: 100%; border-radius: 3px; }
+.detalhe-linha {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  font-size: 0.9rem; color: #e0e0e0;
+}
+.detalhe-ico { flex-shrink: 0; }
+.detalhe-rotulo { font-size: 0.8rem; color: #aaa; }
+.detalhe-desc {
+  margin: 0; font-size: 0.9rem; color: #ccc;
+  white-space: pre-wrap; word-break: break-word;
+}
+.detalhe-badges { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.detalhe-badge {
+  font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 999px;
+  background: #2a2a2a; border: 1px solid #333; color: #ccc;
+}
+
 /* ── Modo claro (estilo Google Calendar) ──
    Superfícies brancas, bordas #dadce0, texto #3c4043/#70757a;
    os acentos (hoje, aba activa, botões principais) mantêm o âmbar PIPE. */
@@ -303,6 +358,11 @@
 [data-theme="light"] .btn-cancelar:hover { color: #3c4043; border-color: #c5cad4; }
 [data-theme="light"] .btn-apagar { background: #c5221f; color: #ffffff; }
 [data-theme="light"] .btn-apagar:hover { background: #a50e0e; }
+
+[data-theme="light"] .detalhe-linha { color: #3c4043; }
+[data-theme="light"] .detalhe-rotulo { color: #70757a; }
+[data-theme="light"] .detalhe-desc { color: #3c4043; }
+[data-theme="light"] .detalhe-badge { background: #f1f3f4; border-color: #dadce0; color: #5f6368; }
 </style>
 
 <script>
@@ -313,6 +373,8 @@ let corSeleccionada = 'tomate';
 let mesActual = new Date().getMonth();
 let anoActual = new Date().getFullYear();
 let eventosCache = [];
+let eventoDetalheId = null;
+let eventoDetalhe = null;
 
 // ── Navegação entre vistas ──
 function mudarVista(vista) {
@@ -359,6 +421,7 @@ async function carregarAgenda() {
     grupos[data].forEach(e => {
       const div = document.createElement('div');
       div.className = 'agenda-evento';
+      div.onclick = () => abrirDetalhe(e.id, e);
       div.innerHTML = `
         <div class="agenda-cor evento-${e.cor}"></div>
         <div class="agenda-hora">${formatarHora(e)}</div>
@@ -367,8 +430,8 @@ async function carregarAgenda() {
           ${e.localizacao ? `<div class="agenda-info-local">📍 ${escHtml(e.localizacao)}</div>` : ''}
         </div>
         <div class="agenda-acoes">
-          <button onclick="abrirModalEditar(${e.id})" title="Editar">✏️</button>
-          <button onclick="confirmarApagar(${e.id})" title="Apagar">🗑️</button>
+          <button onclick="event.stopPropagation(); abrirModalEditar(${e.id})" title="Editar">✏️</button>
+          <button onclick="event.stopPropagation(); confirmarApagar(${e.id})" title="Apagar">🗑️</button>
         </div>`;
       lista.appendChild(div);
     });
@@ -443,7 +506,7 @@ function construirGrelha(eventos) {
       const p = document.createElement('div');
       p.className = `cal-pilula evento-${e.cor}`;
       p.textContent = e.titulo;
-      p.onclick = (ev) => { ev.stopPropagation(); abrirModalEditar(e.id, e); };
+      p.onclick = (ev) => { ev.stopPropagation(); abrirDetalhe(e.id, e); };
       contentor.appendChild(p);
     });
     if (evsDia.length > max) {
@@ -523,6 +586,92 @@ async function abrirModalEditar(id, eventoInline) {
   selecionarCorPorNome(e.cor);
   toggleDiaInteiro();
   document.getElementById('modal-evento').style.display = 'flex';
+}
+
+// ── Modal de detalhe (read-only) ──
+async function abrirDetalhe(id, eventoInline) {
+  let e = eventoInline || eventosCache.find(x => x.id === id);
+  if (!e) {
+    await carregarAgenda();
+    e = eventosCache.find(x => x.id === id);
+  }
+  if (!e) return;
+
+  eventoDetalheId = id;
+  eventoDetalhe = e;
+
+  document.getElementById('det-corbar').className = `detalhe-corbar evento-${e.cor}`;
+  document.getElementById('det-titulo').textContent = e.titulo;
+  document.getElementById('det-data').textContent = formatarDataDetalhe(e);
+  document.getElementById('det-hora').textContent = formatarHoraDetalhe(e);
+
+  const localLinha = document.getElementById('det-local-linha');
+  if (e.localizacao) {
+    document.getElementById('det-local').textContent = e.localizacao;
+    localLinha.style.display = '';
+  } else {
+    localLinha.style.display = 'none';
+  }
+
+  const descLinha = document.getElementById('det-desc-linha');
+  if (e.descricao) {
+    document.getElementById('det-desc').textContent = e.descricao;
+    descLinha.style.display = '';
+  } else {
+    descLinha.style.display = 'none';
+  }
+
+  const notif = document.getElementById('det-notificar');
+  notif.textContent = e.notificar ? '🔔 Notificar' : '🔕 Sem notificação';
+  document.getElementById('modal-detalhe').style.display = 'flex';
+}
+
+function formatarDataDetalhe(e) {
+  const i = new Date(e.data_inicio);
+  const f = new Date(e.data_fim);
+  const base = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  const fmt = d => {
+    const s = d.toLocaleDateString('pt-PT', base);
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
+  // Se os dois extremos caem em dias distintos, mostra os dois
+  if (e.data_inicio.slice(0, 10) !== e.data_fim.slice(0, 10)) {
+    return `${fmt(i)} → ${fmt(f)}`;
+  }
+  return fmt(i);
+}
+
+function formatarHoraDetalhe(e) {
+  if (e.dia_inteiro) return 'Dia inteiro';
+  const i = new Date(e.data_inicio);
+  const f = new Date(e.data_fim);
+  return `${pad(i.getHours())}:${pad(i.getMinutes())} – ${pad(f.getHours())}:${pad(f.getMinutes())}`;
+}
+
+function editarEDetalhe() {
+  fecharDetalhe();
+  if (eventoDetalheId != null) abrirModalEditar(eventoDetalheId, eventoDetalhe);
+}
+
+async function apagarEDetalhe() {
+  if (eventoDetalheId == null) return;
+  if (!confirm('Apagar este evento?')) return;
+  const r = await fetch(`/calendario/api/eventos/${eventoDetalheId}`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': CSRF }
+  });
+  if (r.ok) {
+    fecharDetalhe();
+    if (vistaActual === 'agenda') carregarAgenda();
+    else renderizarMes();
+  }
+}
+
+function fecharDetalhe() {
+  document.getElementById('modal-detalhe').style.display = 'none';
+}
+function fecharDetalheOverlay(e) {
+  if (e.target === document.getElementById('modal-detalhe')) fecharDetalhe();
 }
 
 function fecharModal() {
