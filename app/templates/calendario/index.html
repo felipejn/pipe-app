@@ -9,21 +9,21 @@
   <div class="cal-header">
     <h2 class="cal-titulo">📅 Calendário</h2>
     <div class="cal-tabs">
-      <button class="cal-tab active" data-vista="agenda" onclick="mudarVista('agenda')">Agenda</button>
-      <button class="cal-tab" data-vista="mensal" onclick="mudarVista('mensal')">Mensal</button>
+      <button class="cal-tab" data-vista="agenda" onclick="mudarVista('agenda')">Agenda</button>
+      <button class="cal-tab active" data-vista="mensal" onclick="mudarVista('mensal')">Mensal</button>
     </div>
     <button class="btn-novo-evento" onclick="abrirModalCriar()">+ Novo evento</button>
   </div>
 
   <!-- ───── VISTA AGENDA ───── -->
-  <div id="vista-agenda" class="cal-vista">
+  <div id="vista-agenda" class="cal-vista" style="display:none;">
     <div id="agenda-lista" class="agenda-lista">
       <p class="agenda-vazio" id="agenda-vazio" style="display:none;">Sem eventos futuros.</p>
     </div>
   </div>
 
   <!-- ───── VISTA MENSAL ───── -->
-  <div id="vista-mensal" class="cal-vista" style="display:none;">
+  <div id="vista-mensal" class="cal-vista">
     <div class="cal-mensal-nav">
       <button onclick="navegarMes(-1)">&#8249;</button>
       <span id="cal-mes-label"></span>
@@ -262,11 +262,52 @@
   border-radius: 6px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.9rem;
 }
 .btn-cancelar:hover { color: #e0e0e0; border-color: #666; }
+
+/* ── Modo claro (estilo Google Calendar) ──
+   Superfícies brancas, bordas #dadce0, texto #3c4043/#70757a;
+   os acentos (hoje, aba activa, botões principais) mantêm o âmbar PIPE. */
+[data-theme="light"] .cal-tab { border-color: #dadce0; color: #70757a; }
+[data-theme="light"] .cal-tab:hover { background: #f1f3f4; color: #3c4043; border-color: #dadce0; }
+[data-theme="light"] .cal-tab.active,
+[data-theme="light"] .cal-tab.active:hover { background: #d97706; color: #fff; border-color: #d97706; }
+
+[data-theme="light"] .agenda-vazio { color: #70757a; }
+[data-theme="light"] .agenda-grupo-data { border-bottom-color: #dadce0; }
+[data-theme="light"] .agenda-evento { background: #ffffff; border-color: #dadce0; }
+[data-theme="light"] .agenda-evento:hover { background: #f8f9fa; }
+[data-theme="light"] .agenda-hora { color: #70757a; }
+[data-theme="light"] .agenda-info-titulo { color: #3c4043; }
+[data-theme="light"] .agenda-info-local { color: #70757a; }
+[data-theme="light"] .agenda-acoes button { color: #70757a; }
+
+[data-theme="light"] .cal-mensal-nav button { background: #ffffff; border-color: #dadce0; color: #3c4043; }
+[data-theme="light"] .cal-mensal-nav button:hover { background: #f1f3f4; }
+[data-theme="light"] #cal-mes-label { color: #3c4043; }
+[data-theme="light"] .cal-grelha-header { color: #70757a; border-bottom-color: #dadce0; }
+[data-theme="light"] .cal-dia { background: #ffffff; border-color: #dadce0; }
+[data-theme="light"] .cal-dia:hover { background: #f8f9fa; }
+[data-theme="light"] .cal-dia-num { color: #3c4043; }
+[data-theme="light"] .cal-mais { color: #70757a; }
+
+[data-theme="light"] .modal-overlay { background: rgba(32, 33, 36, 0.55); }
+[data-theme="light"] .modal-caixa { background: #ffffff; border-color: #dadce0; }
+[data-theme="light"] .modal-caixa h3 { color: #3c4043; }
+[data-theme="light"] .modal-caixa label { color: #70757a; }
+[data-theme="light"] .modal-caixa input[type="text"],
+[data-theme="light"] .modal-caixa input[type="datetime-local"],
+[data-theme="light"] .modal-caixa textarea { background: #ffffff; border-color: #dadce0; color: #3c4043; }
+[data-theme="light"] .toggle-label { color: #3c4043; }
+[data-theme="light"] .cor-opcao.selecionada { border-color: #d97706; }
+[data-theme="light"] .modal-erro { color: #c5221f; }
+[data-theme="light"] .btn-cancelar { color: #5f6368; border-color: #dadce0; }
+[data-theme="light"] .btn-cancelar:hover { color: #3c4043; border-color: #c5cad4; }
+[data-theme="light"] .btn-apagar { background: #c5221f; color: #ffffff; }
+[data-theme="light"] .btn-apagar:hover { background: #a50e0e; }
 </style>
 
 <script>
 const CSRF = '{{ csrf_token() }}';
-let vistaActual = 'agenda';
+let vistaActual = 'mensal';
 let eventoEditandoId = null;
 let corSeleccionada = 'tomate';
 let mesActual = new Date().getMonth();
@@ -582,6 +623,6 @@ function mostrarErroModal(msg) {
 }
 
 // ── Init ──
-document.addEventListener('DOMContentLoaded', () => carregarAgenda());
+document.addEventListener('DOMContentLoaded', () => mudarVista('mensal'));
 </script>
 {% endblock %}

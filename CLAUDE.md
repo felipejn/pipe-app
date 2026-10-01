@@ -5,7 +5,7 @@
 - **Owner:** Felipe (apelido "Pipe") — ortografia Portuguesa Europeia em TODO o código e mensagens
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
-- **Versão actual:** v1.5.2 (confirmação de entrega dos emails de convite via Mailjet) — detalhe em `estado_atual.md`
+- **Versão actual:** v1.5.6 (Calendário inicia na vista Mensal, modo claro do Calendário ao estilo Google Calendar, tarefas concluídas ocultas por defeito) — detalhe em `Estado_Atual.md`
 
 ## Referência principal
 **Ler `estado_atual.md`** para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.

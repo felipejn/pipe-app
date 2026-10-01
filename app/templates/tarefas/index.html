@@ -154,11 +154,12 @@
             {% endif %}
 
             {% if concluidas and filtro not in ('alta', 'hoje', 'semana') %}
+            {% set concluidas_abertas = filtro == 'concluidas' %}
             <div class="secao-label" style="margin-top:1.2rem">
               Concluídas ({{ concluidas | length }})
-              <button class="btn-colapsar" onclick="toggleConcluidas(this)">▾ ocultar</button>
+              <button class="btn-colapsar" onclick="toggleConcluidas(this)">{% if concluidas_abertas %}▾ ocultar{% else %}▸ mostrar{% endif %}</button>
             </div>
-            <div class="tarefas-lista" id="lista-concluidas">
+            <div class="tarefas-lista" id="lista-concluidas"{% if not concluidas_abertas %} style="display:none;"{% endif %}>
               {% for t in concluidas %}
                 {% include 'tarefas/_tarefa.html' %}
               {% endfor %}
@@ -304,6 +305,7 @@
 <script>
 const LISTA_ACTIVA_ID = {{ lista_activa.id if lista_activa else 'null' }};
 const CSRF_TOKEN = '{{ csrf_token() }}';
+const FILTRO_ACTUAL = {{ filtro | tojson }};
 
 // ── Modais ───────────────────────────────────────────────────────────
 function abrirModalLista() {
@@ -371,11 +373,17 @@ function filtrarTarefas(termo) {
     const n = [...secaoConc.querySelectorAll('.tarefa-item')]
                 .filter(i => i.style.display !== 'none').length;
     if (labelConc) {
-      // Preservar o botão "ocultar" que já existe no label
+      // Preservar o botão de colapsar que já existe no label
       const btnColapsar = labelConc.querySelector('.btn-colapsar');
       labelConc.childNodes[0].textContent = `Concluídas (${n}) `;
-      secaoConc.style.display = n === 0 ? 'none' : '';
+      // Sem termo de busca, restaura o estado por defeito:
+      // secção oculta, excepto quando o filtro activo é "concluídas"
+      if (!q) secaoConc.style.display = FILTRO_ACTUAL === 'concluidas' ? '' : 'none';
+      else    secaoConc.style.display = n === 0 ? 'none' : '';
       labelConc.style.display = n === 0 ? 'none' : '';
+      if (btnColapsar) {
+        btnColapsar.textContent = secaoConc.style.display === 'none' ? '▸ mostrar' : '▾ ocultar';
+      }
     }
   }
 

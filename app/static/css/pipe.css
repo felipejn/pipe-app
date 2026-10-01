@@ -2530,6 +2530,22 @@ input[type="date"] {
 .evento-uva       { background-color: #8e24aa; color: #fff; }
 .evento-grafite   { background-color: #616161; color: #fff; }
 
+/* Chips de evento do Calendário — modo claro (estilo Google Calendar):
+   fundo tintado claro + texto escuro da mesma cor. Aplicam-se apenas às
+   pílulas da vista Mensal; a barra da Agenda e os círculos do selector
+   mantêm as cores sólidas. */
+[data-theme="light"] .cal-pilula.evento-tomate    { background-color: #fce8e6; color: #c5221f; }
+[data-theme="light"] .cal-pilula.evento-flamingo  { background-color: #fce4ec; color: #ad1457; }
+[data-theme="light"] .cal-pilula.evento-tangerina { background-color: #fbe9e7; color: #bf360c; }
+[data-theme="light"] .cal-pilula.evento-banana    { background-color: #fff8e1; color: #6d4c00; }
+[data-theme="light"] .cal-pilula.evento-salvia    { background-color: #e6f4ea; color: #137333; }
+[data-theme="light"] .cal-pilula.evento-basil     { background-color: #e6f4ea; color: #0d652d; }
+[data-theme="light"] .cal-pilula.evento-peacock   { background-color: #e8f0fe; color: #174ea6; }
+[data-theme="light"] .cal-pilula.evento-mirtilo   { background-color: #e8eaf6; color: #283593; }
+[data-theme="light"] .cal-pilula.evento-lavanda   { background-color: #e8eaf6; color: #3949ab; }
+[data-theme="light"] .cal-pilula.evento-uva       { background-color: #f3e5f5; color: #6a1b9a; }
+[data-theme="light"] .cal-pilula.evento-grafite   { background-color: #f1f3f4; color: #5f6368; }
+
 /* ---- Navegação secundária ---- */
 .nav-secundaria {
     display: flex;
