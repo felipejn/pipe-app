@@ -122,6 +122,89 @@ def obter_ids_postos_obsoletos():
     return [posto_id for (posto_id,) in linhas]
 
 
+def _chave_dedup(posto):
+    """Chave de identificação de um posto para deduplicação.
+
+    Deliberadamente **conservadora**: nome + morada + concelho, todos
+    normalizados (caixa, espaços nas pontas e espaços duplicados). Um
+    duplicado genuíno — o mesmo posto físico devolvido pela API com dois
+    `id` (re-atribuição de id da DGEG) — tem os três campos praticamente
+    iguais.
+
+    Exigir os três campos evita fundir estações reais que só coincidam numa
+    parte:
+    - mesmo nome, moradas diferentes: as 4 "Santos da Cunha 6 - Logística e
+      Transportes, Lda." (Maximinos, Merelim, Av. João Paulo II, Prado) —
+      são 4 postos distintos do mesmo operador;
+    - mesma morada, nomes diferentes: "Ilídio Mota - Palmeira 1"/"2",
+      "Cepsa Órfãos I/II (Poente/Nascente)", "Repsol Piscinas I/II" — são
+      estações gémeas na mesma rua.
+    """
+    def normalizar(valor):
+        return ' '.join((valor or '').split()).casefold()
+
+    return (normalizar(posto.nome), normalizar(posto.morada),
+            normalizar(posto.concelho))
+
+
+def obter_ids_duplicados():
+    """Ids de postos a excluir por duplicação (o mesmo posto com dois ids).
+
+    Complementa `obter_ids_postos_obsoletos()`: enquanto esse trata dados
+    congelados/antigos, este trata o posto físico **activo** que a API
+    devolve duplicado sob outro `id` (re-atribuição DGEG). Tais duplicados
+    aparecem em todas as recolhas (`ciclos_ausente=0`), pelo que nunca são
+    apanhados pelo arquivamento automático.
+
+    Não altera a BD: devolve os ids a ignorar no ambiente de leitura, como
+    o resto das regras de exclusão do módulo — reversível a qualquer
+    momento sem perda de histórico.
+
+    De cada grupo de duplicados é keeper o posto mais fiável (por ordem):
+    activo, com preços registados, com a recolha mais recente; em empate,
+    o `id` mais baixo (determinístico). Os restantes são devolvidos.
+    """
+    from sqlalchemy import func
+
+    ultima_por_posto = dict(
+        db.session.query(PrecoHistorico.posto_id,
+                         func.max(PrecoHistorico.data_recolha).label('ult'))
+        .group_by(PrecoHistorico.posto_id)
+        .all()
+    )
+
+    grupos = {}
+    for posto in Posto.query.all():
+        grupos.setdefault(_chave_dedup(posto), []).append(posto)
+
+    duplicados = []
+    for membros in grupos.values():
+        if len(membros) < 2:
+            continue
+        ordenados = sorted(
+            membros,
+            key=lambda p: (
+                not p.ativo,                                  # activo primeiro
+                ultima_por_posto.get(p.id) is None,           # com preços primeiro
+                _data_negativa(ultima_por_posto.get(p.id)),   # recolha mais recente
+                p.id,                                         # desempate estável
+            )
+        )
+        duplicados.extend(p.id for p in ordenados[1:])
+
+    return sorted(duplicados)
+
+
+def _data_negativa(data):
+    """Timestamp invertido, para ordenar 'mais recente primeiro' num sort ascendente.
+
+    Devolve um valor Infinity-safe: `None` (sem recolha) fica no fim.
+    """
+    if data is None:
+        return float('-inf')
+    return -data.timestamp()
+
+
 def _headers():
     headers = {'User-Agent': 'PIPE-combustiveis/1.0 (uso pessoal)'}
     if API_KEY:
@@ -330,7 +413,7 @@ def obter_tipos_combustivel_disponiveis(concelhos, tipos_utilizador=None):
         db.session.query(PrecoHistorico.tipo_combustivel)
         .join(Posto, Posto.id == PrecoHistorico.posto_id)
         .filter(Posto.concelho.in_(concelhos))
-        .filter(~Posto.id.in_(obter_ids_postos_obsoletos()))
+        .filter(~Posto.id.in_(obter_ids_postos_obsoletos() + obter_ids_duplicados()))
     )
     if tipos_utilizador:
         query = query.filter(PrecoHistorico.tipo_combustivel.in_(tipos_utilizador))
@@ -358,7 +441,7 @@ def obter_precos_para_concelhos(concelhos, tipos_utilizador=None, tipo_seleciona
         ))
         .filter(Posto.concelho.in_(concelhos))
         .filter(Posto.ativo.is_(True))
-        .filter(~Posto.id.in_(obter_ids_postos_obsoletos()))
+        .filter(~Posto.id.in_(obter_ids_postos_obsoletos() + obter_ids_duplicados()))
     )
     if tipos_utilizador:
         query = query.filter(PrecoHistorico.tipo_combustivel.in_(tipos_utilizador))

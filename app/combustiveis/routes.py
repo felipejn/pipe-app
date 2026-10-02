@@ -35,13 +35,15 @@ def dashboard():
     # Estado da recolha — mostrado no cabeçalho para o utilizador perceber se os
     # preços são frescos ou se a última tentativa falhou.
     estado = EstadoAtualizacaoCombustiveis.query.get(1)
-    # Conta só postos activos e NÃO obsoletos — os arquivados já não aparecem
-    # na tabela (filtro em obter_precos_para_concelhos), e os obsoletos
-    # (dados DGEG congelados, como o DJB) tampoco devem figurar no total,
-    # senão o cabeçalho diria "N postos" e a tabela mostraria menos.
+    # Conta só postos activos e NÃO obsoletos nem duplicados — os arquivados já
+    # não aparecem na tabela (filtro em obter_precos_para_concelhos), e os
+    # obsoletos (dados DGEG congelados, como o DJB) nem os duplicados (o mesmo
+    # posto devolvido com dois ids) também não devem figurar no total, senão o
+    # cabeçalho diria "N postos" e a tabela mostraria menos.
     total_postos = (Posto.query
                     .filter(Posto.ativo.is_(True),
-                            ~Posto.id.in_(services.obter_ids_postos_obsoletos()))
+                            ~Posto.id.in_(services.obter_ids_postos_obsoletos()
+                                           + services.obter_ids_duplicados()))
                     .count())
 
     return render_template('combustiveis/dashboard.html',
