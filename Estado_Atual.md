@@ -1,26 +1,19 @@
 # PIPE — Estado Actual do Projecto — v1.5.10
 
 ## O que é o PIPE
+
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
 O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. O módulo Combustíveis é o nono módulo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
-## O que foi feito
+## Estrutura do projecto
 
-### Infraestrutura
-- Repositório Git inicializado e publicado no GitHub: https://github.com/felipejn/pipe-app
-- Suporte a `.env` com `python-dotenv` para gerir variáveis de ambiente localmente
-- `.gitignore` configurado (exclui `.env`, `instance/`, `__pycache__`, `*.db`)
-- `.env.example` incluído no repositório como referência
-- **Deploy concluído no PythonAnywhere** — app online em `https://felipejn.pythonanywhere.com`
-
-### Estrutura do projecto (Flask) — estado actual
 ```
 pipe-app/
 ├── app/
-│   ├── __init__.py          # create_app, app factory
+│   ├── __init__.py          # create_app, app factory + security headers
 │   ├── extensions.py        # Limiter (Flask-Limiter, X-Forwarded-For para PA)
 │   ├── static/
 │   │   ├── css/pipe.css     # design system (tema escuro + tema claro via tokens semânticos) + cores de eventos do Calendário + navegação secundária
@@ -31,65 +24,31 @@ pipe-app/
 │   │       └── pipe.js      # JS base (alertas + alternância de tema claro/escuro)
 │   ├── templates/
 │   │   ├── base.html        # navbar + alternador de tema 🌙/☀️ + anti-FOUC + barra secundária «Voltar/Home» (oculta no dashboard) + meta `csrf-token` (cofre/extensão)
-│   │   ├── dashboard.html   # cards de módulos dinâmicos (Loja de Módulos)
-│   │   ├── auth/
-│   │   ├── euromilhoes/
-│   │   ├── settings/
-│   │   ├── admin/
-│   │   │   ├── dashboard.html
-│   │   │   ├── utilizadores.html
-│   │   │   └── convites.html
+│   │   ├── dashboard.html   # dashboard — grelha de cards dos módulos activos
+│   │   ├── assistente/
+│   │   │   └── index.html   # interface de chat do Assistente IA
+│   │   ├── auth/            # login, registo (por convite), 2FA, reset password
+│   │   ├── euromilhoes/     # registo de jogos e comparação com sorteios
 │   │   ├── tarefas/
-│   │   │   ├── index.html
-│   │   │   ├── editar.html
-│   │   │   └── _tarefa.html
-│   │   ├── notas/
-│   │   │   ├── index.html
-│   │   │   ├── editar.html
-│   │   │   └── _cartao.html
-│   │   ├── passwords/
-│   │   │   ├── index.html
-│   │   │   └── guia_extensao.html  # guia da extensão em HTML (rota /passwords/extensao/guia)
-│   │   ├── cambio/
-│   │   │   └── index.html
+│   │   │   ├── index.html   # vistas lista/detalhe + sidebar de tags
+│   │   │   └── partials/    # items, form, sidebar
+│   │   ├── notas/           # grelha de cartões, etiquetas, checklist
+│   │   ├── passwords/       # gerador + cofre (desbloqueio) + exportação
+│   │   ├── conversoes/      # conversor de ficheiros (HEIC→JPG, PNG/JPG→ICO)
+│   │   ├── cambio/          # conversor de moedas (Wise v3 + fallback)
+│   │   ├── cores/           # conversor HEX↔RGB↔HSL para Flutter
 │   │   ├── modulos/
-│   │   │   └── loja.html
-│   │   └── calendario/
-│   │       └── index.html   # vistas Agenda + Mensal, modal CRUD + modal de detalhe (read-only), JS inline
-│   ├── combustiveis/        # Blueprint Combustíveis ← NOVO
+│   │   │   └── loja.html    # Loja de Módulos — ativar/desativar módulos
+│   │   └── calendario/      # vista mensal + vista de agenda
+│   ├── auth/                # Blueprint Auth
 │   │   ├── __init__.py
-│   │   ├── models.py        # Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis
-│   │   ├── services.py      # API Aberta (api.apiaberta.pt); atualizar_precos_se_necessario, obter_precos_para_concelhos, obter_tipos_combustivel_disponiveis; NOMES_IGNORADOS (blocklist) + MAX_DIAS_PRECO_ATIVO / obter_ids_postos_obsoletos (obsolescência) + obter_ids_duplicados (dedup nome+morada+concelho)
-│   │   ├── routes.py        # /combustiveis/, /combustiveis/definicoes, /combustiveis/atualizar
-│   │   └── templates/
-│   │       └── combustiveis/
-│   │           ├── dashboard.html
-│   │           └── definicoes.html
-│   ├── auth/                # Blueprint auth
-│   │   ├── __init__.py
-│   │   ├── routes.py        # /auth/login, /auth/registo (bloqueado), /auth/registo/<token>, /auth/logout, /auth/perfil, /auth/2fa/*
-│   │   ├── forms.py
-│   │   └── models.py        # modelo User (inclui is_admin) + Convite
+│   │   ├── forms.py         # LoginForm, RegistoForm, 2FA, reset
+│   │   ├── models.py        # User + Convite
+│   │   └── routes.py        # /auth/*
 │   ├── euromilhoes/         # Blueprint Euromilhões
 │   │   ├── __init__.py
-│   │   ├── routes.py
-│   │   ├── models.py        # modelo Jogo (SQLite)
-│   │   └── api.py           # consumo API pública + retry exponencial
-│   ├── notifications/       # serviço central de notificações
-│   │   ├── __init__.py
-│   │   ├── service.py       # NotificationService
-│   │   ├── models.py        # UserNotificationPreferences (BD)
-│   │   └── channels/
-│   │       ├── base.py
-│   │       ├── telegram.py  # TelegramChannel
-│   │       └── email.py     # EmailChannel (Mailjet) — envio + consulta de entrega (v1.5.2)
-│   ├── settings/            # Blueprint de definições
-│   │   ├── __init__.py
-│   │   └── routes.py        # /definicoes/
-│   ├── admin/               # Blueprint de administração
-│   │   ├── __init__.py
-│   │   ├── decorators.py    # @admin_required
-│   │   └── routes.py        # /admin/ — incluindo gestão de convites
+│   │   ├── models.py        # Jogo
+│   │   └── routes.py        # /euromilhoes/
 │   ├── tarefas/             # Blueprint Tarefas
 │   │   ├── __init__.py
 │   │   ├── models.py        # Lista, Tarefa, TagTarefa
@@ -118,358 +77,267 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # modelo Conversao (histórico, sem ficheiros)
 │   │   └── routes.py        # /conversoes/ — HEIC→JPG + PNG/JPG→ICO
-│   ├── modulos/             # Blueprint Loja de Módulos
-│   │   ├── __init__.py
-│   │   ├── config.py        # MODULOS_DISPONIVEIS (inclui Calendário e Combustíveis)
-│   │   ├── models.py        # UserModulo
-│   │   └── routes.py        # /modulos/loja, /modulos/api/toggle
 │   ├── assistente/          # Blueprint Assistente IA
 │   │   ├── __init__.py
-│   │   ├── cliente.py       # OpenRouter API
-│   │   ├── contexto.py      # tool use orchestration
-│   │   ├── ferramentas.py   # tool functions (7 leitura + 10 escrita, incluindo get_combustiveis)
-│   │   └── routes.py        # /assistente
-│   └── calendario/          # Blueprint Calendário ← NOVO
+│   │   ├── cliente.py       # OpenRouter API, retry + fallback entre modelos
+│   │   ├── contexto.py      # orquestração do fluxo, histórico em sessão, tool use
+│   │   ├── ferramentas.py   # 7 ferramentas de leitura + 10 de escrita
+│   │   └── routes.py        # /assistente/ + /assistente/api/*
+│   ├── modulos/             # Blueprint Loja de Módulos
+│   │   ├── __init__.py
+│   │   ├── models.py        # UserModulo
+│   │   ├── routes.py        # /modulos/loja
+│   │   └── config.py        # MODULOS_DISPONIVEIS (10 módulos)
+│   ├── calendario/          # Blueprint Calendário
+│   │   ├── __init__.py
+│   │   ├── models.py        # Evento
+│   │   └── routes.py        # /calendario/ + /calendario/api/eventos
+│   ├── combustiveis/        # Blueprint Combustíveis
+│   │   ├── __init__.py
+│   │   ├── models.py        # 5 tabelas (postos, preços, utilizador_concelho, utilizador_combustivel, estado_atualizacao)
+│   │   ├── routes.py        # /combustiveis/ (dashboard, concelhos, tipos de combustível, actualização)
+│   │   └── services.py      # API Aberta (api.apiaberta.pt), obsolescência de postos, dedup
+│   ├── notifications/       # Sistema de notificações
+│   │   ├── __init__.py
+│   │   ├── models.py        # UserNotificationPreferences
+│   │   ├── service.py       # orquestração de canais (Telegram + Email)
+│   │   └── channels/        # TelegramChannel, EmailChannel
+│   └── admin/               # Blueprint de administração
 │       ├── __init__.py
-│       ├── models.py        # modelo Evento
-│       └── routes.py        # /calendario/ + /calendario/api/eventos (CRUD)
-├── chrome-extension/        # extensão Chrome MV3 do Cofre (v1.0.1, com ícones)
+│       ├── decorators.py    # @admin_required
+│       └── routes.py        # /admin/ — gestão de convites
+├── chrome-extension/        # extensão Chrome MV3 do Cofre (com ícones)
 │   ├── manifest.json        # MV3 — activeTab, storage, tabs; host_permissions <all_urls>
 │   ├── background.js        # service worker — API do PIPE + captura (origem configurável)
-│   ├── popup.html / popup.js # popup — estado, desbloquear, listar/copiar/actualizar (mensagens inline)
+│   ├── popup.html / popup.js # popup — estado, desbloquear, listar/copiar/actualizar
 │   ├── content.js           # content script — captura apenas em forms de login (ignora o PIPE)
 │   ├── icon48.png / icon128.png # ícones gerados por scripts/gerar_icones_extensao.py
 │   └── README.md            # instalação, permissões e fluxo de uso
 ├── docs/
-│   ├── plano-cofre-passwords.md  # plano de correcção do Cofre (mantido no repositório)
-│   ├── guia-extensao-chrome.md   # guia passo a passo da extensão (instalar e usar)
+│   ├── plano-cofre-passwords.md   # plano de correcção do Cofre (mantido no repositório)
+│   ├── guia-extensao-chrome.md    # guia passo a passo da extensão (instalar e usar)
 │   └── historico/           # briefings e relatórios antigos
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
-│   ├── adicionar_is_admin.py
-│   ├── migrar_notificada_em.py
-│   ├── pipe_tasks.py        # única scheduled task
+│   ├── adicionar_is_admin.py    # migração de BD: colunas is_admin em utilizadores (v1.1.6)
+│   ├── migrar_notificada_em.py  # migração: tarefas.notificada → tarefas.notificada_em
+│   ├── pipe_tasks.py            # única scheduled task do PythonAnywhere
 │   ├── popular_combustiveis.py  # recolha manual de combustíveis (helper)
-│   ├── smoke_combustiveis.py    # smoke test da ferramenta get_combustiveis (v1.4.12)
-│   ├── remover_postos_ignorados.py  # limpeza dos postos em NOMES_IGNORADOS
-│   ├── reset_postos_combustiveis.py # reset das tabelas de postos/histórico
+│   ├── remover_postos_ignorados.py  # limpeza dos postos em services.NOMES_IGNORADOS
+│   ├── reset_postos_combustiveis.py  # reset das tabelas de postos/histórico (combustíveis)
 │   ├── testar_assistente.py     # smoke test do Assistente IA contra a OpenRouter
 │   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
 │   ├── gerar_icones_extensao.py # gera icon48/icon128 da extensão Chrome (Pillow, sem Flask)
-│   ├── migrar_convites_mailjet.py # ALTER TABLE: colunas do Mailjet em `convites` (v1.5.2, idempotente)
-│   ├── verificar_mailjet.py     # estado real dos emails no Mailjet + `--ligar-convites` (v1.5.2)
-│   └── verificar_resultados.py  # mantido para referência histórica
+│   ├── verificar_mailjet.py     # estado real dos emails no Mailjet + `--apenas-hoje`
+│   ├── verificar_resultados.py  # verifica resultados dos últimos sorteios (Euromilhões)
+│   └── smoke_combustiveis.py    # smoke test da ferramenta get_combustiveis (Assistente IA)
 ├── tests/
-│   ├── conftest.py                      # guarda-civil: bloqueia drop_all com BD de ficheiro
-│   ├── test_assistente_cliente.py       # OpenRouter: classificação de respostas e fallback
-│   ├── test_assistente_contexto.py      # orquestração do tool use
-│   ├── test_assistente_combustiveis.py  # ferramenta get_combustiveis (v1.4.12)
-│   ├── test_cofre.py                    # Cofre: crypto, modelos, API, dedup, sessão/KDF (inclui 409 com id)
-│   ├── test_extensao_distribuicao.py    # distribuição da extensão: download do ZIP + página do guia (v1.5.4)
-│   ├── test_extensao_js.py              # corre tests/extensao_harness.js (Node) — JS da extensão
-│   ├── extensao_harness.js              # harness Node: content script + funções puras do popup
-│   ├── test_convites_email.py           # convites: MessageID, estado no Mailjet, endpoint de verificação (v1.5.2)
-│   ├── test_isolamento_bd.py            # regressão do isolamento dos testes
-│   └── test_tarefas_listas_predefinidas.py  # listas predefinidas no registo: seed + idempotência (v1.5.7)
-├── instance/
-│   ├── backups/             # cópias de segurança (backup_bd.py)
-│   ├── flask_session/       # sessões server-side do cofre (Flask-Session)
-│   └── pipe.db              # SQLite (excluído do git)
-├── .env
+│   ├── conftest.py              # guarda-civil: bloqueia `db.drop_all()` com BD de ficheiro (obrigatório create_app('testing'))
+│   ├── conftest_utils.py        # helpers de fixture de app
+│   ├── test_cofre.py            # 32 testes
+│   ├── test_convites_email.py   # 14 testes
+│   ├── test_pipe_tasks.py       # 13 testes (tarefa_tarefas + tarefa_calendario, mocks)
+│   ├── test_tarefas_listas_predefinidas.py  # 3 testes
+│   ├── test_extensao_js.py      # 1 teste
+│   ├── test_extensao_distribuicao.py  # 8 testes
+│   ├── test_isolamento_bd.py    # 1 teste
+│   ├── test_assistente_cliente.py     # 13 testes
+│   ├── test_assistente_combustiveis.py# 31 testes
+│   ├── test_assistente_contexto.py    # 9 testes
+│   ├── test_assistente_contexto_truncagem.py # 10 testes
+│   ├── test_combustiveis_dedup.py     # 11 testes
+│   └── smoke/                 # smoke tests (ex.: test smoke api de conversoes)
 ├── .env.example
-├── config.py                # Config / Development / Production / Testing
 ├── requirements.txt
-└── run.py
+├── scripts/
+└── README.md
+
 ```
 
 ---
 
+## Módulos
+
 ### Módulo Auth (`app/auth/`)
-- Modelo `User` com password em hash (Werkzeug)
-- Campo `is_admin` — Boolean, default=False
-- Novo modelo `Convite` — sistema de registo por convite (único, 7 dias de validade)
-- Formulários: `LoginForm`, `RegistoForm`, `AlterarPasswordForm`, `VerificarCodigoForm`, `ConfigurarDoisFAForm`, `ConfirmarTOTPForm`, `PedirResetForm`, `ResetPasswordForm`
-- Rotas: `/auth/login`, `/auth/registo` (bloqueado — requer convite), `/auth/registo/<token>`, `/auth/logout`, `/auth/perfil`
-- Rotas 2FA: `/auth/2fa/verificar`, `/auth/2fa/escolher`, `/auth/2fa/enviar/<metodo>`, `/auth/2fa/reenviar`
-- Rotas TOTP: `/auth/2fa/totp/configurar`, `/auth/2fa/totp/desactivar`
-- Rotas recuperação de password: `/auth/recuperar-password`, `/auth/reset-password/<token>`
-- **Registo aberto desativado** — apenas entrada por convite gerado por admin
+
+- Registo por convite apenas — `Convite` com token único, validade de 7 dias e contador de usos (`convites_usados`)
+- Login com `@login_required` (Flask-Login)
+- 2FA: **Telegram, Email e TOTP** — métodos configuráveis e simultâneos (`UserNotificationPreferences`, `pyotp` + `qrcode`)
+- Reset de password por email
+- Rotas: `/auth/login`, `/auth/register`, `/auth/2fa/*`, `/auth/reset/*`
+- Rotas críticas protegidas por rate limiting (`Flask-Limiter`); falhas de login registadas com `app.logger.warning` (username + IP)
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
-- Modelo `Jogo` (SQLite)
-- `api.py` — consome a API pública com retry exponencial (3 tentativas, backoff 5s/10s/20s)
-- Rotas: listar jogos, registar, apagar, gerar combinação, resultados, frequências
-- Cálculo local do próximo sorteio (terça ou sexta)
+
+- Modelo `Jogo` — `jogos_euromilhoes` (numeros, estrelas, data_sorteio, filtrado por `user_id`)
+- Interface de registo de combinações e visualização do histórico; cálculo do próximo sorteio
+- `scripts/verificar_resultados.py` — verifica automaticamente os resultados dos últimos sorteios e envia notificação em caso de vitória
 
 ### Módulo Tarefas (`app/tarefas/`)
-- **Modelos:** `Lista`, `Tarefa` (com `notificada_em`), `TagTarefa`
-- **Rotas:** criar/editar/apagar listas e tarefas, toggle concluída, adição rápida
-- **Funcionalidades:** vista "Todas", busca em tempo real, filtros, secção de concluídas colapsável, modal de nova lista com selector de emoji
-- **Comportamento ao abrir:** vista "Todas" por defeito — parâmetro `lista` tem default `'todas'` em `routes.py`; secção de concluídas **oculta por defeito** (botão «▸ mostrar»), aberta automaticamente apenas quando `filtro == 'concluidas'` (v1.5.6)
-- **Mobile:** selector `<select>` acima da grelha, visível apenas em ecrãs ≤ 640px
-- **Listas predefinidas no registo (v1.5.7):** contas novas nascem com 4 listas — Pessoal 📌 (ordem 0), Casa 🏠, Trabalho 💼, Compras 🛒 — criadas por `app/tarefas/seed.py::semear_listas_predefinidas(user_id)` chamada por `registo_com_convite` no mesmo commit. Função idempotente: só semeia se o utilizador não tiver nenhuma lista (nunca apaga nem duplica) — o deploy não toca nas listas das contas existentes. Vista inicial mantém-se "Todas".
+
+- Modelos: `Lista`, `Tarefa`, `TagTarefa`
+- Formulários Flask-WTF (`ListaForm`, `TarefaForm`); semente de listas predefinidas (`tarefas.seed`)
+- Vistas de lista e de detalhe com busca e filtros por etiquetas; apoio ao teclado (atalhos de navegação)
+- Notificações: no dia do prazo e em todos os dias de atraso até conclusão
 
 ### Módulo Loja de Módulos (`app/modulos/`)
-- Tabela `UserModulo` (`user_id` + `modulo_slug` + `ativo`)
-- `config.py` — dicionário `MODULOS_DISPONIVEIS` com 10 módulos (inclui Calendário e Combustíveis)
-- `models.py` — modelo `UserModulo` (PK composta) + helper `get_modulos_ativos(user_id)`
-- `routes.py` — `GET /modulos/loja`, `POST /modulos/api/toggle` (AJAX + CSRF)
-- Ícone 🛒 na navbar acessível a todos os utilizadores autenticados
-- Zero módulos activos por defeito — dashboard mostra estado vazio com link para a loja
+
+- Modelo `UserModulo` (`user_modulos`) — ativação/desativação de módulos por utilizador
+- `MODULOS_DISPONIVEIS` em `app/modulos/config.py` com 10 módulos (Euromilhões, Tarefas, Notas, Passwords, Câmbio, Cores, Conversões, Assistente IA, Calendário, Combustíveis)
+- Rotas: `/modulos/loja` (loja), `/modulos/api/toggle` (AJAX `POST` com `request.get_json()`)
 
 ### Módulo Notas (`app/notas/`)
-- **Modelos:** `Nota`, `ItemChecklist`, `EtiquetaNota`
-- **Rotas:** `GET /notas/`, `POST /notas/criar`, `GET/POST /notas/<id>`, `POST /notas/<id>/accao`, `POST /notas/<id>/apagar`
-- **Funcionalidades:** grelha de cartões, criação inline, texto livre e checklist, 8 cores (paleta Google Keep — claro + escuro, texto forçado a preto sobre cores claras para contraste), fixar/arquivar, etiquetas, busca em tempo real, toggle checklist no cartão
+
+- Modelos: `Nota`, `ItemChecklist`, `EtiquetaNota`
+- Cartões com 8 cores (paleta do Google Keep), fixar/arquivar, busca em tempo real, checklist inline e etiquetas
 
 ### Módulo Passwords (`app/passwords/`)
-- **Gerador (stateless):** modos Password (8–64 chars), Passphrase (3–10 palavras PT), PIN (4–12 dígitos); barra de força por entropia, botão copiar, geração automática ao carregar
-- **Cofre (com BD — `cofre_configs`, `cofre_passwords`):** AES-256-GCM com chave derivada por PBKDF2-SHA256 (`COFRE_KDF_ITERATIONS`, 600 000) da password mestra (verificação por bcrypt); a chave existe apenas em sessão server-side (Flask-Session filesystem em `instance/flask_session/`) e nunca no cookie; expira ao fim de `COFRE_SESSION_TIMEOUT` (900 s), bloqueando apenas o cofre — a sessão de login mantém-se; entradas deduplicadas por domínio normalizado (`extrair_dominio()`, única fonte de verdade) + username; importação do CSV do Chrome; todas as queries filtradas por `user_id` (anti-IDOR)
-- **API:** `/passwords/api/cofre/*` (estado, activar, desbloquear, bloquear, alterar-password, CRUD de entradas, importar-csv) e `GET /passwords/api/csrf-token`, que devolve o token CSRF **assinado** (usado pelo JS do cofre e pela extensão Chrome — nunca `session['csrf_token']`, que é o valor cru); CORS restrito por `COFRE_CORS_ORIGINS`
-- **Ficheiros:** `crypto.py` (cifra/decifra + KDF), `models.py` (`CofreConfig`, `CofrePassword`, `extrair_dominio()`), `routes.py` (gerador + API do cofre), `wordlist.py`/`generator.py` (gerador stateless)
-- **Extensão Chrome (MV3):** `chrome-extension/` — popup (estado, desbloquear, listar/preencher) e content script com heurística de captura (só forms de login); origem do servidor configurável em `chrome.storage.local.pipeOrigin` (default: PythonAnywhere) → detalhe na secção própria abaixo
-- ⚠️ **Deploy:** exige `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` para criar `cofre_configs`/`cofre_passwords` e `COFRE_CORS_ORIGINS` definido no `.env`; a pasta `instance/flask_session/` é criada automaticamente pelo Flask-Session
 
-### Extensão Chrome — Cofre (`chrome-extension/`) ← v1.5.0, corrigido em v1.5.1
-- **Manifest V3**, 8 ficheiros (sem build step): `manifest.json`, `background.js`, `popup.html`, `popup.js`, `content.js`, `README.md`, `icon48.png`, `icon128.png` (versão da extensão: **1.0.1**)
-- **Permissões:** `activeTab`, `storage`, `tabs` + `host_permissions: <all_urls>`; **sem** permissão `scripting` — o preenchimento é feito com `chrome.tabs.sendMessage` para o content script
-- **`background.js` (service worker):** origem do PIPE em `PIPE_ORIGIN_DEFAULT = 'https://felipejn.pythonanywhere.com'`, sobreponível por `chrome.storage.local.pipeOrigin` (ex.: `http://127.0.0.1:5000` em desenvolvimento); obtém o token CSRF em `GET /passwords/api/csrf-token` e envia-o no header `X-CSRFToken`
-- **`popup.*`:** estado do cofre (activado/desbloqueado), desbloqueio com a password mestra, listagem das entradas do domínio do separador activo, copiar password e **fluxo de captura** — a captura só é oferecida no site onde foi feita (comparação por domínio), com TTL de 15 min; se o domínio + utilizador já existir, o 409 dá origem ao botão **Actualizar entrada** (PUT); mensagens inline em `#mensagem` (**sem `alert()`**, que fecha o popup e podia abrir um diálogo vazio); o botão 📋 usa listeners por JS (**o `onclick` inline seria bloqueado pela CSP das páginas de extensão MV3**) e a password nunca é interpolada em HTML; com sessão em falta ou cofre não activado mostra link para `/auth/login` **segundo o `pipeOrigin` configurado**
-- **`content.js`:** heurística de captura — apenas forms de **login** (campo password + username/email); ignora registo e alteração de password e **não actua no próprio PIPE**: produção (`pythonanywhere.com`), a origem configurada em `chrome.storage.local.pipeOrigin` e as rotas `/auth`|`/passwords` do servidor local (antes só excluía a produção, pelo que capturava o login do PIPE local e deixava a captura pendente para sempre)
-- **Configuração obrigatória no servidor:** `COFRE_CORS_ORIGINS=chrome-extension://<ID>` (sem isto o browser bloqueia os `fetch` por CORS) e, em produção, `SESSION_COOKIE_SAMESITE='None'` + `Secure=True` (o cookie de sessão tem de viajar em pedidos cross-site)
-- **Gestão dos IDs — decisão (v1.5.4):** cada instalação «Load unpacked» tem um **ID único** (derivado do caminho da pasta), gerido no `.env` **do servidor** — o utilizador não configura nada, instala e envia o ID; o admin acrescenta-o à lista `COFRE_CORS_ORIGINS` (separada por vírgulas, sem espaços) e faz Reload no PA. Os IDs acumulam-se (um por instalação nova; reinstalar na mesma pasta mantém o mesmo ID). **Mantido este modelo** face à alternativa Chrome Web Store (ID fixo e instalação com um clique, mas conta de programador $5 + revisão da Google por `<all_urls>` e passwords) — com poucos utilizadores via convite a lista por vírgulas é suficiente
-- ✅ **Ícones (v1.5.1):** `icon48.png` (48×48) e `icon128.png` (128×128) gerados por `scripts/gerar_icones_extensao.py` e incluídos na pasta — o Chrome já não assinala ícone em falta (mantém-se a Opção B do guia: apagar a chave `icons` do manifest, se algum dia se quiser o ícone genérico)
-- **API — 409 com id (v1.5.1):** `POST /passwords/api/cofre/entradas` devolve, em caso de duplicado (`dominio` + `username`), o `id`/`dominio`/`username` da entrada existente — é o que permite à extensão oferecer «Actualizar entrada» (PUT) em vez de falhar sem alternativa; regressão em `tests/test_cofre.py::test_duplicado_devolve_id_e_actualiza_pela_extensao`
-- **Guia de instalação e uso:** `docs/guia-extensao-chrome.md` — passo a passo (activar o cofre, ícones, «Load unpacked», copiar o ID, `COFRE_CORS_ORIGINS`, uso diário, **testar localmente sem deploy** — o Chrome trata os pedidos de extensões com host permissions como same-site, pelo que o cookie `Lax` de desenvolvimento chega à extensão —, actualização após alterações, problemas comuns e verificação de segurança)
-- **Distribuição para download (v1.5.4):** o próprio PIPE serve a extensão — **`GET /passwords/extensao/download`** (`@login_required`) gera o ZIP em memória a partir da pasta `chrome-extension/` (prefixo `chrome-extension/` em cada entrada, para o «Load unpacked» ficar directo; nome `pipe-cofre-extensao-<versão>.zip` lido do manifest) e **`GET /passwords/extensao/guia`** serve o guia como página HTML (`app/templates/passwords/guia_extensao.html`, conversão de `docs/guia-extensao-chrome.md` sem dependências novas). Entrada na página `/passwords/`: secção «🧩 Extensão Chrome» com os dois botões. Sem alteração de BD — em produção basta o push (a pasta `chrome-extension/` já vem no repositório)
+- **Gerador (stateless):** modos Password (8–64 chars), Passphrase (3–10 palavras PT), PIN (4–12 dígitos); barra de força por entropia; cópia para a área de transferência
+- **Cofre (com BD — `cofre_configs`, `cofre_passwords`):** AES-256-GCM com chave derivada por PBKDF2-SHA256 (`COFRE_KDF_ITERATIONS`, 600 000) da password mestra (verificação por bcrypt); a chave existe apenas em sessão server-side (Flask-Session filesystem em `instance/flask_session/`) e nunca no cookie; expira ao fim de `COFRE_SESSION_TIMEOUT` (900 s), bloqueando apenas o cofre — a sessão de login mantém-se; entradas deduplicadas por domínio normalizado (`extrair_dominio()`, única fonte de verdade) + username; importação de CSV do Chrome; todas as queries filtradas por `user_id` (anti-IDOR)
+- **API:** `/passwords/api/cofre/*` (estado, activar, desbloquear, bloquear, alterar-password, CRUD de entradas, importar-csv) e `GET /passwords/api/csrf-token`, que devolve o token CSRF assinado (usado pelo JS do cofre e pela extensão Chrome — nunca `session['csrf_token']`, que é o valor cru); CORS restrito por `COFRE_CORS_ORIGINS`
+- **Extensão Chrome (MV3):** `chrome-extension/` — popup (estado, desbloquear, listar/preencher) e content script com heurística de captura (só forms de login); origem do servidor configurável em `chrome.storage.local.pipeOrigin` (default: PythonAnywhere)
 
 ### Módulo Câmbio (`app/cambio/`)
-- **Sem BD** — módulo stateless
-- **API externa:** Wise API v3 com fallback para ExchangeRate-API (lógica em `service.py`: `MOEDAS` + `obter_taxa()`; `routes.py` delega via `_obter_taxa()` por compatibilidade)
-- **Moedas:** EUR, BRL, USD, GBP, JPY, CHF, CAD, AUD
-- **Funcionalidades:** fees Wise detalhados, inverter moedas, botão copiar
+
+- `service.py`: constante `MOEDAS` e função `obter_taxa(origem, destino, valor)` — API Wise v3 + fallback ExchangeRate-API, stateless
+- Rotas: `/cambio/` (interface de conversão), `/cambio/api/convert` (AJAX `POST` `request.get_json()`)
 
 ### Módulo Cores (`app/cores/`)
-- **Sem BD** — módulo stateless
-- **Funcionalidades:** Cor → Flutter (HEX/RGB/HSL/CMYK), Flutter → Cor, todos os equivalentes Flutter, preview em tempo real
+
+- Swatches Material Design; conversão HEX↔RGB↔HSL↔CMYK com output para código Flutter
+- Rotas: `/cores/` + `/cores/api/convert`
 
 ### Módulo Conversões (`app/conversoes/`)
-- **Modelo:** `Conversao` (metadados no histórico, sem ficheiros)
-- **Conversões:** HEIC→JPG (`pillow_heif`), PNG/JPG→ICO (Pillow LANCZOS)
-- **Funcionalidades:** dropzone drag & drop, download direto ou ZIP, zero disco
 
-### Módulo Calendário (`app/calendario/`) ← NOVO — v1.2
-- **Modelo:** `Evento` com campos: `id`, `user_id` (FK → `utilizadores.id`), `titulo`, `descricao`, `localizacao`, `data_inicio`, `data_fim`, `dia_inteiro`, `cor`, `notificar`, `notificado_em`, `criado_em`
-- **Paleta de 11 cores:** tomate, flamingo, tangerina, banana, sálvia, basil, peacock, mirtilo, lavanda, uva, grafite
-- **Rotas API:**
-  - `GET /calendario/` — página principal (login required)
-  - `GET /calendario/api/eventos?inicio=&fim=` — lista eventos do intervalo (60/min)
-  - `POST /calendario/api/eventos` — criar evento (30/min)
-  - `PUT /calendario/api/eventos/<id>` — editar evento (30/min)
-  - `DELETE /calendario/api/eventos/<id>` — apagar evento (30/min)
-- **Template `calendario/index.html`:**
-  - **Vista Mensal — inicial desde a v1.5.6** — grelha 7×N (Seg–Dom), navegação mês anterior/seguinte/Hoje, pílulas coloridas com título, dia actual destacado (âmbar), clique em slot vazio pré-preenche data no modal; tab «Mensal» activa no HTML, `vistaActual = 'mensal'` e init `mudarVista('mensal')`
-  - **Vista Agenda** — lista cronológica a partir de hoje, agrupada por data, com hora início–fim, cor, localização; botões editar e apagar por evento (tab «Agenda»)
-  - **Modal único** (criar e editar) — título, descrição, localização, datetime início/fim, toggle dia inteiro, toggle notificar, selector de 11 cores (círculos clicáveis), validação data_fim ≥ data_inicio, mensagem de erro inline
-  - **Modal de detalhe (read-only, v1.5.9)** — acionado ao **clicar** num evento (pílula na vista Mensal ou linha na vista Agenda) em vez de abrir o modal de edição; mostra barra de cor, título, data (pt-PT, dois dias se multi-dia), intervalo `HH:MM – HH:MM` ou «Dia inteiro», localização e descrição (condicionais) e badge de notificação; botões **Editar** (abre o modal existente), **Apagar** (com `confirm`) e **Fechar**. Os botões rápidos ✏️/🗑️ da linha da Agenda mantêm-se com `event.stopPropagation()` (acesso directo, sem disparar o detalhe). Sem novo endpoint — os dados vêm da API existente; paridade tema claro/escuro mantida
-  - Frontend vanilla JS inline — padrão PIPE; CSRF via `X-CSRFToken` em todos os fetch
-- **Integração na Loja de Módulos** — entrada em `MODULOS_DISPONIVEIS` com slug `calendario`
-- **CSS** — 11 classes `.evento-<cor>` adicionadas ao `pipe.css` + 11 overrides `[data-theme="light"] .cal-pilula.evento-<cor>` (fundo tintado claro + texto escuro da mesma cor, estilo Google Calendar; só afectam as pílulas — a barra `.agenda-cor` e os círculos `.cor-opcao` mantêm as cores sólidas — v1.5.6)
-- **Modo claro estilo Google Calendar (v1.5.6)** — secção `[data-theme="light"]` no `<style>` do template: superfícies brancas, bordas `#dadce0`, texto `#3c4043`/`#70757a`, hover `#f1f3f4`/`#f8f9fa`; acentos mantêm o âmbar PIPE (dia de hoje, aba activa, «+ Novo evento», Guardar); anel do selector de cor passa de branco (invisível sobre branco) para âmbar; modal com overlay `rgba(32,33,36,0.55)`; cache-buster `?v=5` → `?v=6` no `base.html`; **modo escuro intocado**
-- **Padrão de imports corrigido:** `from app import db` + `from app.extensions import limiter` (padrão PIPE)
-- **Bug corrigido:** `#agenda-vazio` recriado via `innerHTML` a cada chamada `carregarAgenda()` para evitar perda de referência DOM ao alternar vistas
+- HEIC→JPG (`pillow_heif`) e PNG/JPG→ICO (`PIL`)
+- Limites: `MAX_FICHEIROS = 20`, `MAX_TAMANHO_MB = 10`, `MAX_TAMANHO_BYTES = 10 485 760`; ficheiros processados em memória (sem persistência), histórico em `conversoes`
+- Rotas: `/conversoes/` + `/conversoes/api/convert`
 
-### Área Admin (`app/admin/`)
-- Blueprint em `/admin`, decorador `@admin_required`
-- Ícone 🛠️ na navbar visível apenas para admins
-- Dashboard com estatísticas, lista de utilizadores, toggle activo/admin, apagar utilizador
-- **Gestão de Convites:** `GET /admin/convites`, `POST /admin/convites/gerar`, `POST /admin/convites/<id>/revogar` e `GET /admin/convites/<id>/estado-email` (v1.5.2 — consulta ao Mailjet se o email foi entregue; coluna «Email (Mailjet)» com badge + 🔄 na tabela de convites)
-- Reutiliza `EmailChannel` (Mailjet) para envio automático de convites; desde v1.5.2 o `MessageID` da resposta é guardado no convite (`mailjet_message_id`) — **sem ID não há como verificar a entrega depois**, pelo que convites antigos se ligam com `scripts/verificar_mailjet.py --ligar-convites`
+### Módulo Calendário (`app/calendario/`)
 
-### Módulo Assistente IA (`app/assistente/`) — em desenvolvimento
-- **Sem BD** — histórico de conversa em Flask session (máx 20 mensagens, 3000 chars por mensagem, 8000 chars total de histórico)
-- **Ficheiros:** `cliente.py` (OpenRouter API, retry 3x + fallback entre modelos), `contexto.py` (tool use + logging de erro), `ferramentas.py` (7 tools de leitura: `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis`; 10 tools de escrita), `routes.py`
-- **Modelo:** `inclusionai/ling-3.0-flash-sante:free` — configurado via `OPENROUTER_MODEL` env var (default em `app/assistente/cliente.py`). Fallbacks: `poolside/laguna-s-2.1:free`, `liquid/lfm-2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`
-- **Correção aplicada (v1.4.0):** o modelo anterior (`google/gemma-4-26b-a4b-it:free`) não suportava tool use, causando falhas silenciosas com a mensagem genérica de erro. Trocado para `google/gemma-4-31b-it:free`. Removidos modelos inválidos (`qwen/qwen3.6-plus:free`, `qwen/qwen3-coder:free`). Adicionado `import traceback` e `traceback.print_exc()` + `print(f'[Assistente ERRO] ...')` nos blocos `except Exception` de `contexto.py` para diagnóstico visível nos logs. Simplificado tratamento de HTTP 429 (break imediato para próximo modelo, sem parsing de `Retry-After` header)
-- **Correção de bug crítica (v1.4.4):** `processar_mensagem_assistente('cria um evento para amanhã: "Cortar cabelo" às 9 horas')` devolvia "Não consegui gerar uma resposta" em vez de criar o evento. Diagnóstico: o OpenRouter devolve HTTP 200 com corpo `{"error": ...}` quando o provider upstream falha; o código original só fazia `raise_for_status()` (200 passava como sucesso) e `raise_for_status()` estava fora do `try`, abortando a cadeia de fallback. Correção em `app/assistente/cliente.py`: classes `RateLimitError` e `ServicoIndisponivelError`, constante `_MODELOS_FALLBACK`, função `_classificar_resposta()` que valida HTTP e corpo da resposta (distinguindo `rate_limit` / `modelo_indisponivel` / `servico` / `ok`), `chamar_llm()` com fallback imediato em qualquer falha de provider e backoff apenas para exceções de rede. Reforço em `app/assistente/contexto.py`: parsing defensivo de `choices` (verificação de tipo), `tool_calls` com validação de tipo, `content` vazio aceite, `argumentos` aceita `str` ou `dict`, `ServicoIndisponivelError` tratado no ciclo. Validação: 21 testes unitários offline passaram; smoke test real contra OpenRouter com `cohere/north-mini-code:free` criou evento com sucesso (ID 4).
+- Modelo `Evento` (`evento`) — `user_id`, `titulo`, `data_inicio`, `data_fim`, `descricao`, `localizacao`, `dia_inteiro`, `cor`, `notificar`
+- Rotas: `/calendario/` (vista mensal + agenda), `/calendario/api/eventos` (GET com filtros `inicio`/`fim`; POST com `request.get_json()` — criar evento), rate limit 60/min
+- Vistas de calendário com navegação mensal/agenda, cores de evento (tomate → grafite, 11 classes `.evento-*`)
+- **O que o utilizador tem de saber para não partir nada:** a migração da tabela `evento` no PythonAnywhere corre-se manualmente com `python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"` — a tabela não é criada por `db.create_all()` no arranque da app porque o blueprint do Calendário não está importado em `app/__init__.py`
 
-- **Implementação (v1.4.5):** adicionada ferramenta de leitura `get_eventos` ao Assistente IA. O calendário era o único módulo sem ferramenta de consulta. Adicionados em `app/assistente/ferramentas.py`: schema JSON em `DEFINICOES_FERRAMENTAS_LEITURA`, entrada em `REGISTO_FERRAMENTAS`, e função `get_eventos(user_id, data=None, futuros=False)` com query filtrada por `user_id`, data específica (AAAA-MM-DD) e eventos futuros. Correcção do import `from datetime import date, datetime, timedelta`.
-    - **Teste:** import verificado com sucesso — `get_eventos` presente em `REGISTO_FERRAMENTAS` e `DEFINICOES_FERRAMENTAS_LEITURA`
+### Módulo Combustíveis (`app/combustiveis/`)
 
-- **Correção (v1.4.6):** o Assistente IA respondia com atraso porque o `.env` tinha `OPENROUTER_MODEL=thinkingmachines/inkling-small:free`. Esses modelos são restritos a *agentic harnesses* e devolvem HTTP 403 ("is only available on agentic harnesses") quando chamados por aplicações comuns — cada pergunta perdia tempo nessa falha antes de cair no fallback. Além disso, o ID `liquid/lfm2.5-2.6b:free` na fila era inválido (HTTP 400 "is not a valid model ID").
-    - **Correção 1 (causa raiz):** `OPENROUTER_MODEL` actualizado para `inclusionai/ling-3.0-flash-fin:free` em `.env` e `.env.example`. A variável de ambiente sobrepõe o default do código, pelo que era ela que mantinha os modelos `thinkingmachines` em primeiro lugar; o default no código (`cliente.py`) foi alterado em simultâneo para o mesmo valor, para os dois ficarem coerentes.
-    - **Correção 2:** removidos os modelos `thinkingmachines/*` de `_MODELOS_FALLBACK`. Corrigido o ID de `liquid/lfm2.5-2.6b:free` para `liquid/lfm-2.5-2.6b:free` (hífen em falta).
-    - **Fila final (ordem de preferência):** `inclusionai/ling-3.0-flash-fin:free` → `nex-agi/nex-n2.5-mini:free` → `inclusionai/ling-3.0-flash-sante:free` → `liquid/lfm-2.5-2.6b:free` → `nvidia/nemotron-3-super-120b-a12b:free` → `nvidia/nemotron-3-ultra-550b-a55b:free` (último recurso, mais lento).
-    - **Validação:** IDs confirmados no catálogo do OpenRouter (`/api/v1/models`, 445 modelos) — todos gratuitos, contexto ≥65K e suporte a `tools`. Smoke test real: os 6 modelos responderam (0.7s–1.6s cada); no fluxo `chamar_llm(..., ferramentas=...)` o `inclusionai/ling-3.0-flash-fin:free` respondeu em **0.9s**, chamou a ferramenta correctamente e devolveu texto em PT-PT. 22 testes unitários passaram.
-    - **Diagnóstico pós-deploy (iterações 1 e 2 contra a API real):** o `ling-3.0-flash-fin:free` responde bem (~1.2s, com tool call correcta) mas o fornecedor **limita-o intermitentemente por upstream (HTTP 429)**; nesses casos o fallback assume o pedido automaticamente — comportamento esperado, sem perder a resposta. O log `Modelo ... indisponivel: resposta sem conteudo nem tool calls` corresponde a respostas em que o *reasoning* consumiu o orçamento de tokens sem produzir `content` nem `tool_calls`; o classificador rejeita-as e passa ao modelo seguinte. **Testado e descartado:** desactivar o *reasoning* globalmente **não é viável** — o `liquid/lfm-2.5-2.6b:free` devolve HTTP 400 ("Reasoning is mandatory for this endpoint and cannot be disabled") e a taxa de tool calls piora nos restantes; por isso **não** se envia o parâmetro `reasoning` no payload.
+- Modelos: `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao` — FK de utilizador apontam para `utilizadores.id`; `db.create_all()` cria as tabelas no primeiro reload (modelos importados em `app/__init__.py`)
+- `services.py`: recolha via API Aberta (`api.apiaberta.pt`) com paginação por tipo de combustível; arquivamento automático de postos ausentes (`LIMIAR_CICLOS_AUSENTE = 2` ciclos); dedup conservadora por `nome+morada+concelho` (`obter_ids_duplicados`) com exclusão apenas em leitura; blocklist `NOMES_IGNORADOS`
+- Rotas: `/combustiveis/` (dashboard + `POST /combustiveis/atualizar`, rate limit 6/hora), `/combustiveis/concelhos`, `/combustiveis/tipos`
+- Scripts auxiliares: `reset_postos_combustiveis.py` (drop + `db.create_all()` + repovoamento; cria colunas `ativo`/`ciclos_ausente` que o `create_all()` não acrescenta a uma BD existente), `remover_postos_ignorados.py` (idempotente), `popular_combustiveis.py` (recolha manual)
 
-- **Implementação (v1.4.7):** adicionada ferramenta de leitura `get_cambio` ao Assistente IA — converte valores entre moedas com taxas em tempo real (Wise v3 + fallback ExchangeRate-API). Refactor do Câmbio: lógica extraída de `routes.py` para o serviço partilhado `app/cambio/service.py` (`MOEDAS` + `obter_taxa()`); rota `/cambio/api/convert` delega sem alteração de comportamento. Adicionados em `app/assistente/ferramentas.py`: schema JSON em `DEFINICOES_FERRAMENTAS_LEITURA` (`origem`, `destino`, `valor` — todos required), entrada em `REGISTO_FERRAMENTAS` e função `get_cambio(user_id, origem, destino, valor)` stateless (validação case-insensitive contra `MOEDAS`, `valor > 0`, erros em PT-PT). `SYSTEM_PROMPT_LEITURA`/`SYSTEM_PROMPT_ESCRITA` em `contexto.py` actualizados; subtítulo e boas-vindas do chat (`assistente/index.html`) mencionam câmbios.
-    - **Validação:** 22 testes `pytest` a passar; smoke test real via `executar_ferramenta('get_cambio', {EUR→USD, 5})` devolveu conversão Wise (`resultado 3.92`, `taxa 0.784`); casos de erro (moeda inválida, valor ≤ 0/não numérico, serviço indisponível) devolvem `{'erro': ...}` em PT-PT.
+### Assistente IA (`app/assistente/`)
 
-- **Renderização Markdown no chat (v1.4.10):** o modelo responde com formatação Markdown (`**negrito**`, `*itálico*`, `# headers`, `- listas`, ```bloco de código```, `` `inline` ``, `> citações`, links) mas o `escaparHtml()` do template exibia tudo como texto plano. Adicionada a função `markdownToHtml()` inline em `app/templates/assistente/index.html` (~60 linhas de regex vanilla JS) que converte a sintaxe Markdown em HTML antes de `wrapper.innerHTML`. Fluxo: `escaparHtml(texto)` protege contra XSS → `markdownToHtml()` interpreta a sintaxe. Regras CSS adicionadas em `app/static/css/pipe.css` para `.chat-bubble strong`, `em`, `code`, `pre`, `ul`, `li`, `blockquote`, `h3/h4/h5`, `a` — respeitam tokens de tema claro/escuro.
-    - **Validação:** código verificado inline; funciona com o padrão PIPE (sem dependências externas)
-
-- **Integração com Combustíveis + boas-vindas curtas (v1.4.12):** o módulo Combustíveis era o único módulo com BD ainda sem ferramenta de consulta no Assistente IA.
-    - **Nova ferramenta de leitura `get_combustiveis(user_id, tipo_combustivel=None, concelho=None, apenas_mais_barato=False, limite=20)`** em `app/assistente/ferramentas.py`: delega em `combustiveis_services.obter_precos_para_concelhos` (o mesmo serviço do dashboard, pelo que herda automaticamente a exclusão de postos arquivados e obsoletos — regra dos 30 dias e `NOMES_IGNORADOS`). Devolve preço em €/L com 3 casas, marca, morada, `data_dgeg` e `data_recolha`. Com `apenas_mais_barato=True` devolve o mínimo por combustível no formato do card 🏆 do dashboard. Esquema JSON em `DEFINICOES_FERRAMENTAS_LEITURA` e entrada em `REGISTO_FERRAMENTAS`.
-    - **Filtro por utilizador — ponto crítico:** ao contrário dos outros módulos, os `Posto` são globais e não têm `user_id`. O isolamento faz-se pelas preferências do utilizador (`UtilizadorConcelho` / `UtilizadorCombustivel`), que são lidas por `user_id` e passadas como filtro às queries; os argumentos do modelo (concelho, combustível) são sempre validados contra esse universo e nunca o substituem. Sem concelhos escolhidos a ferramenta devolve erro orientador para Combustíveis → Definições.
-    - **Normalização de acentos:** `_normalizar_texto()` (NFD + remoção de diacríticos) faz o match de concelhos e combustíveis. Sem isto, um pedido por `"gasoleo simples"` (sem acento, como os modelos escrevem frequentemente) era rejeitado como combustível inexistente — detectado no smoke test e corrigido antes do commit.
-    - **Frescura dos dados:** a resposta inclui sempre `recolha` (`ultima_atualizacao`, `ultima_execucao_sucesso`, `mensagem_erro`), para o modelo não apresentar preços de uma recolha falhada como se fossem actuais. Não se força recolha dentro do chat (são ~12 pedidos HTTP e ~3-4 s de espera) — o assistente informa e encaminha para o botão "Atualizar Dados".
-    - **`get_resumo_geral` alargado:** passa a incluir concelhos de combustíveis, nº de postos com preço e o mais barato por combustível (ou uma nota de que falta configurar o módulo).
-    - **Prompts:** `SYSTEM_PROMPT_LEITURA` e `SYSTEM_PROMPT_ESCRITA` mencionam combustíveis, com regra explícita de nunca inventar postos/preços/concelhos, apresentar em €/L com 3 casas e citar a data da recolha.
-    - **Boas-vindas do chat encurtadas:** a mensagem inicial tinha 7 linhas de lista + 2 parágrafos e ia crescer ainda mais com combustíveis. Passou a 3 linhas (saudação + estado do modo + "Em que posso ajudar?"); as capacidades ficam no subtítulo do cabeçalho, que passou a mencionar tarefas, notas, calendário, câmbios e combustíveis.
-    - **Testes:** novo `tests/test_assistente_combustiveis.py` (20 testes, SQLite em memória) — registo da ferramenta, isolamento por utilizador, filtros case/accent-insensitive, `apenas_mais_barato`, limites (default/truncamento/máximo), exclusão de postos obsoletos, frescura e `get_resumo_geral`. Nova classe `TestingConfig` em `config.py` (`testing`) para os testes isolarem a BD. Total: **42 testes** a passar (eram 22).
-    - **Validação:** smoke directo com `scripts/smoke_combustiveis.py` (novo) contra a BD real — 14 preços em Vila Verde, mais barato `PD VILA VERDE` a 2,113 €/L; e smoke de ponta a ponta contra a OpenRouter: *"Onde está o gasóleo mais barato nos meus concelhos?"* → tool call correcta e resposta com preço e data da recolha (18/09/2026); *"Qual o preço do gasóleo em Lisboa?"* → o modelo explica que o concelho não está configurado e encaminha para Combustíveis → Definições. Sem alteração de BD.
+- **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo principal via `OPENROUTER_MODEL` (default: `inclusionai/ling-3.0-flash-sante:free`); fila de fallback: `inclusionai/ling-3.0-flash-sante:free`, `inclusionai/ling-3.0-flash-fin:free`, `nex-agi/nex-n2.5-mini:free`, `liquid/lfm-2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`. Auth por `OPENROUTER_API_KEY`; retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback imediato em qualquer falha de provider (incluindo respostas HTTP 200 com `{"error": ...}` no corpo — detetadas por `_classificar_resposta()`, com classes `RateLimitError`/`ServicoIndisponivelError`)
+- **Contexto** (`contexto.py`): `processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None)` — orquestra o fluxo: monta prompt + histórico, chama LLM, executa tool calls (máx. 4 iterações), guarda resposta. Histórico em Flask session (20 mensagens = 10 trocas, tecto de 3000 chars/mensagem e 8000 chars no total)
+- **Ferramentas** (`ferramentas.py`): tool use com **7 funções de leitura** (`get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis`) e **10 de escrita** (`criar_tarefa`, `alternar_tarefa`, `apagar_tarefa`, `criar_nota`, `alternar_nota_acao`, `apagar_nota`, `criar_evento`, `atualizar_evento`, `apagar_evento`, `gerar_credencial`). Todas filtram por `user_id` (obrigatório, injetado pelo caller); `get_combustiveis` aceita `tipo_combustivel`, `concelho`, `posto` (nome **ou** marca, insensível a acentos e maiúsculas), `apenas_mais_barato` e `limite`
+- **Rotas** (`routes.py`):
+  - `GET /assistente` — página de chat (tema claro/escuro)
+  - `POST /assistente/api/chat` — AJAX `{mensagem: "..."}` → `{resposta: "..."}` (rate limit 30/min)
+  - `POST /assistente/api/modo` — alterna modo leitura/escrita (rate limit 10/min)
+  - `POST /assistente/api/limpar` — limpa histórico da sessão (rate limit 10/min)
+- **System prompt:** PT-PT; capacidades limitadas à leitura em modo leitura (não sugere acções que não pode executar — encaminha para o módulo respectivo); nunca inventar dados; tom formal e conciso
+- Testes: `test_assistente_cliente.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_contexto.py` (9), `test_assistente_contexto_truncagem.py` (10)
 
 ### Sistema de notificações (`app/notifications/`)
-- `NotificationService` — `notification_service.send(user, type, subject, body, data)`
-- `TelegramChannel` ✅ e `EmailChannel` ✅ (Mailjet) — desde v1.5.2 o `enviar()` guarda o resultado em `ultimo_resultado` (`MessageID` + motivo de falha; o retorno bool mantém-se para os restantes chamadores) e há `consultar_estado(message_id)` (actividade: `sent`/`delivered`/`softbounced`/… + cronologia + motivo do bounce)
-- `UserNotificationPreferences` na BD; página de definições em `/definicoes`
 
-### Scheduled task — `scripts/pipe_tasks.py`
-Script unificado que corre 1x/dia no PA (07:00). Cada módulo é uma função independente.
+- Modelo `UserNotificationPreferences` (`notificacao_preferencias`) — preferências por canal (Telegram, Email, Tarefas, Calendário)
+- `service.py` orquestra o envio; canais: `TelegramChannel` (python-telegram-bot) e `EmailChannel` (Mailjet)
 
-| Módulo | Quando actua | O que faz |
-|---|---|---|
-| `tarefa_euromilhoes` | Terças e sextas | Verifica resultados e notifica utilizadores com jogos |
-| `tarefa_tarefas` | Todos os dias | Notifica tarefas com prazo para hoje («Vencem hoje») e em atraso — 1×/dia, diariamente enquanto persistirem |
-| `tarefa_combustiveis` | **Terças-feiras** | Actualiza preços dos postos (via API Aberta api.apiaberta.pt), respeitando o intervalo mínimo de 1x/dia por terça; ignorado nos restantes dias |
-| `tarefa_calendario` | Todos os dias | Lembretes de eventos: no dia anterior («Amanhã») e no dia («Hoje»); ignora eventos já iniciados e respeita o toggle notificar |
+### Scheduled task (`scripts/pipe_tasks.py`)
+
+- Única scheduled task do PythonAnywhere: `python /home/felipejn/pipe-app/scripts/pipe_tasks.py`
+- Configuração: comando acima, **hora 07:00**, recorrência diária
+- Módulos activos:
+  | Tarefa | Frequência | Descrição |
+  |---|---|---|
+  | `tarefa_euromilhoes` | Terças e sextas | Verifica resultados dos sorteios |
+  | `tarefa_tarefas` | Todos os dias | Notifica tarefas com prazo para hoje («Vencem hoje») e em atraso — 1×/dia enquanto persistirem |
+  | `tarefa_combustiveis` | Terças-feiras | Actualiza preços dos postos (via API Aberta), respeitando o intervalo mínimo de 1x/dia por terça |
+  | `tarefa_calendario` | Todos os dias | Lembretes de eventos no dia anterior («Amanhã») e no dia («Hoje»); ignora eventos já iniciados e respeita o toggle `notificar` |
+
 ### Autenticação 2FA
-- Telegram ✅, Email ✅, TOTP ✅ (pyotp + qrcode)
+
+- Telegram, Email, TOTP (`pyotp` + `qrcode`)
 - Múltiplos métodos em simultâneo — utilizador escolhe no login
 
 ### Design System (`app/static/css/pipe.css`)
+
 - Tema escuro (por defeito) e tema claro — acentos âmbar/dourado mantêm-se nos dois
-- **Tokens semânticos em `:root`:** superfícies (`--cor-superficie`, `--cor-superficie-2`), bordas (`--cor-borda`, `--cor-borda-hover`), texto (`--cor-texto`, `--cor-texto-suave`, `--cor-texto-subtil(-2)`), estados (`--cor-sucesso/erro/info/aviso-texto`), prioridades (alta/média/baixa), `--cor-overlay-hover`, `--sombra` — ~23 cores fixas substituídas por variáveis
-- **Tema claro via `[data-theme="light"]`** — sobrepõe apenas os tokens; o `data-theme` é definido no `<html>` antes do CSS (script anti-FOUC no `base.html` lê `localStorage['pipe-tema']`, default `dark`)
+- **Tokens semânticos em `:root`:** superfícies, bordas, texto, estados, prioridades, `--cor-overlay-hover`, `--sombra` — ~23 cores fixas substituídas por variáveis
+- **Tema claro via `[data-theme="light"]`** — sobrepõe apenas os tokens; o `data-theme` é definido no `<html>` antes do CSS (script anti-FOUC no `base.html`)
 - Cores de identidade preservadas nos dois temas: âmbar (`--cor-primaria`), 11 classes `.evento-*` do Calendário, bolas do Euromilhões, `#1a1000` sobre âmbar no `.btn-primario`
-- `.btn-tema` — botão de alternância na navbar (fundo transparente, `--cor-overlay-hover` no hover)
 - Componentes: navbar, cartões, formulários, botões, alertas, skeleton loader, toggles, modais
 - Componentes Euromilhões: bolas, barras de frequência, badges de resultado
 - Componentes Tarefas: sidebar, items, check circular, busca, badges, estado vazio, selector mobile
-- Componentes Notas: grelha de cartões, palete de cores, checklist, sidebar de etiquetas, 8 cores alinhadas à paleta Google Keep (`#F28B82`, `#FBBC05`, `#FFF475`, `#CCFF90`, `#CBF0F8`, `#D7AEFB`, `#E8EAED`) aplicáveis em tema claro e escuro ✅ — texto forçado a preto em cartões coloridos via `.nota-com-cor` para garantir contraste em ambos os temas
-- **Componentes Calendário:** 11 classes `.evento-<cor>` (tomate → grafite) ← NOVO
-- Layout responsivo (sidebar oculta em mobile)
+- Componentes Notas: grelha de cartões, palete de cores, checklist, sidebar de etiquetas, 8 cores alinhadas à paleta Google Keep
+- Componentes Combustíveis: dashboard de preços, grelha de postos, selector de concelho/tipo, badge de última actualização
+- Componentes Assistente IA: balões de chat (`chat-bubble`, `--user` âmbar, `--assistant` `#2a2f47`/`#2b3149`), faixa lateral âmbar nos balões do assistente, classes `cartao-novo` + `badge-novo` para destaque de módulos no dashboard
+- Componentes Calendário: 11 cores de evento (`.evento-tomate` … `.evento-grafite`)
 
-### Interface / Navegação (frontend — sessão paralela)
-- **Barra secundária «Voltar / Home»** em `base.html`: renderizada em todas as páginas excepto o dashboard (`{% if request.endpoint != 'dashboard' %}`); «← Voltar» usa `javascript:history.back()` e «Home» aponta para `url_for('dashboard')`.
-- **Estilos CSS:** `.nav-secundaria` (barra com fundo `--cor-superficie` e borda inferior) e `.nav-link-secundario` (+ `:hover` com sublinhado), em `pipe.css`.
-- **Alternador de tema (v1.4):** botão 🌙/☀️ em `.navbar-utilizador` (entre ⚙️ Definições e «Sair»); lógica centralizada em `pipe.js` (IIFE com guarda `if (!btn) return`): alterna `data-theme` entre `light`/`dark`, grava em `localStorage['pipe-tema']` e troca o ícone ☀️/🌙
-- **Anti-FOUC:** script inline no `<head>`, antes do `pipe.css`, aplica o tema guardado antes do primeiro paint (evita flash de tema errado ao carregar)
-- **PWA (já presente em `app/static/`):** `manifest.json`, `sw.js` (service worker, registado no `base.html`; desde a v1.4 **network-first para CSS/JS/HTML** com cache `pipe-v3` — garante que alterações de estilos chegam aos clientes após deploy; cache-first só como fallback offline) e ícones `icons/icon-192.png` / `icons/icon-512.png` — inclui `theme-color` âmbar e modo standalone em iOS.
+### Interface / Navegação (frontend)
 
-### Módulo Combustíveis (`app/combustiveis/`) ← NOVO — v1.3
-- **Schema:** tabelas `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel` e `combustiveis_estado_atualizacao`. FK de utilizador aponta para `utilizadores.id` (nome real da tabela). `db.create_all()` cria as tabelas no primeiro reload (sem Flask-Migrate).
-- **Modelo `Posto.id`** é o id da API Aberta; relacionamento `precos` lazy='dynamic'. Campos de arquivamento (v1.3.2): `ativo` (Boolean, `nullable=False`, default `True`) e `ciclos_ausente` (Integer, `nullable=False`, default `0`).
-- **Serviço:** `services.atualizar_precos_se_necessario(forcar=False, hoje=None)` — corre **só às terças-feiras** (e só uma vez por dia, via `estado.ultima_atualizacao.date() == hoje`, marcador gravado apenas em execuções com sucesso, para permitir retry no mesmo dia após falha); o botão manual "Actualizar Dados" (`forcar=True`) ignora o dia. Faz paginação completa da API Aberta (`GET /v1/fuel/stations?fuel=<slug>&district=Braga&page=&limit=100`) por combustível (~12 pedidos, ~3-4 s por recolha), filtra do lado do cliente por `municipality` (Braga/Vila Verde/Amares) e grava em `Posto` + `PrecoHistorico` (chave `station_id`); só grava novo histórico quando `preco` ou `updated_at` mudam (deduplicação). Autenticação via header `X-API-Key` (var `APIABERTA_API_KEY`, opcional — sem chave = 30 pedidos/min; com chave = 300/min). `obter_precos_para_concelhos(concelhos, tipos_utilizador, tipo_selecionado)` devolve o preço mais recente por posto+combustível; o dropdown `?combustivel=` filtra *dentro* do universo de tipos do utilizador. `obter_tipos_combustivel_disponiveis` lista os tipos do universo. Devolve `postos_verificados`, `precos_novos`, `postos_arquivados` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade).
-- **Rotas:**
-  - `GET /combustiveis/` — dashboard: cards "Mais barato por combustível" + tabela (Posto | Concelho | Combustível | Preço (€/L) | Data); filtro GET `?combustivel=`; redirect para Definições se sem concelhos.
-  - `GET/POST /combustiveis/definicoes` — checkboxes de concelhos + combustíveis; gravação em `UtilizadorConcelho` e `UtilizadorCombustivel` (delete+insert, como nas outras definições).
-  - `POST /combustiveis/atualizar` — força a actualização (rate limit 6/hora) e faz redirect, com flash honesto ("X postos verificados, Y registos novos" ou "sem alterações desde a última recolha") e, desde a v1.3.2, com o sufixo "N posto(s) arquivado(s) (deixaram de aparecer na API)." quando a recolha arquivou pelo menos um posto (concordância singular/plural).
-- **Templates** em `app/templates/combustiveis/{dashboard,definicoes}.html` (arranjo do PIPE: `app/templates/<modulo>/`).
-- **CSS:** reutiliza as classes existentes (`pipe.css`) — `.cartao`, `.admin-tabela`, `.opcao-check`, `.btn`, `.campo-texto`, `.secao-*`. Dropdown usa `class="campo-texto"` e GET (sem CSRF).
-- **Scheduled task:** `tarefa_combustiveis` em `scripts/pipe_tasks.py` — chama `services.atualizar_precos_se_necessario(forcar=False)`; log "Actualização automática ignorada — hoje não é terça-feira." quando fora de terça e "— já actualizado hoje" quando já correu nessa terça; em execução, loga postos verificados, registos novos e total na BD.
-- **Correcções v1.3.1 (após o refactor para a API Aberta):**
-  - **Bug crítico de paginação corrigido** — o `return encontrados` de `_paginar_fuel` estava indentado *dentro* do `while True`, devolvendo logo após a página 1. A recolha via API Aberta via apenas 4 postos (de 95) e o botão manual respondia "Preços atualizados (4 postos)." em ~1 s. Corrigido (return ao nível da função) e adicionada guarda `PAGINAS_MAX = 60`.
-  - **Filtro `district`** — a API honra `district` (não honra `municipality`, `municipio`, `concelho`, `q` ou `search`). Com `district=Braga` a paginação passa de ~96 para ~12 pedidos (~21 s → ~3 s). O match é por prefixo (devolve também Bragança), pelo que o filtro por concelho continua a ser aplicado do lado do cliente.
-  - **Deduplicação de histórico** — só se grava `PrecoHistorico` quando `preco` ou `data_atualizacao_dgeg` (o `updated_at` da API) difere do último registo do mesmo posto+combustível. Evita linhas 100% duplicadas (as recolhas DGEG tinham triplicado o histórico).
-  - **Retorno honesto** — `atualizar_precos_se_necessario` devolve `postos_verificados`, `precos_novos` e `postos_na_bd` (mantém `postos_atualizados` por compatibilidade). O flash distingue "Preços actualizados — X postos verificados, Y registos novos." de "Preços verificados — X postos, sem alterações desde a última recolha." (em v1.3.2 o retorno ganhou ainda `postos_arquivados` — ver abaixo.)
-  - **Estado visível** — o dashboard mostra "Última actualização: … · N postos na base de dados" e o erro da última recolha, se existir.
-  - **`ultima_atualizacao` só é marcada em caso de sucesso** — uma falha na terça permite retry no mesmo dia (antes, a falha às 08:00 bloqueava o resto do dia).
-  - **Rate limit** — `POST /combustiveis/atualizar` limitado a 6/hora (`@limiter.limit`).
-- **Deduplicação de duplicados da API (v1.5.10):** `services.obter_ids_duplicados()` devolve os ids de postos que são o **mesmo posto físico** devolvido pela API sob outro `id` (re-atribuição DGEG), com a chave **conservadora nome+morada+concelho** normalizados e um vencedor por grupo (activo → com preços → recolha mais recente → `id` menor). Exclusão só na leitura (`obter_precos_para_concelhos`, `obter_tipos_combustivel_disponiveis`, contagem `total_postos` do dashboard), sem alteração de BD. Complementa `obter_ids_postos_obsoletos()` (que trata dados congelados/antigos): os duplicados aparecem em todas as recolhas (`ciclos_ausente=0`), pelo que nunca são apanhados pelo arquivamento automático. Só funde duplicados genuínos — não toca nas estações gémeas reais ("Palmeira 1/2", "Órfãos I/II", "Piscinas I/II") nem nas 4 "Santos da Cunha 6" do mesmo operador. 11 testes em `tests/test_combustiveis_dedup.py`.
-- **Arquivamento automático (v1.3.2):** um posto que deixe de aparecer nas respostas da API Aberta passa a ser arquivado em vez de ficar visível indefinidamente no dashboard com a última data em que foi visto — o caso dos `id` reatribuídos pela DGEG (ex.: "E.S. FERREIROS REPSOL" substituída por "Posto Ferreiros- ESO305 REPSOL" com id diferente), em que o posto antigo ficava "congelado" na BD e o id novo criava um registo em paralelo, com o dashboard a mostrar as duas entradas como se fossem postos distintos. Regras:
-  - Cada recolha incrementa `ciclos_ausente` dos postos activos que **não** vieram nessa resposta; ao atingir `LIMIAR_CICLOS_AUSENTE = 2` (constante junto de `PAGINAS_MAX` em `services.py`) o posto passa a `ativo=False`. O conjunto de ids vistos nesta chamada é o `postos_vistos` que a função já usava (não foi criada variável nova).
-  - **Reactivação automática:** qualquer posto presente numa recolha fica com `ativo=True` e `ciclos_ausente=0` — a atribuição é feita logo após o `flush()`, antes do bloco de deduplicação, para também correr no ramo do `continue` (postos cujo preço/timestamp não mudou).
-  - **Histórico preservado:** arquivar nunca apaga `PrecoHistorico`; o posto só deixa de aparecer no dashboard e nos cálculos de "mais barato".
-  - **Guarda contra falhas parciais:** o bloco de arquivamento só corre quando `len(erros) == 0`. Numa recolha com erro (ex.: um combustível sem resposta) todos os postos desse combustível ficariam fora do conjunto de ids vistos e seriam contados como ausentes por engano — com a guarda, `ciclos_ausente` fica intocado e `postos_arquivados` é 0.
-  - **Filtros:** `obter_precos_para_concelhos` e a contagem `total_postos` do dashboard (cabeçalho) filtram `Posto.ativo == True`, pelo que os arquivados desaparecem também dos cards de "mais barato por combustível". `obter_tipos_combustivel_disponiveis` **não** foi alterado.
-  - **Retorno/UI:** nova chave `postos_arquivados` no dict (0 nas execuções com erros, fora do dia ou já corridas); o flash do botão manual reporta-a quando é maior que zero.
-- **Blocklist de postos obsoletos (v1.3.3):** a API Aberta continua a devolver os `id` antigos de estações cujo `id` foi reatribuído, mas **com os preços congelados** — como vêm em todas as recolhas, o arquivamento automático nunca os apanha (`ciclos_ausente` fica a 0) e, sendo mais baratos do que os reais, ganhavam o card "Mais barato por combustível" com valores falsos. Resolvido com a constante `NOMES_IGNORADOS` em `services.py` (nomes exactos) e o auxiliar `_nome_ignorado()` (comparação normalizada, insensível a caixa e a espaços nas pontas). O filtro é a **primeira instrução** do ciclo de registos, antes de criar/actualizar `Posto`, gravar `PrecoHistorico` ou alimentar `postos_vistos` — os postos da lista nunca são criados, actualizados nem reactivados. Se ainda existirem na BD, como não contam como vistos, o arquivamento automático esconde-os ao 2.º ciclo (auto-curativo). Limpeza do que já estava gravado: `scripts/remover_postos_ignorados.py` (importa a lista de `services.NOMES_IGNORADOS` — não a duplica; apaga primeiro o histórico por causa da FK; idempotente).
-  - **Os 5 postos sem dados de hoje** (2026-09-18) que este diagnóstico isolou de entre os 80 — todos os outros 75 tinham dados do próprio dia:
-    | Nome obsoleto | id | Última fonte | Homólogo actual | Gasóleo simples |
-    |---|---|---|---|---|
-    | `E.S. FERREIROS` | 66475 | 2026-07-13 | Posto Ferreiros- ESO305 (95233) | 1,919 € → 2,239 € |
-    | `E.S. BRAGA PISCINAS I` | 66481 | 2026-07-13 | REPSOL - BRAGA - PISCINAS I (95237) | 1,929 € → 2,249 € |
-    | `E.S. BRAGA PISCINAS II` | 66482 | 2026-07-13 | REPSOL - BRAGA - PISCINAS II (95236) | 1,929 € → 2,249 € |
-    | `BP Braga João 21` | 94671 | 2026-06-10 | PA BP João XXI (95254) | 1,999 € → actual |
-    | `DJB COMBUSTIVEIS` | 69288 | 2026-04-09 | — (único DJB, provavelmente encerrado) | 2,128 € |
-  - **`DJB COMBUSTIVEIS` ficou de fora por decisão explícita** (não é duplicado — não existe outro posto equivalente). ⚠️ Consequência a ter em conta: é actualmente o **mais barato em "Gasolina simples 95" (1,935 €)** com dados de Abril/2026, ou seja, polui o card "Mais barato" exactamente como os anteriores. Para o remover basta acrescentar `'DJB COMBUSTIVEIS'` a `NOMES_IGNORADOS` e repetir `scripts/remover_postos_ignorados.py`.
-  - **Resultado:** 80 → 76 postos (4 postos e 12 registos de preço removidos). Recolha forçada a seguir: 76 → 76, com os 4 nomes a **não** voltarem a entrar e os homólogos frescos intactos (Ferreiros- ESO305, REPSOL PISCINAS I/II, PA BP João XXI, todos `ativo=True`). Card de gasóleo simples passou de um falso 1,919 € para 2,049 € (`Bxpress Braga`, fonte de hoje).
-- **Primeira recolha:** correu uma vez manualmente via `services.atualizar_precos_se_necessario(forcar=True)` (equivalente a `scripts/popular_combustiveis.py`). Substitui o antigo `scripts/mapear_combustiveis_inicial.py` (removido — não era necessário com a API Aberta: a paginação por combustível já devolve os postos da zona directamente).
-- **Integração na Loja:** entrada em `MODULOS_DISPONIVEIS` com slug `combustiveis`, ícone ⛽, rota `combustiveis.dashboard`.
+- **Dashboard** — grelha de cartões dos módulos activos (lida com `MODULOS_DISPONIVEIS`); módulos activos têm destaque; sem links de módulos na navbar
+- **Padrão AJAX/fetch no PIPE:**
+  - Passar sempre `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch
+  - Backend usa `request.get_json()` — não usa `validate_on_submit()`
+- **Padrão de imports nos blueprints:**
+  - `from app import db` — para SQLAlchemy
+  - `from app.extensions import limiter` — para rate limiting
 
-### Segurança
+---
+
+## Segurança
 
 | Medida | Implementação | Ficheiro |
 |---|---|---|
 | CSRF | Flask-WTF CSRFProtect em todos os formulários | `app/__init__.py` |
-| Rate limiting | Flask-Limiter nas rotas críticas | `app/auth/routes.py`, `app/combustiveis/routes.py`, `app/extensions.py` |
+| Rate limiting | Flask-Limiter nas rotas críticas | `app/auth/routes.py`, `app/combustiveis/routes.py`, `app/assistente/routes.py`, `app/extensions.py` |
 | Logging de login falhado | `app.logger.warning` com username e IP | `app/auth/routes.py` |
 | Security headers | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` | `app/__init__.py` |
 | Password hashing | Werkzeug `generate_password_hash` / `check_password_hash` | `app/auth/models.py` |
 | Controlo de acesso | `@login_required` e `@admin_required` | rotas protegidas |
 | Configuração IP PA | `X-Forwarded-For` no Limiter | `app/extensions.py` |
-| CORS do cofre | `COFRE_CORS_ORIGINS` (apenas `chrome-extension://<ID>`): a origem autorizada recebe `Access-Control-Allow-Origin` + `Allow-Credentials`; origem errada não recebe o header e o browser bloqueia o pedido | `app/__init__.py`, `config.py` |
-| Cookie de sessão cross-site (extensão Chrome) | `SameSite=None` + `Secure` em produção (obrigatório para os `fetch` a partir de `chrome-extension://`); `Lax` em desenvolvimento. Os POSTs continuam protegidos pelo token CSRF do Flask-WTF | `config.py`, `app/__init__.py` |
-| Sessão do cofre | chave AES só em Flask-Session server-side (`instance/flask_session/`); expira em `COFRE_SESSION_TIMEOUT` (900 s) bloqueando **apenas** o cofre, sem apagar a sessão de login | `app/passwords/routes.py` |
-| SameSite e extensões | o Chrome trata pedidos de uma extensão como *same-site* quando esta tem `host_permissions` para o destino (o manifest declara `<all_urls>`), pelo que o cookie `Lax` de desenvolvimento chega à extensão — é o que permite testar sem HTTPS; `ProductionConfig` mantém `None` explícito, que não depende dessa isenção | `config.py`, `chrome-extension/manifest.json` |
-
-### Testes realizados
-- **Suite automatizada `pytest` — 146 testes** ✅ (135 anteriores + 11 novos de dedup de postos em `tests/test_combustiveis_dedup.py`; inclui 31 do Cofre em `tests/test_cofre.py`, 1 de regressão do isolamento em `tests/test_isolamento_bd.py`, o 409 da extensão, o harness JS em `tests/test_extensao_js.py`, 14 de convites/Mailjet em `tests/test_convites_email.py` e 8 da distribuição da extensão em `tests/test_extensao_distribuicao.py`)
-- ⚠️ **Incidente 2026-09-23 — BD local apagada por uma corrida de `pytest`:** `tests/test_cofre.py` criava a app com a config real e chamava `db.drop_all()`; reescrever `SQLALCHEMY_DATABASE_URI` **depois** de `create_app()` não tem efeito (o engine é fixado em `db.init_app()`), pelo que o `drop_all()` correu contra `instance/pipe.db` e apagou as 21 tabelas. Corrigido: os testes usam `create_app('testing')` (SQLite em memória + sessões em pasta temporária) e `tests/conftest.py` bloqueia `db.drop_all()` com BD de ficheiro. Dados locais perdidos (schema recriado; conta recriada com `scripts/criar_admin.py`, que agora define `is_admin=True`). Validação: `sha256` de `instance/pipe.db` inalterado antes/depois de duas corridas completas
-- Login e registo ✅
-- Dashboard com cards de módulos ✅
-- Módulo Loja de Módulos — activar/desactivar módulos ✅
-- Dashboard dinâmico — estado vazio + cards por módulos activos ✅
-- Módulo Euromilhões completo ✅
-- 2FA Telegram, Email, TOTP ✅
-- Recuperação de password por email ✅
-- Notificações Telegram e Email (manual) ✅
-- Área admin completa ✅
-- Sistema de Convites ✅
-- Módulo Tarefas completo ✅
-- `pipe_tasks.py` com módulo Tarefas ✅
-- Módulo Notas completo ✅
-- Módulo Passwords completo ✅
-- **Cofre de Passwords — ciclo completo** ✅ (activar, desbloquear, criar/editar/apagar entradas, alterar password mestra, dedup por domínio normalizado, dedup na importação do CSV do Chrome, bloqueio por inactividade e isolamento entre utilizadores; 31 testes em `tests/test_cofre.py`) + 1 teste de regressão do isolamento de BD (`tests/test_isolamento_bd.py`)
-- Módulo Câmbio — conversão EUR → BRL ✅
-- **Assistente IA — conversão de moeda (`get_cambio`)** ✅ (Wise + fallback, validado com smoke test real EUR→USD)
-- **Assistente IA — preços de combustíveis (`get_combustiveis`)** ✅ (v1.4.12; filtros por combustível/concelho, modo mais-barato, isolamento por concelhos do utilizador, comparação insensível a acentos; validado com smoke real + OpenRouter)
-- **Assistente IA — mensagem inicial curta** ✅ (v1.4.12; de 9 linhas para 3, capacidades no subtítulo do cabeçalho)
-- **Testes do Assistente IA** ✅ (v1.4.12; 42 testes `pytest` — cliente, orquestração e ferramenta `get_combustiveis`)
-- **Módulo Calendário — Vista Agenda** ✅ (criar, editar, apagar, agrupamento por data)
-- **Módulo Calendário — Vista Mensal** ✅ (grelha 7×N, navegação, pílulas coloridas, clique em slot)
-- **Módulo Calendário — Modal CRUD** ✅ (validação, selector de cor, toggles)
-- **Módulo Calendário — alternância Agenda ↔ Mensal** ✅ (bug DOM corrigido)
-- **Módulo Combustíveis — dashboard com filtro `?combustivel=`** ✅
-- **Módulo Combustíveis — definições com checkboxes de concelhos + combustíveis** ✅
-- **Módulo Combustíveis — `tarefa_combustiveis` às terças** ✅ (ignora fora de terça; força no botão manual)
-- **Módulo Combustíveis — paginação completa + deduplicação** (95 postos verificados num só ciclo, histórico sem linhas duplicadas, filtro `district`)
-- **Módulo Combustíveis — arquivamento automático (v1.3.2)** ✅ (reset local: 95 → 80 postos, 15 registos que já não vinham da API eliminados; 2.ª recolha real não subiu `ciclos_ausente` de nenhum posto; posto ausente arquivado exactamente ao 2.º ciclo com `postos_arquivados=1` e reactivado ao reaparecer, com `ciclos_ausente` reiniciado a 0; filtro do dashboard confirmado por lista de ids; render de `GET /combustiveis/` e flash de `POST /combustiveis/atualizar` validados; 22 testes `pytest` a passar)
-- **Módulo Combustíveis — blocklist de postos obsoletos (v1.3.3)** ✅ (4 postos/12 preços removidos: 80 → 76; recolha forçada a seguir deu 76 verificados, 0 registos novos, 0 arquivados, com os 4 nomes a não voltarem a ser criados; homólogos frescos intactos; "mais barato" em gasóleo simples passou do falso 1,919 € para 2,049 € real)
-- **Tema claro/escuro — alternância via botão na navbar** ✅ (tema e ícone mudam; escolha persiste após reload via `localStorage`)
-- **Tema claro/escuro — anti-FOUC** ✅ (tema aplicado antes do primeiro paint, sem flash)
-- **Módulo Notas — paleta de cores Google Keep** ✅ (8 cores substituíram as cores escuras anteriores; aplicáveis em tema claro e escuro, sem alteração de BD — `Nota.CORES`, `_cartao.html`, `index.html` actualizados; `editar.html` usa a mesma fonte via `|tojson`)
-- **Módulo Notas — contraste de texto em cartões coloridos** ✅ (texto forçado a preto via `.nota-com-cor` / `var(--nota-texto, var(--cor-texto))` sobre fundos claros; `_cartao.html` (grelha), e editor completo `editar.html` — `.nota-editar-titulo`, `.nota-editar-textarea`, `.checklist-editar-input`); garante legibilidade em tema claro e escuro
-
+| CORS do cofre | `COFRE_CORS_ORIGINS` (apenas `chrome-extension://<ID>`): origem autorizada recebe `Access-Control-Allow-Origin` + `Allow-Credentials`; origem errada não recebe o header | `app/__init__.py`, `config.py` |
+| Cookie de sessão cross-site (extensão Chrome) | `SameSite=None` + `Secure` em produção (obrigatório para os `fetch` a partir de `chrome-extension://`); `Lax` em desenvolvimento | `config.py`, `app/__init__.py` |
+| Sessão do cofre | chave AES só em Flask-Session server-side (`instance/flask_session/`); expira em `COFRE_SESSION_TIMEOUT` (900 s), bloqueando apenas o cofre | `app/passwords/routes.py` |
 
 ---
 
-## Deploy — PythonAnywhere
+## Testes
+
+- Execução:
+  - `pytest --collect-only -q` — recolhe todos os testes (146 colectados)
+  - `pytest -q` — executa a suite completa
+- A suite consta de 14 ficheiros de teste, totalizando **146 testes**: `test_cofre.py` (32), `test_convites_email.py` (14), `test_pipe_tasks.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_cliente.py` (13), `test_combustiveis_dedup.py` (11), `test_assistente_contexto_truncagem.py` (10), `test_assistente_contexto.py` (9), `test_extensao_distribuicao.py` (8), `test_tarefas_listas_predefinidas.py` (3), `test_extensao_js.py` (1), `test_isolamento_bd.py` (1) e helpers em `conftest.py`/`conftest_utils.py`
+- **Aviso do `conftest.py`:** nenhum teste pode tocar na BD real do PIPE. O `drop_all_seguro` intercepta `flask_sqlalchemy.SQLAlchemy.drop_all` e levanta `RuntimeError` sempre que a URI da BD não for `:memory:` — obrigatoriedade de criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). O anti-padrão `db.drop_all()` com BD de ficheiro levanta erro porque o engine do SQLAlchemy fica fixado em `db.init_app()` e a reatribuição de `SQLALCHEMY_DATABASE_URI` depois de `create_app()` não tem efeito
+
+---
+
+## Deploy no PythonAnywhere
 
 ### Estado
+
 - **App online** em `https://felipejn.pythonanywhere.com` ✅
 - **WSGI configurado** ✅
 - **Static files** configurados ✅
-- **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às 08:00 ✅
-- **Módulo Combustíveis — reset das tabelas (colunas `ativo`/`ciclos_ausente`) pendente no PA** ⚠️
-- **Módulo Calendário — deploy e migração de BD pendentes** ⚠️
-- **Cofre de Passwords — deploy pendente no PA** ⚠️ — `pip install -r requirements.txt` (4 dependências novas: Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` para `cofre_configs`/`cofre_passwords`, `COFRE_CORS_ORIGINS` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` em produção
-- **Extensão Chrome do Cofre — ícones** ✅ — `icon48.png` e `icon128.png` já existem em `chrome-extension/` (gerados por `scripts/gerar_icones_extensao.py`, incluídos no ZIP servido em `/passwords/extensao/download`)
+- **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às **07:00** ✅ (configuração confirmada no painel Tasks do PythonAnywhere)
+- **Cofre de Passwords** — deploy pendente no PA ⚠️: `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` para `cofre_configs`/`cofre_passwords`, `COFRE_CORS_ORIGINS=chrome-extension://<ID>` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção
+- **Calendário** — deploy pendente no PA ⚠️: correr a migração da tabela `evento` (ver comando abaixo)
+- **Combustíveis** — tabelas criadas por `db.create_all()` no primeiro reload ⚠️: `python scripts/reset_postos_combustiveis.py` (drop das tabelas de postos/histórico + `db.create_all()` + repovoamento) e `python scripts/remover_postos_ignorados.py` (idempotente); correr **antes** de abrir o dashboard
+- **Convites — Mailjet (v1.5.2)** ⚠️: `python scripts/migrar_convites_mailjet.py` **depois** de fazer deploy do código (cria as colunas `mailjet_message_id`, `email_estado`, `email_verificado_em` em `convites`); sem isso as queries ao modelo falham com `no such column: convites.mailjet_message_id`
 
-### Configuração WSGI
+### Comando de migração do Calendário (executar no PA após deploy)
+
+```bash
+python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"
+```
+
+### WSGI
+
 ```python
 import sys, os
 from dotenv import load_dotenv
@@ -485,6 +353,7 @@ application = create_app()
 ```
 
 ### Variáveis de ambiente no PA (`.env`)
+
 ```
 FLASK_ENV=production
 SECRET_KEY=<gerado com secrets.token_hex(32)>
@@ -495,185 +364,77 @@ MAILJET_FROM_EMAIL=...
 WISE_API_KEY=...
 APIABERTA_API_KEY=...
 COFRE_CORS_ORIGINS=chrome-extension://<ID da extensão>
+OPENROUTER_API_KEY=...
+OPENROUTER_MODEL=inclusionai/ling-3.0-flash-sante:free
 ```
 
-### Migrações de BD executadas
-- `scripts/adicionar_is_admin.py` ✅
-- `scripts/migrar_notificada_em.py` ✅
-- Módulo Notas — tabelas criadas por `db.create_all()` ✅
-- Módulo Loja — tabela `user_modulos` criada por `db.create_all()` ✅
-- Módulo Passwords — cofre: tabelas `cofre_configs` e `cofre_passwords` criadas por `db.create_all()` **localmente** ✅ — a criar no PA no primeiro reload após o deploy ⚠️
-- **Módulo Calendário — tabela `evento` a criar no PA após deploy** ⚠️
-- **Módulo Combustíveis — 4 tabelas** (`combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao`) criadas por `db.create_all()` no primeiro reload; modelo `UtilizadorCombustivel` adicionado ao import de `db.create_all()` em `app/__init__.py` ✅
-- **Módulo Combustíveis — arquivamento de postos (v1.3.2)** ⚠️ no PA — `python scripts/reset_postos_combustiveis.py` (drop das tabelas de postos/histórico + `db.create_all()` + repovoamento; cria as colunas `ativo`/`ciclos_ausente` que o `create_all()` sozinho não acrescenta a uma BD existente)
-- **Cópia de segurança da BD:** `python scripts/backup_bd.py` copia `instance/pipe.db` para `instance/backups/pipe-AAAAMMDD-HHMMSS.db` (mantém as últimas 10). Correr antes de operações de risco (reset de tabelas, migrações manuais); pode ser agendado no PA
-- **Convites — colunas do Mailjet (v1.5.2)** ⚠️ no PA — `python scripts/migrar_convites_mailjet.py` (adiciona `mailjet_message_id`, `email_estado`, `email_verificado_em` a `convites`; idempotente — o `db.create_all()` **não faz `ALTER TABLE`** e sem as colunas as queries ao modelo rebentam com `no such column`)
-- **Módulo Combustíveis — blocklist de postos obsoletos (v1.3.3)** ⚠️ no PA — `python scripts/remover_postos_ignorados.py` (apaga os postos de `services.NOMES_IGNORADOS` e o respectivo histórico; idempotente, pode correr antes ou depois do reset)
+### Cópia de segurança da BD
 
-### Comando de migração do Calendário (executar no PA após deploy)
-```bash
-python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"
-```
+`python scripts/backup_bd.py` copia `instance/pipe.db` para `instance/backups/pipe-AAAAMMDD-HHMMSS.db` (mantém as últimas 10). Correr antes de operações de risco (reset de tabelas, migrações manuais).
 
-### Módulo Combustíveis (migração)
-As tabelas do módulo Combustíveis são criadas **automaticamente** pelo `db.create_all()` (já chamado no arranque da app e com os modelos importados em `app/__init__.py`), **sem necessidade de script de migração manual**. A primeira população de dados é feita uma única vez correndo `services.atualizar_precos_se_necessario(forcar=True)` — ou, por conveniência, `python scripts/popular_combustiveis.py` (script de ajuda, não obrigatório). No deploy do PA, basta o primeiro reload — as 4 tabelas + a linha seed `id=1` de `EstadoAtualizacaoCombustiveis` são criadas. **`api.apiaberta.pt` está na whitelist do PA** (é um domínio com documentação Swagger pública, diferentemente da DGEG que o substituiu).
+---
 
-### Módulo Combustíveis (reset pós-v1.3.2 — colunas novas)
-As colunas `ativo` e `ciclos_ausente` foram acrescentadas ao modelo `Posto`. Como o `db.create_all()` **não faz `ALTER TABLE`**, uma BD já existente continuaria sem as colunas e qualquer query rebentaria com `no such column: combustiveis_postos.ativo`. O script `scripts/reset_postos_combustiveis.py` resolve isso de propósito: apaga por completo as tabelas `combustiveis_precos_historico` e `combustiveis_postos` (não só as linhas — ordem `PrecoHistorico` → `Posto`, por causa da FK), chama `db.create_all()` — que as recria já com as colunas novas —, repõe `EstadoAtualizacaoCombustiveis.ultima_atualizacao = None` e força uma recolha imediata (`atualizar_precos_se_necessario(forcar=True)`). **Não toca** em `combustiveis_utilizador_concelho` nem em `combustiveis_utilizador_combustivel` — as definições do utilizador mantêm-se. Traz o mesmo *bootstrap* dos restantes scripts (`sys.path.insert` + `load_dotenv`), com `from app import create_app, db` (o `db` **não** está em `app.extensions`, que só define o `limiter`).
+## Pendências de deploy
 
-**Ordem de execução:** deploy do código → correr `python scripts/reset_postos_combustiveis.py` → **só depois** abrir o dashboard. Resultado local: 95 → 80 postos (15 registos que já não vinham da API foram eliminados), 228 registos de preços, ~3,6 s com `APIABERTA_API_KEY` definida.
+- **Calendário:** migrar tabela `evento` no PA — `python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"`
+- **Cofre:** `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt) + `db.create_all()` das tabelas do cofre + `COFRE_CORS_ORIGINS` no `.env` + Reload + confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção
+- **Combustíveis:** `python scripts/reset_postos_combustiveis.py` (cria colunas `ativo`/`ciclos_ausente`) **antes** de abrir o dashboard + `python scripts/remover_postos_ignorados.py` (idempotente)
+- **Convites/Mailjet:** `python scripts/migrar_convites_mailjet.py` **depois** do deploy do código
+- **Extensão Chrome do Cofre:** teste de ponta a ponta em produção seguindo `docs/guia-extensao-chrome.md` (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS e que a chave do cofre não aparece nos cookies; recarregar ⟳ o cartão da extensão em `chrome://extensions` depois das alterações
+- ⚠️ **Antes de qualquer operação acima, correr:** `python scripts/backup_bd.py`
 
-**Nota sobre duplicados da própria API (v1.5.10 — resolvido):** o par `66475` "E.S. FERREIROS" / `95233` "Posto Ferreiros- ESO305" e os quatro "Santos da Cunha 6 - Logística e Transportes, Lda." (EN 14 / Largo de Madre Deus / EN 201 Merelim / EN 201 Prado) são **devolvidos pela API com ids e moradas diferentes**, e por isso nunca eram apanhados pelo arquivamento (`ciclos_ausente=0`). **A análise revelou que a premissa original estava errada:** os 4 "Santos da Cunha 6" são **4 estações físicas distintas** do mesmo operador (confirmado no site do operador: Maximinos, Merelim, Av. João Paulo II, Prado), e o `66475` já é ignorado pelo blocklist `NOMES_IGNORADOS`. Uma heurística por **morada+concelho** teria fundido 3 pares de estações **reais** gémeas na mesma rua ("Ilídio Mota - Palmeira 1/2", "CEPSA ÓRFÃOS - I (Poente)/II (Nascente)", "REPSOL - BRAGA - PISCINAS I/II"). Implementou-se por isso a chave **conservadora nome+morada+concelho** (`services.obter_ids_duplicados()`), que só funde o mesmo posto devolvido com dois `id`. Verificação nos 75 postos reais: **0 duplicados** — nenhuma estação real é fundida.
+---
+
+## Armadilhas conhecidas
+
+- **`create_all()` não faz `ALTER TABLE`** — a migração da v1.5.2 adicionou colunas do Mailjet em `convites`; a v1.3.2 adicionou `ativo`/`ciclos_ausente` em `combustiveis_postos`; a migração `notificada_em` alterou `tarefas`. Em PythonAnywhere é necessário executar os scripts de migração manuais (`migrar_convites_mailjet.py`, `reset_postos_combustiveis.py`, `migrar_notificada_em.py`), nunca confiar no `db.create_all()` numa BD já existente
+- **Engine fixado em `db.init_app()`** — atribuir `app.config['SQLALCHEMY_DATABASE_URI']` **depois** de `create_app()` não tem efeito sobre o engine já construído; por isso os testes têm de usar `create_app('testing')` antes de qualquer reatribuição (o conftest bloqueia `db.drop_all()` com BD de ficheiro)
+- **Cache do nginx do PythonAnywhere** — serve ficheiros estáticos com cache de longo prazo e **ignora parâmetros de query**; quando se altera o CSS é preciso actualizar o `cache-buster` em `base.html` (`?v=...`) para forçar o reload no browser
+- **OpenRouter pode devolver HTTP 200 com erro** — quando o provider upstream falha, o corpo é `{"error": ...}`; o código do Assistente IA deve usar `_classificar_resposta()` em vez de confiar só em `raise_for_status()`; há fila de fallback de modelos gratuitos
+- **`db` não está em `app.extensions`** — o objeto SQLAlchemy vive em `app/__init__.py` (importar via `from app import db`)
 
 ---
 
 ## Arquitectura de módulos
 
-Cada módulo é um Flask Blueprint independente. A navegação é feita pelos cards no dashboard.
+1. Criar `app/<modulo>/` com `__init__.py` + `routes.py` (+ `models.py` se BD)
+2. Registar blueprint em `app/__init__.py`
+3. Adicionar entrada em `app/modulos/config.py` (`MODULOS_DISPONIVEIS`)
+4. Adicionar card em `app/templates/dashboard.html`
+5. Se precisa de scheduled task: adicionar em `scripts/pipe_tasks.py`
 
-**Para adicionar um novo módulo:**
-1. Criar `app/<modulo>/` com `__init__.py` e `routes.py` (+ `models.py` se precisar de BD)
-2. Registar o blueprint em `app/__init__.py`
-3. Adicionar entrada em `app/modulos/config.py`
-4. Adicionar CSS específico em `pipe.css` se necessário
-5. Adicionar função `tarefa_<modulo>()` em `scripts/pipe_tasks.py` se precisar de tarefa agendada
-
-**Padrão AJAX/fetch no PIPE:**
-- Passar sempre `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch
-- Backend usa `request.get_json()` — não usa `validate_on_submit()`
-
-**Padrão de imports nos blueprints:**
-- `from app import db` — para SQLAlchemy
-- `from app.extensions import limiter` — para rate limiting
+Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`; imports `from app import db` e `from app.extensions import limiter`; rate limiting nas rotas críticas; tudo filtrado por `user_id` (anti-IDOR), exceto os `Posto` do Combustíveis que são globais.
 
 ---
 
-## Ponto onde estamos
+## Próximos passos
 
-**Versão v1.6.0** — cores e contraste dos balões de conversa do Assistente IA (claro e escuro). O balão do assistente partilhava `--cor-superficie-2` (escuro `#22263a`/claro `#f1f3f7`), quase invisível sobre a superfície do chat; agora usa novos tokens semânticos `--cor-balao-assistente` (escuro `#2b3149`, claro `#eff2f8`) + `--cor-balao-assistente-borda` (escuro `rgba(245,158,11,0.45)` tinte âmbar, claro `#c9cdd8`), uma faixa lateral âmbar de 3px (`border-left`) e relevo subtil (`box-shadow`). O balão do utilizador mantém-se âmbar `#f59e0b`. Alteração no `app/static/css/pipe.css` → cache-buster em `app/templates/base.html` passou de `?v=6` para `?v=7`. Validação: CSS com profundidade de chaves equilibrada (`0`) + **53 testes `pytest` do Assistente IA a passar** (sem regressão). Sem alteração de BD.
-
-> Nota: esta versão está implementada e commitada no GitHub, mas o cabeçalho deste documento indica v1.5.10 — renumerar para v1.6.1 na próxima alteração ou manter esta linha como registo da entrega mais recente.
-
-**Versão v1.5.10** — heurística de deduplicação de postos no módulo Combustíveis (fecha a pendência «duplicados na própria API»). Nova função `services.obter_ids_duplicados()` em `app/combustiveis/services.py`, com a chave **conservadora nome+morada+concelho** (normalizados: `casefold` + colapso de espaços) e um vencedor por grupo — por ordem: posto activo, posto com preços registados, recolha mais recente e, em empate, o `id` mais baixo (determinístico). A exclusão é só no **ambiente de leitura** (como a regra de obsolescência existente), ligada em `obter_precos_para_concelhos`, `obter_tipos_combustivel_disponiveis` e na contagem `total_postos` do dashboard — **sem alteração de BD** e reversível sem perda de histórico. **A premissa da pendência foi corrigida pela análise dos dados reais:** os 4 "Santos da Cunha 6 - Logística e Transportes, Lda." (ids `65182`/`65183`/`65184`/`65771`) são **4 estações físicas distintas** do mesmo operador — confirmado no site do operador (Maximinos, Merelim, Av. João Paulo II e Prado, moradas e códigos postais próprios); e o par "E.S. FERREIROS" (`66475`) vs "Posto Ferreiros- ESO305" (`95233`) já estava coberto pelo blocklist `NOMES_IGNORADOS`. Uma heurística por **morada+concelho** (como a pendência sugeria) teria fundido 3 pares de estações **reais** gémeas na mesma rua — "Ilídio Mota - Palmeira 1"/"2" (Av. Cávado 268), "CEPSA ÓRFÃOS - I (Poente)"/"II (Nascente)" (Av. Cónego Jorge Peixoto Coutinho) e "REPSOL - BRAGA - PISCINAS I"/"II" (Av. Frei Bartolomeu dos Mártires) — pelo que a chave exige os **três** campos e não funde nenhuma delas. Verificação nos 75 postos reais: **0 duplicados** detectados, `sha256` da BD inalterado. Novo `tests/test_combustiveis_dedup.py` (11 testes): 5 casos reais preservados (mesmo nome/moradas diferentes, mesma morada/nomes diferentes, concelhos diferentes), 4 de normalização e de escolha do vencedor e 2 de leitura (o duplicado não aparece nos preços nem no dropdown de combustíveis). **Suite: 146 testes `pytest` a passar.** Documento `Estado_Atual.md` limpo: Mailjet (domínio autenticado) e `tarefa_calendario_hoje()` (feito na v1.5.8) marcados como resolvidos, ícones da extensão corrigidos (já existiam) e contagem de testes actualizada.
-
-**Versão v1.5.9** — janela de visualização (detalhe) do evento no Calendário. Antes, clicar num evento abria directamente o modal de edição; agora abre um **novo modal read-only** (`#modal-detalhe`, no `app/templates/calendario/index.html`): barra de cor, título, data formatada pt-PT (duas datas se multi-dia), intervalo `HH:MM – HH:MM` ou «Dia inteiro», localização e descrição (condicionais) e badge de notificação; botões **Editar** (fecha o detalhe e abre o modal de edição existente via `abrirModalEditar`), **Apagar** (`confirm` + `DELETE`, actualiza a vista activa) e **Fechar**. Novas funções inline `abrirDetalhe()`, `editarEDetalhe()`, `apagarEDetalhe()`, `fecharDetalhe()`/`fecharDetalheOverlay()` e helpers `formatarDataDetalhe()`/`formatarHoraDetalhe()`, com estado `eventoDetalheId`/`eventoDetalhe`. Gatilhos trocados: a pílula da vista Mensal e a linha da vista Agenda passam a abrir o detalhe; os botões rápidos ✏️/🗑️ da Agenda mantêm-se com `event.stopPropagation()` (acesso directo, sem disparar o detalhe). CSS `.detalhe-*` no tema escuro + overrides `[data-theme="light"]` (paleta Google Calendar `#fff`/`#dadce0`/`#3c4043`/`#70757a`), reutilizando `.btn-guardar`/`.btn-apagar`/`.btn-cancelar`. **Sem novo endpoint** — os dados vêm da API `GET /calendario/api/eventos` (já traz `cor`, `notificar`, `dia_inteiro`, `localizacao`, `descricao`); **sem alteração de BD** (deploy = só o push, o template é servido pelo Flask). Sem bump de cache-buster (`?v=` no `base.html`) porque as alterações são no `<style>`/`<script>` inline do template, não no `pipe.css`/`pipe.js` estáticos. Validação: **135 testes `pytest` a passar** (sem regressão) + renderização de `GET /calendario/` (autenticado, `create_app('testing')`) com os marcadores do modal presentes + `node --check` no JS inline (exit 0).
-
-**Versão v1.5.8** — notificações diárias alargadas. `tarefa_tarefas()` passa a avisar também **no dia do prazo** (`data_limite <= hoje`) e depois em todos os dias de atraso até concluir, numa única mensagem por utilizador com as secções «⏰ Vencem hoje» e «⚠ Em atraso» (`type='tarefa_lembrete'`). Nova `tarefa_calendario()` em `pipe_tasks.py` — lembretes de eventos **no dia anterior** («Amanhã») e **no dia** («Hoje»), agrupados por utilizador (`type='evento_lembrete'`), ignorando eventos já iniciados (excepto dia inteiro) e respeitando o toggle `notificar` — completa a pendência desde a v1.4.2 **sem migração de BD** (o campo único `Evento.notificado_em` cobre os dois avisos: véspera grava D−1, dia do evento grava D). Refacto: `app = create_app()` movido para dentro de `if __name__ == '__main__'` — importar o script já não cria a app com a BD real (pré-requisito dos testes). Hora real da scheduled task corrigida em todo lado: **07:00** (o docstring dizia 23:00 e o `Estado_Atual.md` 08:00). Testes: novo `tests/test_pipe_tasks.py` (13 testes, `notification_service.send` mockado). Fora de âmbito (decisão do utilizador): toggle de preferências para eventos/tarefas e aviso na criação de tarefa. Spec: `docs/superpowers/specs/2026-10-01-notificacoes-tarefas-calendario-design.md`.
-
-**Versão v1.5.7** — listas predefinidas no módulo de Tarefas para contas novas. Novo `app/tarefas/seed.py` com a constante `LISTAS_PREDEFINIDAS` (Pessoal 📌, Casa 🏠, Trabalho 💼, Compras 🛒 — `ordem` 0–3, ícones de um emoji no `String(8)`) e `semear_listas_predefinidas(user_id)`, chamada por `registo_com_convite` (`app/auth/routes.py`) logo a seguir ao `flush()` do utilizador e antes do `commit` — um único commit, tudo ou nada. A função é idempotente com condição de guarda explícita (só semeia se o utilizador não tiver **nenhuma** lista): nunca apaga nem duplica, pelo que o deploy não toca nas listas das contas já existentes — decisão do utilizador: semear **apenas no registo**. Frontend sem alterações: vista inicial continua «Todas» («Pessoal» é só a primeira lista da sidebar) e o fallback `Geral` do assistente (`_obter_ou_criar_lista`) ficou intacto — só dispara em contas sem listas — na prática, contas antigas. Testes em `tests/test_tarefas_listas_predefinidas.py` (registo ponta a ponta via convite + guarda de não-alteração de listas existentes + idempotência); **122 testes a passar** no total. Spec: `docs/superpowers/specs/2026-10-01-listas-predefinidas-tarefas-design.md`.
-
-**Versão v1.5.2** — confirmação de entrega dos emails de convite (Mailjet) e diagnóstico de deliverability. O painel de convites mostrava «Convite enviado» só com base na aceitação da API (200 + `success`) — sem prova de entrega, e o `MessageID` da resposta era deitado fora. `EmailChannel.enviar()` passa a guardar o resultado em `self.ultimo_resultado` (`MessageID` lido de `Messages[0].To[0]` + motivo de falha; o retorno bool mantém-se, pelo que 2FA/recuperação de password e testes de email não mudam) e ganha **`consultar_estado(message_id)`**, que consulta `/REST/messagehistory/{id}` + `/REST/message/{id}` e devolve estado, cronologia de eventos e o motivo do bounce. O modelo `Convite` ganhou 3 colunas (`mailjet_message_id`, `email_estado`, `email_verificado_em` — migração idempotente em `scripts/migrar_convites_mailjet.py`) + `estado_email()` (rótulo PT + classe de badge a partir do mapa `ESTADOS_EMAIL`). O envio grava ID + estado `aceite` (a falha grava `falhou` e devolve o motivo detalhado no JSON) e há novo endpoint **`GET /admin/convites/<id>/estado-email`** (400 sem ID, 502 se o Mailjet falhar, nunca destrói o estado anterior; guarda `email_verificado_em`); a tabela `/admin/convites` ganhou a coluna **«Email (Mailjet)»** com badge (enviado/entregue/falhou-transitório) e botão 🔄 que actualiza o estado e mostra no hover a cronologia + motivo (JS novo com escape HTML dos comentários do bounce). Convites antigos sem ID ligam-se retroactivamente com `scripts/verificar_mailjet.py --ligar-convites` (pareamento por email + proximidade temporal ≤ 2 h) — **os 2 convites existentes já estão ligados na BD local** (gardengate → `1152921544892419067`, yahoo → `288230416497838458`, ambos `sent`). Diagnóstico com a API real do Mailjet: **ambos os convites de 25/09 foram efectivamente enviados (`sent`, sem bounce) e caíram em spam** — causa raiz identificada: `MAILJET_FROM_EMAIL=pipe.notificacoes@outlook.com` não está alinhado com SPF/DKIM autenticados (não é domínio autenticável na conta) → DMARC falha → **Gmail rejeita à porta** (`550 5.7.40`; um 3.º email de 25/09 07:01 para o gmail **softbounced** por essa razão, verificado no `Comment` do evento) e os restantes destinatários caem em spam (diagnóstico Mailjet: «Your FROM domain is not authenticated»). Correcções de robustez no caminho: stdout UTF-8 nos scripts de migração/diagnóstico (a consola cp1252 do Windows rebentava com o `✓`, o mesmo bug do script de ícones) e `try/except` de rede no `_email_do_contacto`. **Suite: 90 testes `pytest` a passar** (eram 76; +14 em `tests/test_convites_email.py`: canal, geração de convite, endpoint, renderização da página e caminhos de falha) + `node --check` no JS extraído do template. **Alteração de BD** — no PA: correr `python scripts/migrar_convites_mailjet.py` após o deploy.
-
-**Versão v1.5.6** — três ajustes de frontend: Calendário a iniciar na vista Mensal, cores do modo claro do Calendário ao estilo Google Calendar e tarefas concluídas ocultas por defeito. (1) **Vista Mensal por defeito** (`app/templates/calendario/index.html`): tab «Mensal» activa no HTML, `#vista-agenda` oculto, `vistaActual = 'mensal'` e init a chamar `mudarVista('mensal')` (antes `carregarAgenda()`); guardar/apagar já re-renderizam a vista correcta via `vistaActual` e o clique numa pílula passa o evento inline, sem depender da cache da agenda. (2) **Modo claro estilo Google Calendar** — o CSS do módulo estava fixo em cores escuras (`#1e1e1e`, `#1a1a1a`, bordas `#333`), pelo que em tema claro o módulo ficava escuro sobre página clara; nova secção no template prefixada com `[data-theme="light"]` (superfícies brancas, bordas `#dadce0`, texto `#3c4043`/`#70757a`, hover `#f1f3f4`/`#f8f9fa`, overlay `rgba(32,33,36,0.55)`) mantendo os acentos em âmbar PIPE (dia de hoje, aba activa, «+ Novo evento», Guardar) e o anel do selector de cor a passar de branco (invisível sobre branco) para âmbar; no `pipe.css`, 11 overrides `[data-theme="light"] .cal-pilula.evento-<cor>` com fundo tintado + texto escuro da mesma cor (pares estilo Google/Material, ex. tomate `#fce8e6`/`#c5221f`, peacock `#e8f0fe`/`#174ea6`), aplicados **apenas** às pílulas — a barra da Agenda e os círculos do selector mantêm as cores sólidas; botão Apagar do modal em vermelho Google `#c5221f`; cache-buster `?v=5` → `?v=6` no `base.html`. Modo escuro intocado. (3) **Tarefas concluídas ocultas** (`app/templates/tarefas/index.html`): `#lista-concluidas` arranca com `display:none` e botão «▸ mostrar», abrindo automaticamente apenas quando `filtro == 'concluidas'` (senão o filtro ficaria com página vazia); `filtrarTarefas()` ganhou `FILTRO_ACTUAL` (via `tojson`) para restaurar o estado por defeito ao limpar a busca e sincroniza o texto do botão em cada filtragem. Validação: **119 testes `pytest` a passar** + smoke de 22 verificações com `create_app('testing')` (render de `/calendario/` e `/tarefas/` com sessão autenticada, chips claros no `pipe.css`, cache-buster). **Sem alteração de BD** — no PA basta o push + Reload (o service worker é network-first para CSS/HTML).
-
-**Versão v1.5.5** — Assistente IA: filtro por posto em `get_combustiveis` e entrega de resultados grandes (bug reportado no chat). Pergunta real «quanto está o gasóleo simples no Pingo Doce de Vila Verde?» → o assistente respondia com o mais barato do concelho (2,125 €, do Intermarché) e mandava o utilizador ao módulo, alegando que a ferramenta «devolve sempre uma lista muito extensa». Causas: (1) `get_combustiveis` **não tinha filtro por posto** — só `tipo_combustivel`/`concelho`/`apenas_mais_barato`/`limite`; (2) mesmo com os filtros possíveis, os 14 registos de Vila Verde davam **2 853 chars** de JSON, acima do tecto `LIMITE_CHARS_TOOL_RESULT` (2000) de `contexto.py`, e `_serializar_resultado_tool()` **descartava o resultado inteiro** substituindo-o pelo aviso «Resultado demasiado grande…» — o modelo ficava sem dados nenhuns naquele pedido (a nota da v1.4.15 dizia que o corte só afectava o histórico, mas `contexto.py` aplicava-o também à mensagem `role: tool` da chamada corrente); (3) o payload por registo trazia `morada` e `data_recolha`, ~370 chars por registo. Alterações: (a) novo argumento **`posto`** em `get_combustiveis` — compara com o **nome e a marca**, insensível a acentos/maiúsculas (`'Pingo Doce'` encontra `PD VILA VERDE`/`PINGO DOCE`), aplica-se antes de `apenas_mais_barato` (também serve «o mais barato no posto X»), devolve erro orientador com até 15 postos disponíveis (`LIMITE_POSTOS_SUGERIDOS`) quando não encontra, e a descrição da ferramenta passa a instruir o modelo a usá-lo; (b) `_serializar_resultado_tool()` **degrada progressivamente** (`LIMITES_ITENS_DEGRADACAO` = 10 → 8 → 5 → 3 → 1 itens) até o JSON caber, em vez de o descartar — o aviso genérico fica só como último recurso; (c) payload de `get_combustiveis` sem `morada`/`data_recolha` por registo (frescura global em `recolha`, data DGEG em `data_dgeg`): 14 registos = 2 294 chars, e a lista do concelho chega ao modelo com **8 de 14** registos e sem aviso. Validação: **119 testes `pytest`** a passar (novo `tests/test_assistente_contexto_truncagem.py` com a regressão do aviso + 11 casos de `posto` em `tests/test_assistente_combustiveis.py`) e smoke real contra a BD (75 postos): «Pingo Doce de Vila Verde» + gasóleo simples devolve `PD VILA VERDE` a **2,129 €/L**; sem filtros, 213 registos entregues em 1 759 chars (antes: aviso, zero dados). **Sem alteração de BD** — não é preciso correr scripts no PythonAnywhere.
-
-**Versão v1.5.4** — distribuição da extensão do Cofre a partir do próprio PIPE. Até aqui a extensão só existia no repositório («Load unpacked» a partir da pasta clonada) — não havia forma de um utilizador do PIPE a obter sem GitHub. Novas rotas **`GET /passwords/extensao/download`** e **`GET /passwords/extensao/guia`** (ambas `@login_required`, em `app/passwords/routes.py`): a primeira empacota a pasta `chrome-extension/` em memória com `zipfile` (padrão já usado em `app/conversoes/routes.py`) e devolve `pipe-cofre-extensao-<versão>.zip` com prefixo `chrome-extension/` em cada entrada — ao descompactar fica logo a pasta certa para o «Load unpacked»; a versão é lida do `manifest.json`. A segunda serve `app/templates/passwords/guia_extensao.html`, conversão HTML de `docs/guia-extensao-chrome.md` (8 passos + tabelas «Antes de começar»/«Problemas comuns» + notas ⚠️), sem dependência `markdown` nova. Novo bloco CSS escopado `.guia-extensao`/`.guia-nota` em `pipe.css` (tokens de tema claro/escuro) com cache-buster `?v=4` → `?v=5` no `base.html` (lição da v1.4.14 — o nginx do PA cacheia estáticos). Entrada na página `/passwords/`: secção «🧩 Extensão Chrome» com botões de download e do guia. Novo `tests/test_extensao_distribuicao.py` (8 testes: conteúdo do ZIP, manifest MV3 válido, exigência de sessão em ambas as rotas, conteúdo do guia, entry point na página). **Correcção pré-existente:** o commit `ecf154d` (v1.5.3) alterou a fila de modelos do Assistente sem sincronizar `tests/test_assistente_cliente.py` (`MODELO_DEFAULT`/`_MODELOS_FALLBACK_BRUTOS` ainda com `nex-agi` e sem `poolside`) — constantes actualizadas. **Suite: 98 testes `pytest` a passar** (eram 90). **Sem alteração de BD** — no PA basta o push (a pasta `chrome-extension/` já vem no repositório) e Reload.
-
-**Versão v1.5.3** — fila de modelos do Assistente IA reordenada e modelo principal alterado. O `inclusionai/ling-3.0-flash-sante:free` passou a ser o modelo principal (default em `app/assistente/cliente.py` e via `OPENROUTER_MODEL` no `.env`); removidos `nex-agi/nex-n2.5-mini:free` e `inclusionai/ling-3.0-flash-fin:free` da fila; adicionado `poolside/laguna-s-2.1:free` como 2.º fallback. Nova ordem: `inclusionai/ling-3.0-flash-sante:free` → `poolside/laguna-s-2.1:free` → `liquid/lfm-2.5-2.6b:free` → `nvidia/nemotron-3-super-120b-a12b:free` → `nvidia/nemotron-3-ultra-550b-a55b:free`. Testado que o `dots-studio/dots-3-note-preview:free` suporta tool calling (erro de tool calls 4.75%, structured outputs 25.08%) mas descartado — não está na fila. Sem alteração de BD.
-
-**Versão v1.5.1** — correcções à extensão Chrome do Cofre, detectadas no primeiro teste de ponta a ponta (guardar as credenciais do próprio PIPE e depois abrir o popup em qualquer site). Quatro defeitos corrigidos. (1) **Captura presa em todos os separadores:** o `pendingCapture` ficava em `chrome.storage.local` sem prazo e o popup não comparava o site — passou a ser oferecida apenas no site onde foi feita (comparação por domínio via `dominioDeUrl()`), com TTL de 15 min (alinhado com `COFRE_SESSION_TIMEOUT`); noutros sites aparece só como nota informativa com opção de descartar. (2) **O PIPE era capturado:** o `content.js` só excluía `pythonanywhere.com`, pelo que o login local (`/auth/login`) era guardado — agora ignora a origem configurada (`pipeOrigin`), a produção e as rotas `/auth`|`/passwords` do servidor local (`localhost`/`127.0.0.1`, qualquer porta). (3) **«Guardar» falhava sem saída:** uma entrada já existente devolvia 409 **sem o `id`**, pelo que o popup só mostrava erro — `api_criar_entrada` passa a devolver `id`/`dominio`/`username` no 409 e o popup oferece «Actualizar entrada» (PUT, coberto por teste de regressão). (4) **`alert()` no popup** (a janela vazia «A extensão PIPE Cofre — Password Manager indica:»): todos os `alert()` foram substituídos por mensagens inline em `#mensagem` (o `alert()` fecha o popup da extensão e podia deixar um diálogo sem texto); aproveitou-se para corrigir o botão 📋 copiar, que usava `onclick` inline — bloqueado pela CSP das páginas de extensão MV3 — e interpolava a password em HTML, passando a listeners por JS com o id da entrada; o botão de refresh passou a «↻ Actualizar lista» (com «Actualizar» confundia-se com actualizar a entrada); separadores não-site (`chrome://`) deixam de dizer «Sem entradas»; os links de login seguem `chrome.storage.local.pipeOrigin`; `background.js` propaga `status`/`dados` dos erros da API (`respostaErro()`). `manifest.json` → **1.0.1**; incluídos os ícones `icon48.png`/`icon128.png` gerados por `scripts/gerar_icones_extensao.py`. **Suite: 76 testes `pytest` a passar** (eram 74) — inclui o novo teste de regressão do 409 (`test_duplicado_devolve_id_e_actualiza_pela_extensao`) e `tests/test_extensao_js.py`, que corre `tests/extensao_harness.js` com o Node (`vm` + stubs de `chrome`/`document`): 22 verificações sobre a abrangência do content script (onde captura/não captura) e as funções puras do popup — salta se não houver Node. **Sem alteração de BD** (apenas um campo novo no JSON do 409).
-
-**Versão v1.5.0** — Cofre de passwords com extensão Chrome. O módulo Passwords deixou de ser stateless: novas tabelas `cofre_configs` + `cofre_passwords` e novo `app/passwords/crypto.py` (AES-256-GCM; chave de 32 bytes derivada por PBKDF2-SHA256 com `COFRE_KDF_ITERATIONS` = 600 000 a partir da password mestra, cuja verificação é feita por bcrypt). A chave **nunca** entra no cookie: vive apenas em Flask-Session server-side (`SESSION_TYPE='filesystem'`, `instance/flask_session/`) e expira em `COFRE_SESSION_TIMEOUT` = 900 s — a expiração faz `session.pop` apenas das chaves do cofre (nunca `session.clear()`), pelo que bloqueia o cofre sem deslogar o utilizador. API em `/passwords/api/cofre/*` (estado, activar, desbloquear, bloquear, alterar-password, CRUD de entradas e importação do CSV do Chrome), sempre filtrada por `user_id` (anti-IDOR) e com deduplicação por domínio normalizado (`extrair_dominio()` em `models.py`, única fonte de verdade) + username. Novo `GET /passwords/api/csrf-token`, que devolve o token **assinado** (`generate_csrf()`) para o JS do cofre e para a extensão — o valor cru de `session['csrf_token']` não é utilizável; o `base.html` passou a expor o token por `<meta name="csrf-token">`. Segurança cross-site: CORS restrito por `COFRE_CORS_ORIGINS` (lista de `chrome-extension://<ID>`) em `app/__init__.py` e, em produção, `SESSION_COOKIE_SAMESITE='None'` + `Secure=True` (obrigatório para os `fetch` da extensão; em desenvolvimento mantém-se `Lax`/sem HTTPS). Extensão Chrome MV3 em `chrome-extension/` (manifest, service worker, popup e content script com heurística de captura só em forms de login; origem configurável em `chrome.storage.local.pipeOrigin`, default PythonAnywhere) — os ícones declarados no manifest ficaram por criar em v1.5.0 e foram incluídos em v1.5.1. O plano de correcção que guiou a implementação fica em `docs/plano-cofre-passwords.md`, mantido no repositório. Incidente e correcção: uma corrida de `pytest` apagou `instance/pipe.db` porque o teste reescrevia `SQLALCHEMY_DATABASE_URI` **depois** de `create_app()` (o engine fica fixado em `db.init_app()`); o `TestingConfig` passou a definir tudo o que é lido em `create_app()` (SQLite em memória + `SESSION_FILE_DIR` temporário), `tests/conftest.py` bloqueia `db.drop_all()` com BD de ficheiro e `tests/test_isolamento_bd.py` é a regressão — `sha256` da BD verificado inalterado em duas corridas completas. `scripts/criar_admin.py` passa a criar o utilizador com `is_admin=True` (sem isso ficava-se sem acesso à área de admin e sem forma de gerar convites). Novo `scripts/backup_bd.py` (cópias em `instance/backups/`, mantém as últimas 10). **Suite: 74 testes `pytest` a passar** (eram 42). **Alteração de BD** — no PA é preciso `pip install -r requirements.txt`, `db.create_all()` (cria as duas tabelas do cofre no primeiro reload) e `COFRE_CORS_ORIGINS` no `.env`.
-
-**Versão v1.4.15** — limites de caracteres no histórico do Assistente IA. Adicionados dois tectos de caracteres ao histórico de sessão para evitar que o histórico ocupe demasiada memória: `MAX_CHARS_POR_MENSAGEM = 3000` (cada mensagem guardada é truncada a 3000 chars) e `MAX_CHARS_HISTORICO_TOTAL = 8000` (orçamento total do histórico em sessão, com remoção automática das mensagens antigas quando excedido). Adicionado `max_tokens: 1000` ao payload da chamada à OpenRouter para limitar a geração do modelo. Criadas as funções auxiliares `_truncar_listas()`, `_serializar_resultado_tool()`, `_limpar_historico()` e `_tamanho_historico()` em `contexto.py`, com corte estrutural de listas (evita JSON inválido) e tecto final de 2000 chars no JSON dos tool results — o corte só afeta o que fica guardado para os próximos pedidos, nunca a resposta actual. A `_limpar_historico()` passou a fazer 3 cortes sucessivos (por mensagem, por remoção antiga, por orçamento total). Sem alteração de BD.
-
-**Versão v1.4.12** — Assistente IA com acesso aos preços de combustíveis e mensagem inicial curta. O módulo Combustíveis era o único módulo com BD sem ferramenta de consulta no assistente (mesma lacuna que o Calendário em v1.4.5 e o Câmbio em v1.4.7). Nova ferramenta de leitura `get_combustiveis` (`ferramentas.py`) que delega em `combustiveis_services.obter_precos_para_concelhos` e filtra sempre pelos concelhos/combustíveis escolhidos pelo utilizador — os `Posto` são globais e sem `user_id`, pelo que este é o único mecanismo de isolamento. Suporta filtros por combustível e concelho, modo `apenas_mais_barato` (card 🏆) e limite de resultados; a comparação de nomes é insensível a acentos e caixa (o modelo escreve "gasoleo simples"). A resposta inclui sempre a frescura da recolha, para o modelo não apresentar preços antigos como actuais. `get_resumo_geral` passa a incluir combustíveis; os dois system prompts foram actualizados. A mensagem de boas-vindas do chat passou de 9 linhas para 3 (saudação + modo + "Em que posso ajudar?"), com as capacidades no subtítulo do cabeçalho. Novo `tests/test_assistente_combustiveis.py` (20 testes) e `TestingConfig` em `config.py`: 42 testes a passar (eram 22). Validação: smoke directo contra a BD real (Vila Verde, mais barato `PD VILA VERDE` a 2,113 €/L) e smoke de ponta a ponta contra a OpenRouter, incluindo o caminho de erro (concelho não configurado). **Sem alteração de BD** — não é necessário correr nenhum script no PythonAnywhere.
-
-**Versão v1.4.10** — módulo Combustíveis: regra geral de obsolescência, para além da blocklist por nomes. `DJB COMBUSTIVEIS` (id 69288) incluído em `services.NOMES_IGNORADOS` (dados DGEG de Abr/2026 que falseiam o card de gasolina 95 — antes 1,935 €) e nova constante `MAX_DIAS_PRECO_ATIVO = 30` com helper `obter_ids_postos_obsoletos()`, que exclui no ambiente de **leitura** (`obter_precos_para_concelhos`, `obter_tipos_combustivel_disponiveis` e a contagem `total_postos` do dashboard) qualquer posto cuja actualização DGEG mais recente tenha mais de 30 dias ou cujo nome esteja bloqueado. Esta abordagem (ignorar, não arquivar) é intencional: estes postos continuam a ser devolvidos pela API em todas as recolhas (`ciclos_ausente=0`), pelo que o arquivamento automático não os apanha e um `ativo=False` seria revertido na recolha seguinte; a regra também cobre futuros casos sem lista manual, é reversível (ajustando a constante) e preserva todo o histórico. `scripts/remover_postos_ignorados.py` agora também limpa o DJB (`id 69288`). Verificação: recolha forçada confirma 76 → 75 postos, sem regressão dos nomes bloqueados nem dos 4 homólogos frescos; mínimo gasolina 95 passa de 1,935 € (DJB, Abr/2026) para 1,959 € (PLENERGY - BRAGA I, hoje); a regra deteta um posto falso com dados de 8 meses e exclui-o, e um rollback confirma a BD inalterada. `git push` pendente de credencial (https, sem token/ssh neste ambiente). 22 testes `pytest` a passar. **Alteração de BD** — correr `python scripts/remover_postos_ignorados.py` no PA após o deploy, antes de abrir o dashboard.
-
-**Versão v1.4.9** — módulo Combustíveis: eliminação dos postos duplicados com preços desactualizados (v1.3.3). A API Aberta continua a devolver os `id` antigos de estações reatribuídas mas com valores congelados; como aparecem em todas as recolhas, o arquivamento automático não os apanha e, por serem mais baratos que os reais, ganhavam o card "Mais barato por combustível". Nova constante `NOMES_IGNORADOS` em `services.py` (E.S. FERREIROS, E.S. BRAGA PISCINAS I, E.S. BRAGA PISCINAS II, BP Braga João 21) com auxiliar `_nome_ignorado()` normalizado, aplicada antes de qualquer escrita na recolha (os postos nunca são criados, actualizados nem reactivados) e `scripts/remover_postos_ignorados.py` para limpar o que já estava gravado (80 → 76 postos, 12 registos de preço). Verificação: recolha forçada após a limpeza confirma 76 → 76 sem regressão dos nomes bloqueados e homólogos frescos intactos; card de gasóleo simples corrigido de 1,919 € (falso, Jul/2026) para 2,049 € (hoje). `DJB COMBUSTIVEIS` mantido por decisão explícita (não é duplicado), apesar de actualmente liderar o card de gasolina 95 com dados de Abril/2026. Validação: 22 testes `pytest` a passar. Sem alteração de BD.
-
-**Versão v1.4.8** — módulo Combustíveis: arquivamento automático de postos (v1.3.2) e reinício das tabelas de postos/histórico. Um posto que deixe de aparecer nas respostas da API Aberta passa a ser arquivado em vez de ficar visível indefinidamente com dados desactualizados — o caso dos `id` reatribuídos pela DGEG, em que o posto antigo ficava "congelado" na BD e o id novo criava um registo em paralelo, com o dashboard a mostrar os dois como postos distintos. Novos campos `Posto.ativo` / `Posto.ciclos_ausente`, constante `LIMIAR_CICLOS_AUSENTE = 2`, reactivação automática ao reaparecer, arquivamento condicionado a recolhas sem erros, filtro `Posto.ativo == True` em `obter_precos_para_concelhos` e na contagem do dashboard, chave `postos_arquivados` no retorno e flash do botão manual. Reinício completo das tabelas de postos e histórico com `scripts/reset_postos_combustiveis.py`, preservando as definições do utilizador (95 → 80 postos). Validação: 22 testes `pytest` a passar + testes manuais (arquivamento exactamente ao 2.º ciclo, reactivação, 2.ª recolha sem subir contadores, render do dashboard e flash). **Alteração de BD** — exige correr o script de reset no PythonAnywhere após o deploy, antes de abrir o dashboard.
-
-**Versão v1.4.13** — Assistente IA com renderização de tabelas Markdown no chat. Adicionada a função `processarTabela()` inline em `app/templates/assistente/index.html` (~40 linhas de JS vanilla) que detecta blocos de tabela Markdown (`| cabeçalho | ... |`, `|---| ... |`, `| dados | ... |`) e converte em HTML `<table>` com `<thead>`/`<tbody>`. Regras CSS adicionadas em `app/static/css/pipe.css` para `.chat-bubble table`, `th`, `td`, `tr:hover` — respeitam tokens de tema claro/escuro. O parsing de tabelas ocorre antes do parsing de parágrafos no loop de `markdownToHtml()`, pelo que blocos de tabela são sempre capturados primeiro. Sem alteração de BD.
-
-**Versão v1.4.14 (fix)** — Correcção de cache estático no PythonAnywhere. O nginx do PA cacheia ficheiros estáticos ignorando query params do Flask. O `pipe.css` com as regras de tabela foi actualizado mas o `base.html` ainda usava cache-buster `?v=3`, pelo que o browser em produção carregava a versão antiga sem as regras CSS de tabela. Incrementado para `?v=4` em `app/templates/base.html` (tanto no `<link>` do CSS como no `<script>` do JS). Commit `70a8d12`. Sem alteração de BD.
-
-**Versão v1.4.15** — limites de caracteres no histórico do Assistente IA. Adicionados dois tectos de caracteres ao histórico de sessão para evitar que o histórico ocupe demasiada memória: `MAX_CHARS_POR_MENSAGEM = 3000` (cada mensagem guardada é truncada a 3000 chars) e `MAX_CHARS_HISTORICO_TOTAL = 8000` (orçamento total do histórico em sessão, com remoção automática das mensagens antigas quando excedido). Adicionado `max_tokens: 1000` ao payload da chamada à OpenRouter para limitar a geração do modelo. Criadas as funções auxiliares `_truncar_listas()`, `_serializar_resultado_tool()`, `_limpar_historico()` e `_tamanho_historico()` em `contexto.py`, com corte estrutural de listas (evita JSON inválido) e tecto final de 2000 chars no JSON dos tool results — o corte só afeta o que fica guardado para os próximos pedidos, nunca a resposta actual. A `_limpar_historico()` passou a fazer 3 cortes sucessivos (por mensagem, por remoção antiga, por orçamento total). Sem alteração de BD.
-
-**Versão v1.4.11** — Assistente IA com renderização Markdown no chat.
-
-**Versão v1.4.7** — Assistente IA com acesso a conversões de moeda. Nova ferramenta de leitura `get_cambio(user_id, origem, destino, valor)` (Wise v3 + fallback ExchangeRate-API, stateless, disponível em modo consulta e execução); refactor do Câmbio com serviço partilhado `app/cambio/service.py` sem alteração de comportamento da rota; prompts e chat actualizados. Validação: 22 testes `pytest` a passar + smoke test real (EUR→USD via Wise). Sem alteração de BD.
-
-**Versão v1.4.6** — correção da lentidão do Assistente IA. O `OPENROUTER_MODEL` do `.env` ainda apontava para `thinkingmachines/inkling-small:free`, modelo restrito a *agentic harnesses* que devolve HTTP 403 em aplicações comuns — cada pergunta perdia tempo nessa falha antes de cair no fallback. Substituído por `inclusionai/ling-3.0-flash-fin:free` (`.env` e `.env.example`) e removidos os modelos `thinkingmachines/*` da fila de fallback; corrigido o ID inválido `liquid/lfm2.5-2.6b:free` → `liquid/lfm-2.5-2.6b:free`. IDs validados contra o catálogo do OpenRouter e por smoke test real (resposta em 0.9s com tool use em PT-PT). 22 testes unitários a passar. Sem alteração de BD.
-
-**Versão v1.4.5** — implementação da ferramenta de leitura `get_eventos` para o Assistente IA, exibição do modelo no chat e conclusão de auditoria e limpeza de ficheiros obsoletos. Adicionada a 5.ª ferramenta de leitura do assistente (`get_eventos(user_id, data=None, futuros=False)`), preenchendo a lacuna do Calendário. No chat do assistente, adicionada indicação visual do modelo utilizado (`<small class="chat-modelo">`). Concluída a auditoria de ficheiros do repositório: removidos ficheiros de código morto/residuais (`app/static/js/passwords.js`, `scripts/adicionar_is_admin_local.py`, scripts de depuração de rede do OpenRouter) e organizados briefings antigos para `docs/historico/`. Suite automatizada de testes `pytest` validada com 22 testes unitários a passar. Sem alteração de BD.
-
-**Versão v1.4.4** — correção de bug crítico no Assistente IA. `processar_mensagem_assistente('cria um evento para amanhã: "Cortar cabelo" às 9 horas')` devolvia "Não consegui gerar uma resposta" em vez de criar o evento. Diagnóstico: o OpenRouter devolve HTTP 200 com corpo `{"error": ...}` quando o provider upstream falha; o código original só fazia `raise_for_status()` (200 passava como sucesso) e `raise_for_status()` estava fora do `try`, abortando a cadeia de fallback. Correção em `app/assistente/cliente.py`: classes `RateLimitError` e `ServicoIndisponivelError`, constante `_MODELOS_FALLBACK`, função `_classificar_resposta()` que valida HTTP e corpo da resposta (distinguindo `rate_limit` / `modelo_indisponivel` / `servico` / `ok`), `chamar_llm()` com fallback imediato em qualquer falha de provider e backoff apenas para exceções de rede. Reforço em `app/assistente/contexto.py`: parsing defensivo de `choices` (verificação de tipo), `tool_calls` com validação de tipo, `content` vazio aceite, `argumentos` aceita `str` ou `dict`, `ServicoIndisponivelError` tratado no ciclo. Validação: 21 testes unitários offline passaram; smoke test real contra OpenRouter com `cohere/north-mini-code:free` criou evento com sucesso (ID 4). Sem alteração de BD.
-
-**Versão v1.4.3** — fix de cache pós-deploy. As alterações CSS e a alternância de tema não chegavam aos utilizadores após deploy porque o Service Worker (`pipe-v2`) e o cache HTTP do Flask (12h) serviam ficheiros antigos. Corrigido com três alterações: (1) `app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0` em `app/__init__.py` para desactivar cache HTTP de ficheiros estáticos; (2) bumped do Service Worker para `CACHE = 'pipe-v3'` em `app/static/sw.js` (o `activate` handler já tinha `skipWaiting()` + `clients.claim()` para invalidar caches antigos); (3) cache-busting `?v=3` no link do CSS em `app/templates/base.html`. Sem alteração de BD.
-
-**Versão v1.4.2** — nove módulos completos (oito deployed + Calendário local; mais o módulo **Combustíveis**, local). Módulo Calendário implementado com vistas Agenda e Mensal, CRUD completo via API, modal único, paleta de 11 cores e integração na Loja de Módulos. Módulo Combustíveis implementado com recolha via **API Aberta** (`api.apiaberta.pt/v1/fuel/stations`, autenticada com `X-API-Key`) para Braga/Vila Verde/Amares, dashboard filtrado, definições de concelhos+combustíveis e tarefa agendada às terças. Primeira recolha completa concluída com **95 postos** — mas via implementação DGEG; após o refactor para a API Aberta o bug de paginação (`return` dentro do `while`) limitava a recolha a 4 postos, corrigido em v1.3.1. Commit do fix `cf58e59` no branch `main` (publicado no GitHub). Em v1.4.0: tema claro/escuro concluído e testado — tokens semânticos no `pipe.css`, alternador 🌙/☀️ na navbar (persistido em `localStorage['pipe-tema']`, default escuro), anti-FOUC no `base.html` e service worker passado a network-first para CSS/JS/HTML (cache `pipe-v2`); sem migração de BD — o deploy exige apenas push + Reload no PA (na primeira visita ao browser, recarregar 2× para o SW novo activar). Em v1.4.1: paleta de cores do módulo Notas actualizada para a paleta Google Keep (8 cores vibrantes aplicáveis em tema claro e escuro, sem necessidade de migração de BD); sem novas rotas. Em v1.4.2: fix de contraste — texto em cartões de nota coloridos forçado a preto (`css .nota-com-cor` + fallback `var(--nota-texto, var(--cor-texto))` nas classes do editor `.nota-editar-titulo`/`.nota-editar-textarea`/`.checklist-editar-input`) em ambos os temas, evitando texto branco invisível sobre fundos claros; sem alteração de BD.
-
-**Pendências do Calendário:**
-- Deploy no PythonAnywhere + migração da tabela `evento`
-- ✅ **Backlog v1.x: tela de detalhe do evento** — resolvido em **v1.5.9** (modal read-only ao clicar no evento; botões Editar/Apagar/Fechar; botões rápidos ✏️/🗑️ mantidos com `stopPropagation`)
-
-**Pendências gerais:**
-- **Assistente IA:** ✅ resolvido em v1.4.6 — fila de modelos validada contra o catálogo do OpenRouter e fallback automático a funcionar (`OPENROUTER_MODEL` do `.env` corrigido; era a causa da lentidão)
-- **Combustíveis — duplicados na própria API:** ✅ **resolvido em v1.5.10** — NEW `services.obter_ids_duplicados()`, com a chave **conservadora nome+morada+concelho** (normalizados). Exclusão só no ambiente de leitura (como `obter_ids_postos_obsoletos()`), sem alteração de BD. **Nota importante — a premissa original estava errada:** os casos citados não são duplicados. Os 4 "Santos da Cunha 6 - Logística e Transportes, Lda." são **4 estações físicas distintas** do mesmo operador (Maximinos, Merelim, Av. João Paulo II, Prado — confirmado no site do operador); e o par "E.S. FERREIROS" (`66475`) vs "Posto Ferreiros- ESO305" (`95233`) já estava resolvido pelo blocklist `NOMES_IGNORADOS`. Uma heurística por *morada+concelho* teria fundido 3 pares de estações **reais** gémeas ("Palmeira 1/2", "Cepsa Órfãos I/II (Poente/Nascente)", "Repsol Piscinas I/II" na mesma rua). A chave por nome+morada+concelho não funde nenhum deles.
-- **Combustíveis — follow-up opcional:** ✅ resolvido em v1.4.10 — `obter_tipos_combustivel_disponiveis` agora exclui, via `obter_ids_postos_obsoletos()`, não só postos arquivados como também os obsoletos (dados DGEG congelados, caso do DJB), mantendo o dropdown alinhado ao dashboard
-- **Módulos futuros:** arquitectura pronta — versão 1.x
-- **Cofre — deploy no PA:** ⚠️ pendente — `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` das tabelas do cofre, `COFRE_CORS_ORIGINS` no `.env` e Reload; correr `python scripts/backup_bd.py` antes
-- **Cofre — extensão Chrome:** ⚠️ pendente — fazer o teste de ponta a ponta em produção seguindo `docs/guia-extensao-chrome.md` (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS (resposta inutilizável para origin errado) e que a chave do cofre **não** aparece nos cookies do browser (ícones ✅ e correcções de captura/409 feitas em v1.5.1; lembra: recarregar ⟳ o cartão da extensão em `chrome://extensions` depois das alterações)
-- **Mailjet — domínio remetente:** ✅ **resolvido** — o domínio próprio está autenticado no Mailjet (Account → Domains, com registos DNS DKIM/SPF/DMARC) e `MAILJET_FROM_EMAIL` foi mudado para `pipe@<domínio-próprio>` (`.env` local + PA). Os emails de convite já não caem em spam (confirmado pelo utilizador). A verificação de entrega continua disponível via `python scripts/verificar_mailjet.py --apenas-hoje` ou pelo 🔄 do painel.
-- **Convites — deploy da v1.5.2 no PA:** ⚠️ correr `python scripts/migrar_convites_mailjet.py` **depois** de fazer deploy do código (cria as 3 colunas do Mailjet em `convites`); sem isso as queries ao modelo rebentam com `no such column: convites.mailjet_message_id`
+1. **Deploy do Calendário no PythonAnywhere** — correr o comando de migração da tabela `evento`
+2. **Testar notificações do Calendário em produção** — via `pipe_tasks.py` (tarefa `tarefa_calendario`)
+3. **Deploy do Cofre de Passwords no PythonAnywhere** — conforme pendências acima
+4. **Deploy dos Combustíveis no PythonAnywhere** — `reset_postos_combustiveis.py` + `remover_postos_ignorados.py`
+5. **Extensão Chrome do Cofre** — teste de ponta a ponta em produção
+6. Manter `CHANGELOG.md` atualizado com cada versão — o histórico do projecto vive apenas lá a partir de agora
 
 ---
 
-## Próximos passos imediatos
+## Dependências
 
-1. Módulo Combustíveis — recolha manual concluída ✅ e reinício das tabelas (v1.3.2) concluído localmente ✅ (95 → 80 postos: o reset eliminou os registos que já não vinham da API; a recolha via API Aberta valida 80 postos por ciclo e o dedup impede linhas repetidas)
-2. Deploy do módulo Combustíveis no PythonAnywhere + `db.create_all()` para criar as tabelas ✅ (criadas no primeiro reload, sem migração manual)
-   - `api.apiaberta.pt` já está na whitelist do PA (documentação Swagger pública)
-   - Definir `APIABERTA_API_KEY` no `.env` do PA e Reload da web app (sem a chave, 30 pedidos/min; com chave, 300/min — com o filtro `district` a recolha desceu de ~25 s para ~3-4 s)
-   - ⚠️ **Correr `python scripts/reset_postos_combustiveis.py` no PA** — é o que cria as colunas `ativo`/`ciclos_ausente` (o `create_all()` não faz `ALTER TABLE`); correr **antes** de abrir o dashboard
-   - ⚠️ **Correr `python scripts/remover_postos_ignorados.py` no PA** — remove os postos em `NOMES_IGNORADOS` (os 4 duplicados com preços congelados — E.S. FERREIROS, E.S. BRAGA PISCINAS I/II, BP Braga João 21 — e o `DJB COMBUSTIVEIS`, dados DGEG de Abr/2026) e o respectivo histórico; idempotente
-3. ✅ **Notificações do Calendário em `pipe_tasks.py`** — implementadas em **v1.5.8** como `tarefa_calendario(hoje)` (lembretes no dia anterior «Amanhã» e no dia «Hoje»), com 8 testes em `tests/test_pipe_tasks.py`
-4. Deploy do Calendário no PythonAnywhere
-5. Migração da tabela `evento` no PA
-6. Testar notificações do Calendário em produção
-7. **Cofre de Passwords — deploy no PythonAnywhere:** `pip install -r requirements.txt`, `db.create_all()` (cria `cofre_configs`/`cofre_passwords`), `COFRE_CORS_ORIGINS=chrome-extension://<ID>` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção e correr `python scripts/backup_bd.py` antes
-8. **Extensão Chrome do Cofre:** seguir `docs/guia-extensao-chrome.md` — instalar via «Load unpacked» (os ícones já vêm na pasta), anotar o ID da extensão e colocá-lo em `COFRE_CORS_ORIGINS`
-9. **Cofre — smoke manual de ponta a ponta em produção:** activar → criar → editar → apagar → alterar password mestra → esperar expiração (900 s) e confirmar que só o cofre bloqueia (a sessão de login mantém-se) → desbloquear pela extensão e preencher um form de login
-10. **Convites/Mailjet — v1.5.2 no PA:** ✅ domínio próprio autenticado no Mailjet + `MAILJET_FROM_EMAIL` actualizado (os emails já não vão para spam) — ⚠️ falta apenas correr `python scripts/migrar_convites_mailjet.py` no PA **após o deploy** (colunas novas em `convites`); confirmar com `python scripts/verificar_mailjet.py --apenas-hoje`
-
----
-
-## Dependências actuais
-```
-Flask==3.0.3
-Flask-Login==0.6.3
-Flask-WTF==1.2.1
-Flask-SQLAlchemy==3.1.1
-Flask-Session==0.5.0
-flask-cors==5.0.0
-cryptography==43.0.1
-bcrypt==4.2.0
-Werkzeug==3.0.3
-WTForms==3.1.2
-python-dotenv==1.0.1
-requests==2.32.3
-email-validator==2.2.0
-pyotp==2.9.0
-qrcode==7.4.2
-pillow==10.4.0
-pillow-heif==0.21.0
-Flask-Limiter==3.8.0
-```
+- Flask 3.0, Flask-Login, Flask-WTF, Flask-SQLAlchemy, Flask-Limiter, Flask-Session
+- Werkzeug, SQLAlchemy, python-dotenv
+- pyotp, qrcode
+- requests, python-telegram-bot
+- Pillow, pillow_heif
+- cryptography, bcrypt, flask-cors
 
 ## Contexto técnico
-- Python com ortografia Portuguesa Europeia em todos os comentários e mensagens ao utilizador
-- Hosting: PythonAnywhere (plano free) — `https://felipejn.pythonanywhere.com`
-- Custo total: zero
-- Base de dados: SQLite
-- Autenticação: username/password + 2FA opcional (Telegram ✅, Email ✅, TOTP ✅) + recuperação de password por email ✅
-- Notificações: Telegram ✅ + Mailjet email ✅ — arquitectura modular, canais independentes
-- Admin: área restrita com gestão de utilizadores + sistema de convites, decorador `@admin_required`
-- Scheduled task: `pipe_tasks.py` — script unificado, um módulo por função, isolamento de erros
-- Rate limiting: Flask-Limiter com `X-Forwarded-For` para PythonAnywhere
-- Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`
-- Login event logging: tentativas falhadas registadas com username e IP via `app.logger.warning`
-- Cofre de Passwords: AES-256-GCM (chave derivada por PBKDF2-SHA256, 600 000 iterações) + bcrypt para a password mestra; a chave existe apenas em sessão server-side (Flask-Session) — nunca no cookie do browser
-- Extensão Chrome (MV3) do Cofre: CORS restrito a `chrome-extension://<ID>` (`COFRE_CORS_ORIGINS`) e cookie de sessão `SameSite=None` + `Secure` em produção; planos e briefings antigos em `docs/` (o plano do Cofre mantém-se no repositório)
+
+- Deploy em PythonAnywhere (plano free) por trás do nginx; base de dados SQLite em `instance/pipe.db`
+- Modelo app factory: `create_app(config_name)` com ambiente `testing` para testes (SQLite em memória)
+- Frontend vanilla JS inline nos templates; sem ficheiros JS externos por módulo
+- PWA: `manifest.json` + `sw.js` (service worker, cache `pipe-v3`)
+- Autenticação de dois fatores via Telegram, email e TOTP; convites com validade de 7 dias para registo
+
+---
+
+**Histórico de versões: ver [CHANGELOG.md](CHANGELOG.md)**
