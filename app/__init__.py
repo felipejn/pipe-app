@@ -6,7 +6,7 @@ from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
 from flask_session import Session
 from flask_cors import CORS
-from app.extensions import limiter
+from app.extensions import limiter, migrate
 from config import config, BASE_DIR
 
 db = SQLAlchemy()
@@ -51,6 +51,7 @@ def create_app(config_name='default'):
 
     # Inicializar extensões
     db.init_app(app)
+    migrate.init_app(app, db, render_as_batch=True)
     login_manager.init_app(app)
     csrf.init_app(app)
 
@@ -134,22 +135,28 @@ def create_app(config_name='default'):
         
         return render_template('dashboard.html', modulos_ativos=modulos_ativos, MODULOS_DISPONIVEIS=MODULOS_DISPONIVEIS)
 
-    # Criar tabelas se não existirem
     with app.app_context():
-        from app.passwords.models import CofrePassword, CofreConfig
-        from app.notifications.models import UserNotificationPreferences  # noqa: F401
-        from app.tarefas.models import Lista, Tarefa, TagTarefa  # noqa: F401
-        from app.notas.models import Nota, ItemChecklist, EtiquetaNota  # noqa: F401
-        from app.conversoes.models import Conversao  # noqa: F401
-        from app.auth.models import Convite  # noqa: F401
-        from app.calendario.models import Evento  # noqa: F401
-        from app.combustiveis.models import Posto, PrecoHistorico, UtilizadorConcelho, UtilizadorCombustivel, EstadoAtualizacaoCombustiveis  # noqa: F401
-        db.create_all()
+        # Criar tabelas SOÓ em ambiente de testes (TestingConfig.TESTING = True).
+        # Em dev/prod as tabelas existem via upgrade da migração de baseline.
+        if app.config.get('TESTING'):
+            from app.passwords.models import CofrePassword, CofreConfig
+            from app.notifications.models import UserNotificationPreferences  # noqa: F401
+            from app.tarefas.models import Lista, Tarefa, TagTarefa  # noqa: F401
+            from app.notas.models import Nota, ItemChecklist, EtiquetaNota  # noqa: F401
+            from app.conversoes.models import Conversao  # noqa: F401
+            from app.auth.models import Convite  # noqa: F401
+            from app.calendario.models import Evento  # noqa: F401
+            from app.combustiveis.models import Posto, PrecoHistorico  # noqa: F401
+            db.create_all()
 
-        # Regra: uma só linha (id=1) na tabela EstadoAtualizacaoCombustiveis
-        from app.combustiveis.models import EstadoAtualizacaoCombustiveis
-        if EstadoAtualizacaoCombustiveis.query.get(1) is None:
-            db.session.add(EstadoAtualizacaoCombustiveis(id=1))
-            db.session.commit()
+        # Seed idempotente da linha EstadoAtualizacaoCombustiveis(id=1).
+        # Mantido fora do create_all (que agora só corre em testes) para que o
+        # arranque em dev/prod nunca rebente numa BD sem upgrade nem crie a linha
+        # duas vezes. A existência da tabela é checada antes de qualquer acesso.
+        if db.inspect(db.engine).has_table('combustiveis_estado_atualizacao'):
+            from app.combustiveis.models import EstadoAtualizacaoCombustiveis
+            if EstadoAtualizacaoCombustiveis.query.get(1) is None:
+                db.session.add(EstadoAtualizacaoCombustiveis(id=1))
+                db.session.commit()
 
     return app
