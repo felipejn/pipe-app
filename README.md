@@ -104,7 +104,7 @@ Gestão de acesso restrito por convite.
 - **Security headers** — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
 - **Notificações** — arquitectura modular com canais independentes (Telegram + Mailjet)
 - **Área admin** — gestão de utilizadores, activar/desactivar contas
-- **Scheduled task** — script unificado `pipe_tasks.py` a correr diariamente às 08:00
+- **Scheduled task** — script unificado `pipe_tasks.py` a correr diariamente às 07:00
 
 ---
 

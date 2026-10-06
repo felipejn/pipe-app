@@ -3,7 +3,7 @@
 O módulo de Tarefas arrancava vazio: o utilizador novo tinha de criar a
 primeira lista à mão antes de poder adicionar tarefas (o input de adição
 rápida só aparece numa lista concreta). Decisão do utilizador (spec em
-docs/superpowers/specs/2026-10-01-listas-predefinidas-tarefas-design.md):
+docs/historico/superpowers-2026-10-01/2026-10-01-listas-predefinidas-tarefas-design.md):
 semear 4 listas APENAS no registo de contas novas — nunca tocar nas listas
 de contas já existentes (deploy), nunca apagar nem duplicar.
 """

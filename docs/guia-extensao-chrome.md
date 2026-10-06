@@ -4,7 +4,7 @@ Guia simplificado, passo a passo, para pôr a extensão `chrome-extension/` a fu
 
 **Tempo:** ~10 minutos. **Sem loja e sem build:** o ZIP da extensão é descarregado do próprio PIPE (secção «🧩 Extensão Chrome» em `/passwords/`, ou directamente em `/passwords/extensao/download`) e carregado no Chrome («Load unpacked»). Quem tenha o projecto clonado pode usar a pasta `chrome-extension/` do repositório — é o mesmo conteúdo. O guia deste ficheiro está também disponível como página em **`/passwords/extensao/guia`**.
 
-Para o detalhe técnico ver `chrome-extension/README.md` e `docs/plano-cofre-passwords.md`.
+Para o detalhe técnico ver `chrome-extension/README.md` e `docs/historico/plano-cofre-passwords.md`.
 
 ---
 
@@ -187,6 +187,6 @@ As entradas continuam no PIPE — a extensão não guarda nada localmente além 
 
 ---
 
-*Contexto técnico e decisões de segurança: `docs/plano-cofre-passwords.md`. Referência da extensão: `chrome-extension/README.md`.*
+*Contexto técnico e decisões de segurança: `docs/historico/plano-cofre-passwords.md`. Referência da extensão: `chrome-extension/README.md`.*
 
 

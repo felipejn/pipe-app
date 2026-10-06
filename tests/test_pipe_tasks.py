@@ -5,7 +5,7 @@ atraso até concluir, 1× por dia (dedupe por `notificada_em`).
 Calendário: avisam no dia anterior («Amanhã») e no dia («Hoje»); o campo único
 `Evento.notificado_em` cobre os dois avisos sem migração de BD.
 
-Spec: docs/superpowers/specs/2026-10-01-notificacoes-tarefas-calendario-design.md
+Spec: docs/historico/superpowers-2026-10-01/2026-10-01-notificacoes-tarefas-calendario-design.md
 """
 import os
 import sys

@@ -5,10 +5,10 @@
 - **Owner:** Felipe (apelido "Pipe") — ortografia Portuguesa Europeia em TODO o código e mensagens
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
-- **Versão actual:** v1.5.9 (Calendário: janela de detalhe read-only ao clicar no evento, com botões Editar/Apagar/Fechar) — detalhe em `Estado_Atual.md`
+- **Versão actual:** v1.5.10 (Combustíveis: heurística de dedup de postos por nome+morada+concelho) — detalhe em `Estado_Atual.md`
 
 ## Referência principal
-**Ler `estado_atual.md`** para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.
+**Ler `Estado_Atual.md`** (nome com maiúsculas nesta platforma — em Linux/PA o sistema de ficheiros é case-sensitive) para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade; é grande (~118 KB) porque acumula o histórico de versões — ler por secções, não de seguida.
 
 ## Regras inegociáveis
 - Usar **sempre** Português Europeu (PT-PT) em comentários, mensagens e documentação
@@ -16,7 +16,7 @@
 - Navegação via **dashboard** — sem links de módulos na navbar
 - **Padrão AJAX:** `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch; backend usa `request.get_json()`
 - Frontend usa **vanilla JS inline nos templates** — sem ficheiros JS externos por módulo
-- **Estado actual** em `estado_atual.md` — manter sempre actualizado após mudanças significativas
+- **Estado actual** em `Estado_Atual.md` — manter sempre actualizado após mudanças significativas
 - **Testes nunca tocam na BD real:** criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). Atribuir `app.config[...]` **depois** de `create_app()` não tem efeito — o engine do SQLAlchemy fica fixado em `db.init_app()` e o Flask-Session em `Session(app)`. Foi esse anti-padrão que apagou `instance/pipe.db`; `tests/conftest.py` agora bloqueia `db.drop_all()` com BD de ficheiro
 
 ## Módulos existentes
@@ -52,7 +52,7 @@
 Flask 3.0, SQLAlchemy, Flask-Login, Flask-WTF, Werkzeug, Flask-Limiter, Pillow, pyotp, requests
 
 ## Scheduled tasks
-`scripts/pipe_tasks.py` — corre 1x/dia às 08:00 no PythonAnywhere
+`scripts/pipe_tasks.py` — corre 1x/dia às 07:00 no PythonAnywhere
 
 ## Assistente IA (WIP)
 Módulo de chat com IA via OpenRouter, com tool use para consultar dados reais dos módulos do PIPE. Card no dashboard com badge "IA" e destaque visual. **Nota:** fila de modelos gratuitos validada contra o catálogo do OpenRouter (v1.4.6) — se a API ficar instável, confirmar que os IDs da fila ainda existem em `https://openrouter.ai/api/v1/models`.

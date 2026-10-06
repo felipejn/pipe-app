@@ -5,7 +5,7 @@ utilizadores já existentes. A função é idempotente: só cria as listas se o
 utilizador ainda não tiver nenhuma, pelo que nunca apaga nem duplica
 listas existentes (segurança para deploys).
 
-Spec: docs/superpowers/specs/2026-10-01-listas-predefinidas-tarefas-design.md
+Spec: docs/historico/superpowers-2026-10-01/2026-10-01-listas-predefinidas-tarefas-design.md
 """
 from app import db
 from app.tarefas.models import Lista

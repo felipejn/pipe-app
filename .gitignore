@@ -9,6 +9,10 @@ venv/
 *.db
 .DS_Store
 
+# Caches e logs locais (cada um tem o seu próprio .gitignore, mas ficam explícitos aqui)
+.pytest_cache/
+.remember/
+
 # Claude Code local config (sensitive)
 .claude/
 .openclaude-profile.json

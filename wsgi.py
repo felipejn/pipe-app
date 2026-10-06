@@ -2,8 +2,8 @@ import sys
 import os
 
 # Ajustar o path para o PythonAnywhere
-# Substituir 'utilizador' pelo teu username no PA
-PROJECTO_DIR = '/home/utilizador/pipe'
+# Preenchido com o path real do projecto no PA (ver scripts/pipe_tasks.py).
+PROJECTO_DIR = '/home/felipejn/pipe-app'
 if PROJECTO_DIR not in sys.path:
     sys.path.insert(0, PROJECTO_DIR)
 
