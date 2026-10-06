@@ -217,14 +217,14 @@ pipe-app/
 - Modelo `Evento` (`evento`) — `user_id`, `titulo`, `data_inicio`, `data_fim`, `descricao`, `localizacao`, `dia_inteiro`, `cor`, `notificar`
 - Rotas: `/calendario/` (vista mensal + agenda), `/calendario/api/eventos` (GET com filtros `inicio`/`fim`; POST com `request.get_json()` — criar evento), rate limit 60/min
 - Vistas de calendário com navegação mensal/agenda, cores de evento (tomate → grafite, 11 classes `.evento-*`)
-- **O que o utilizador tem de saber para não partir nada:** a migração da tabela `evento` no PythonAnywhere corre-se manualmente com `python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"` — a tabela não é criada por `db.create_all()` no arranque da app porque o blueprint do Calendário não está importado em `app/__init__.py`
+- **Esquema:** a tabela `evento` está coberta pela baseline do Flask-Migrate `3b14f5bd26a5` (v1.6.0) — não existe migração manual a executar no PythonAnywhere; o `db.create_all()` só corre em testes. Alterações futuras de esquema seguem o procedimento Flask-Migrate (ver «Procedimento de deploy no PythonAnywhere»)
 
 ### Módulo Combustíveis (`app/combustiveis/`)
 
-- Modelos: `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao` — FK de utilizador apontam para `utilizadores.id`; `db.create_all()` cria as tabelas no primeiro reload (modelos importados em `app/__init__.py`)
+- Modelos: `combustiveis_postos`, `combustiveis_precos_historico`, `combustiveis_utilizador_concelho`, `combustiveis_utilizador_combustivel`, `combustiveis_estado_atualizacao` — FK de utilizador apontam para `utilizadores.id`; as 5 tabelas estão cobertas pela baseline `3b14f5bd26a5` (v1.6.0) — o `db.create_all()` só corre em testes
 - `services.py`: recolha via API Aberta (`api.apiaberta.pt`) com paginação por tipo de combustível; arquivamento automático de postos ausentes (`LIMIAR_CICLOS_AUSENTE = 2` ciclos); dedup conservadora por `nome+morada+concelho` (`obter_ids_duplicados`) com exclusão apenas em leitura; blocklist `NOMES_IGNORADOS`
 - Rotas: `/combustiveis/` (dashboard + `POST /combustiveis/atualizar`, rate limit 6/hora), `/combustiveis/concelhos`, `/combustiveis/tipos`
-- Scripts auxiliares: `reset_postos_combustiveis.py` (drop + `db.create_all()` + repovoamento; cria colunas `ativo`/`ciclos_ausente` que o `create_all()` não acrescenta a uma BD existente), `remover_postos_ignorados.py` (idempotente), `popular_combustiveis.py` (recolha manual)
+- Scripts auxiliares: `reset_postos_combustiveis.py` (drop + `db.create_all()` + repovoamento; cria colunas `ativo`/`ciclos_ausente` que o `create_all()` não acrescenta a uma BD existente), `remover_postos_ignorados.py` (idempotente), `popular_combustiveis.py` (recolha manual) — os dois primeiros são **históricos/obsoletos** desde a v1.6.0 (o baseline cobre o schema); não executar (ver «Armadilhas conhecidas»)
 
 ### Assistente IA (`app/assistente/`)
 
@@ -322,16 +322,14 @@ pipe-app/
 - **WSGI configurado** ✅
 - **Static files** configurados ✅
 - **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às **07:00** ✅ (configuração confirmada no painel Tasks do PythonAnywhere)
-- **Cofre de Passwords** — deploy pendente no PA ⚠️: `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt), `db.create_all()` para `cofre_configs`/`cofre_passwords`, `COFRE_CORS_ORIGINS=chrome-extension://<ID>` no `.env` e Reload; confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção
-- **Calendário** — deploy pendente no PA ⚠️: correr a migração da tabela `evento` (ver comando abaixo)
-- **Combustíveis** — tabelas criadas por `db.create_all()` no primeiro reload ⚠️: `python scripts/reset_postos_combustiveis.py` (drop das tabelas de postos/histórico + `db.create_all()` + repovoamento) e `python scripts/remover_postos_ignorados.py` (idempotente); correr **antes** de abrir o dashboard
-- **Convites — Mailjet (v1.5.2)** ⚠️: `python scripts/migrar_convites_mailjet.py` **depois** de fazer deploy do código (cria as colunas `mailjet_message_id`, `email_estado`, `email_verificado_em` em `convites`); sem isso as queries ao modelo falham com `no such column: convites.mailjet_message_id`
+- **Flask-Migrate — baseline `3b14f5bd26a5`** ✅: a produção foi **stamped** para `3b14f5bd26a5` em 2026-10-06 (a baseline **não** foi executada sobre os dados existentes — o esquema em produção já continha todas as tabelas e colunas); confirmar com `flask db current` (deve indicar `3b14f5bd26a5 (head)`) e `flask db check` (limpo)
+- **Esquema (Calendário, Cofre, Combustíveis, Convites/Mailjet)** ✅ — resolvido pela baseline: `evento`, `cofre_configs`/`cofre_passwords`, as colunas `ativo`/`ciclos_ausente` e `mailjet_message_id`/`email_estado`/`email_verificado_em` já existiam em produção e estão cobertas por `3b14f5bd26a5`; a correcção de `User.is_admin` (`nullable=False`, `server_default=0`) também está integrada na baseline — **nenhum script manual de migração é necessário nem recomendado**
+- **Configuração de produção** (pacotes via `pip install -r requirements.txt`, variáveis do `.env` como `COFRE_CORS_ORIGINS`, cookies `SameSite=None`/`Secure`) — não é verificável a partir do repositório; confirmar no painel/terminal do PythonAnywhere se ainda não foi feito
+- **Extensão Chrome do Cofre** ⚠️: teste de ponta a ponta em produção pendente (ver «Pendências de deploy»)
 
-### Comando de migração do Calendário (executar no PA após deploy)
+### Migrations (Flask-Migrate)
 
-```bash
-python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"
-```
+A baseline `3b14f5bd26a5` cobre todas as tabelas e colunas actuais (incluindo `evento`); no PythonAnywhere não há comandos manuais de migração a executar. Novas alterações de esquema seguem o procedimento descrito em «Procedimento de deploy no PythonAnywhere».
 
 ### WSGI
 
@@ -373,26 +371,41 @@ OPENROUTER_MODEL=inclusionai/ling-3.0-flash-sante:free
 
 ## Pendências de deploy
 
-- **Calendário:** migrar tabela `evento` no PA — `python -c "from app import create_app; from app.extensions import db; from app.calendario.models import Evento; app = create_app(); app.app_context().push(); db.create_all()"`
-- **Cofre:** `pip install -r requirements.txt` (Flask-Session, flask-cors, cryptography, bcrypt) + `db.create_all()` das tabelas do cofre + `COFRE_CORS_ORIGINS` no `.env` + Reload + confirmar `SESSION_COOKIE_SAMESITE=None` + `Secure` em produção
-- **Combustíveis:** `python scripts/reset_postos_combustiveis.py` (cria colunas `ativo`/`ciclos_ausente`) **antes** de abrir o dashboard + `python scripts/remover_postos_ignorados.py` (idempotente)
-- **Convites/Mailjet:** `python scripts/migrar_convites_mailjet.py` **depois** do deploy do código
+- **Calendário, Cofre, Combustíveis, Convites/Mailjet** — ✅ **resolvido pela baseline do Flask-Migrate** (`3b14f5bd26a5`, stamped no PA em 2026-10-06); os scripts manuais (`migrar_convites_mailjet.py`, `reset_postos_combustiveis.py`, `remover_postos_ignorados.py`) são históricos e **não devem ser executados**
 - **Extensão Chrome do Cofre:** teste de ponta a ponta em produção seguindo `docs/guia-extensao-chrome.md` (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS e que a chave do cofre não aparece nos cookies; recarregar ⟳ o cartão da extensão em `chrome://extensions` depois das alterações
-- ⚠️ **Antes de qualquer operação acima, correr:** `python scripts/backup_bd.py`
+- ⚠️ **Antes de qualquer operação de risco sobre a BD (ex.: `flask db upgrade`), correr:** `python scripts/backup_bd.py` e descarregar a cópia para a máquina local
 
 ---
 
 ## Procedimento de deploy no PythonAnywhere
 
-1. `python scripts/backup_bd.py` e **descarregar a cópia** de `instance/backups/` para a máquina local
+### Deploy sem mudança de esquema (maioria dos deploys)
+
+1. `python scripts/backup_bd.py` (recomendado)
 2. `git pull`
 3. `pip install -r requirements.txt`
-4. `flask db check`
-   - **Se limpo** (sem diferenças): `flask db stamp head` → Reload
-   - **Se houver diferenças**: **NÃO** fazer `stamp` — parar e analisar as diferenças antes de qualquer passo adicional
-5. Reload da aplicação
+4. Reload da aplicação
+5. `flask db check` — deve continuar a devolver "No new upgrade operations detected."
 
-**Nunca correr `flask db upgrade` no PythonAnywhere.**
+### Alterações de esquema (Flask-Migrate)
+
+A baseline `3b14f5bd26a5` é **imutável**: nunca editar nem reescrever migrations antigas; alterações futuras criam **novas revisions** a partir dela.
+
+**Adopção inicial da baseline (já executada em 2026-10-06):**
+`flask db check` → `flask db stamp 3b14f5bd26a5`
+
+O `stamp` foi usado apenas uma vez, para registar que a BD de produção já correspondia ao esquema da baseline (a baseline não foi executada sobre os dados existentes). **Não** é o procedimento normal para futuras migrations.
+
+**Fluxo normal para futuras alterações de schema:**
+
+1. Alterar os modelos em `app/<módulo>/models.py`
+2. `flask db migrate -m "descrição"` (em ambiente local)
+3. Rever o diff da migration gerada em `migrations/versions/`
+4. Testar (`pytest -q`) e validar o `flask db upgrade` numa BD vazia, se aplicável
+5. `python scripts/backup_bd.py` **e descarregar a cópia** de `instance/backups/` para a máquina local
+6. No PythonAnywhere: `git pull` → `pip install -r requirements.txt` → `flask db upgrade`
+7. Confirmar com `flask db current` (revisão esperada) e `flask db check` (limpo)
+8. Reload da aplicação
 
 ### Restauro de backup
 
@@ -425,12 +438,10 @@ Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`;
 
 ## Próximos passos
 
-1. **Deploy do Calendário no PythonAnywhere** — correr o comando de migração da tabela `evento`
-2. **Testar notificações do Calendário em produção** — via `pipe_tasks.py` (tarefa `tarefa_calendario`)
-3. **Deploy do Cofre de Passwords no PythonAnywhere** — conforme pendências acima
-4. **Deploy dos Combustíveis no PythonAnywhere** — `reset_postos_combustiveis.py` + `remover_postos_ignorados.py`
-5. **Extensão Chrome do Cofre** — teste de ponta a ponta em produção
-6. Manter `CHANGELOG.md` atualizado com cada versão — o histórico do projecto vive apenas lá a partir de agora
+1. **Testar notificações do Calendário em produção** — via `pipe_tasks.py` (tarefa `tarefa_calendario`)
+2. **Extensão Chrome do Cofre** — teste de ponta a ponta em produção
+3. **Futuras alterações de schema** — seguir o procedimento Flask-Migrate (nunca editar a baseline `3b14f5bd26a5`)
+4. Manter `CHANGELOG.md` atualizado com cada versão — o histórico do projecto vive apenas lá a partir de agora
 
 ---
 

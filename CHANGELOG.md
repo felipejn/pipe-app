@@ -2,7 +2,7 @@
 
 Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de verdade é o histórico Git (https://github.com/felipejn/pipe-app); as descrições de versão foram extraídas e condensadas de `Estado_Atual.md`, e as datas correspondem à data do commit no Git (a menos que indicado).
 
-**Notas de deploy:** todas as alterações de BD requerem um script manual no PythonAnywhere — indicado em `Notas de deploy`. Onde diz "Sem alteração de BD — no PA basta o push + Reload", a versão está no GitHub e o deploy consiste num push seguido de Reload da aplicação no PythonAnywhere.
+**Notas de deploy:** cada entrada indica o que fazer no PythonAnywhere. **Desde a v1.6.0**, alterações de esquema seguem o Flask-Migrate (alterar modelos → `flask db migrate` → rever → testar → backup → `flask db upgrade` → `flask db current`/`flask db check`); as entradas anteriores que indicam scripts manuais de migração são **históricas** — esses scripts estão obsoletos (o baseline `3b14f5bd26a5` cobre o esquema). Onde diz "Sem alteração de BD — no PA basta o push + Reload", o deploy consiste num push seguido de Reload da aplicação no PythonAnywhere.
 
 ---
 
@@ -15,8 +15,12 @@ Flask-Migrate — adoção do versionamento de esquema com revisão única de ba
 - `db.create_all()` passou a correr **só** em ambiente de testes (`TestingConfig.TESTING`); o seed de `EstadoAtualizacaoCombustiveis` usa `sqlalchemy.inspect` dentro de `try/except` com rollback e log.
 - Teste `test_calendario_avisa_no_dia` deixa de depender da hora do dia (subclasse `_DatetimeFixo` fixada às 09:00 de `hoje`, evento às 15:00, com verificação do assunto/corpo "hoje"). Suite: 146 testes.
 
+**Corrigido**
+- `User.is_admin` alinhado com a BD de produção: `nullable=False` com `server_default=0` — a correcção está **integrada na baseline** `3b14f5bd26a5` (commit `daf9ab0`).
+
 **Notas de deploy**
-- **Alteração de BD: não.** No PythonAnywhere: `flask db check` e, se limpo, `flask db stamp head`; **nunca** `flask db upgrade` no PA.
+- **Adopção inicial da baseline — executada em 2026-10-06:** no PythonAnywhere, `flask db check` (limpo) → `flask db stamp 3b14f5bd26a5`. A baseline **não** foi executada sobre os dados existentes (a produção já continha o esquema completo); o `stamp` apenas registou a revisão correspondente.
+- **Futuras alterações de esquema:** alterar modelos → `flask db migrate` → rever a migration → testar → `python scripts/backup_bd.py` → `flask db upgrade` → `flask db current` / `flask db check`. O `stamp` **não** é o procedimento normal para migrations futuras; a baseline `3b14f5bd26a5` é imutável (alterações criam novas revisions).
 
 ---
 
@@ -505,7 +509,7 @@ A `Estado_Atual.md` não descreve versões "v1.x" para este período; ficam regi
    - **Facto:** o `create_all()` do SQLAlchemy cria tabelas inexistentes, mas não acrescenta colunas a tabelas existentes.
    - **Impacto:** as colunas `mailjet_message_id`, `email_estado`, `email_verificado_em` (v1.5.2) e `ativo`, `ciclos_ausente` (v1.3.2/v1.4.8) não apareceriam numa BD já criada — as queries ao modelo rebentariam com `no such column`.
    - **Solução:** scripts de migração explícitos e idempotentes (`scripts/migrar_convites_mailjet.py`, `scripts/reset_postos_combustiveis.py`, `scripts/remover_postos_ignorados.py`) executados manualmente no PA após o deploy.
-   - **Lições:** para BDs em produção, nunca confiar no `create_all()` para evoluir o esquema; preferir scripts de migração explícitos (e, no futuro, avaliar Flask-Migrate).
+   - **Lições:** para BDs em produção, nunca confiar no `create_all()` para evoluir o esquema; na época usaram-se scripts de migração explícitos — desde a **v1.6.0** o esquema evolui com **Flask-Migrate** (baseline `3b14f5bd26a5`, imutável; os scripts manuais são históricos).
 
 ---
 
@@ -515,6 +519,7 @@ Todas as entradas "Versão vX" da `Estado_Atual.md` têm entrada correspondente 
 
 | Versão do documento | Entrada no CHANGELOG | Notas |
 |---|---|---|
+| v1.6.0 | v1.6.0 — 2026-10-06 | ✅ Flask-Migrate — baseline `3b14f5bd26a5` (stamped no PA) |
 | v1.5.9.1 | v1.5.9.1 — 2026-10-01 | ✅ balões alta contraste (`--cor-balao-assistente*`, `?v=7`) |
 | v1.5.10 | v1.5.10 — 2026-10-02 | ✅ dedup postos (`obter_ids_duplicados`) |
 | v1.5.9 | v1.5.9 — 2026-10-01 | ✅ detalhe read-only Calendário |
@@ -544,13 +549,13 @@ Todas as entradas "Versão vX" da `Estado_Atual.md` têm entrada correspondente 
 | v1.4.1 | v1.4.1 — 2026-09-16 | ✅ paleta Keep |
 | v1.4.0 | v1.4.0 — 2026-09-16 | ✅ tema claro/escuro |
 
-**Total: 28 versões incluídas (v1.4.0 a v1.5.10), todas com entrada.**
+**Total: 29 versões incluídas (v1.4.0 a v1.6.0), todas com entrada.**
 
 **Resoluções de inconsistências aplicadas:**
 - **(a)** A v1.4.10 pertence à **obsolescência de postos** (commit `c0f20b8`, 2026-09-18); a **renderização Markdown** (plain) pertence à v1.4.11 (`f6575d2`); as **tabelas Markdown** pertencem à v1.4.13 (`ab83a6a`) — confirmado pelo histórico Git, igual ao documento.
 - **(b)** A v1.4.15 está duplicada na `Estado_Atual.md`; aparece **uma única vez** (commit `34ff462`).
 - **(c)** As fases dos Combustíveis mapeadas para o número do projeto: **v1.3** (implementação + API Aberta) → v1.4.2; **v1.3.1** (bug paginação, blocklist, dedup, rate limit) → v1.4.2; **v1.3.2** (arquivamento automático, colunas `ativo`/`ciclos_ausente`) → v1.4.8; **v1.3.3** (blocklist `NOMES_IGNORADOS`) → v1.4.9. Identificadas como "Combustíveis fase 1.3.x" dentro de cada entrada.
 - **(d)** Versões ordenadas **da mais recente para a mais antiga** por data de commit.
-- **(e)** Última versão real confirmada pelo Git: **v1.5.10** (HEAD `9990f4b`, 2026-10-02); o commit `f1e7c61` (2026-10-01) é a **v1.5.9.1**, numerada entre a v1.5.9 e a v1.5.10 por ordem de implementação.
+- **(e)** Última versão real confirmada pelo Git: **v1.6.0** (2026-10-06 — adoção do Flask-Migrate em `741706c`/`501b7c9`, correcção de `is_admin` integrada na baseline em `daf9ab0`); a v1.5.10 (`9990f4b`, 2026-10-02) foi a versão imediatamente anterior.
 
 **Versões do documento SEM entrada directa:** v1.2 (Calendário) e v1.3 (Combustíveis) — não são secções "Versão vX" autónomas na `Estado_Atual.md`, foram integradas como "fase 1.3.x" dentro da v1.4.2 e referidas no Histórico anterior. Nenhuma informação foi omitida.

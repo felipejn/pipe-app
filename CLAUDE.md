@@ -5,7 +5,8 @@
 - **Owner:** Felipe (apelido "Pipe") — ortografia Portuguesa Europeia em TODO o código e mensagens
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
-- **Versão actual:** v1.5.10 (Combustíveis: heurística de dedup de postos por nome+morada+concelho) — detalhe em `Estado_Atual.md`
+- **Versão actual:** v1.6.0 (Flask-Migrate — baseline `3b14f5bd26a5`; produção stamped em 2026-10-06) — detalhe em `Estado_Atual.md`
+- **Testes:** 146 (pytest — nunca tocam na BD real)
 
 ## Referência principal
 **Ler `Estado_Atual.md`** (nome com maiúsculas nesta platforma — em Linux/PA o sistema de ficheiros é case-sensitive) para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.
@@ -17,6 +18,7 @@
 - **Padrão AJAX:** `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch; backend usa `request.get_json()`
 - Frontend usa **vanilla JS inline nos templates** — sem ficheiros JS externos por módulo
 - **Estado actual** em `Estado_Atual.md` — manter sempre actualizado após mudanças significativas
+- **Esquema da BD:** evolui só com Flask-Migrate — alterar modelo → `flask db migrate` → rever → testar → backup → `flask db upgrade` → `flask db current`/`flask db check`; a baseline `3b14f5bd26a5` é **imutável** (a produção foi stamped em 2026-10-06, sem executar a baseline sobre os dados); `db.create_all()` só corre em testes — os scripts de migração manuais são históricos e não devem ser executados
 - **Testes nunca tocam na BD real:** criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). Atribuir `app.config[...]` **depois** de `create_app()` não tem efeito — o engine do SQLAlchemy fica fixado em `db.init_app()` e o Flask-Session em `Session(app)`. Foi esse anti-padrão que apagou `instance/pipe.db`; `tests/conftest.py` agora bloqueia `db.drop_all()` com BD de ficheiro
 
 ## Módulos existentes
@@ -28,12 +30,15 @@
 | `notas` | `/notas/` | Com BD (Nota, ItemChecklist, EtiquetaNota) |
 | `passwords` | `/passwords/` | Com BD (CofreConfig, CofrePassword) + gerador stateless |
 | `conversoes` | `/conversoes/` | Com BD (Conversao) |
+| `modulos` | `/modulos/loja` | Com BD (UserModulo) — Loja de Módulos |
 | `cambio` | `/cambio/` | Stateless (Wise API + fallback) |
 | `cores` | `/cores/` | Stateless |
 | `notifications` | — | Com BD (UserNotificationPreferences) |
 | `admin` | `/admin/` | Sem BD |
 | `settings` | `/definicoes/` | Sem BD |
-| `assistente` | `/assistente/` | Em desenvolvimento |
+| `calendario` | `/calendario/` | Com BD (Evento) |
+| `combustiveis` | `/combustiveis/` | Com BD (5 tabelas; `Posto` globais) |
+| `assistente` | `/assistente/` | Funcional — 17 tools: 7 de leitura + 10 de escrita (modos leitura/escrita) |
 
 ## Para adicionar módulo
 1. Criar `app/<modulo>/` com `__init__.py` + `routes.py` (+ `models.py` se BD)
@@ -49,7 +54,7 @@
 - Login failures logged com `app.logger.warning`
 
 ## Tech stack
-Flask 3.0, SQLAlchemy, Flask-Login, Flask-WTF, Werkzeug, Flask-Limiter, Pillow, pyotp, requests
+Flask 3.0, SQLAlchemy, Flask-Login, Flask-WTF, Werkzeug, Flask-Limiter, Flask-Migrate, Pillow, pyotp, requests
 
 ## Scheduled tasks
 `scripts/pipe_tasks.py` — corre 1x/dia às 07:00 no PythonAnywhere
@@ -73,14 +78,14 @@ Módulo de chat com IA via OpenRouter, com tool use para consultar dados reais d
 
 ### System prompt
 - Respostas em PT-PT
-- CAPACIDADES LIMITADAS A LEITURA — não sugerir acções que não pode executar (criar, editar, apagar). Enviar utilizador ao módulo respectivo.
+- Dois modos: **leitura** (default — só consulta; encaminha o utilizador para o módulo para acções de escrita) e **escrita** (10 tools de escrita, activadas via toggle no chat e `POST /assistente/api/modo`; limite de 10 escritas/min)
 - Nunca inventar dados — usar ferramentas quando precisa de dados concretos
 - Responder directamente para perguntas simples (cumprimentos, explicações)
 - Tom formal e profissional, respostas concisas
 
 ### Variáveis de ambiente
 - `OPENROUTER_API_KEY` — chave da OpenRouter (obrigatória)
-- `OPENROUTER_MODEL` — modelo a usar (default: `inclusionai/ling-3.0-flash-fin:free`)
+- `OPENROUTER_MODEL` — modelo a usar (default: `inclusionai/ling-3.0-flash-sante:free`)
 
 ### CSS (`pipe.css`)
 - Classes `chat-bubble`, `chat-bubble--user`, `chat-bubble--assistant` para balões
