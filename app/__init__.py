@@ -153,10 +153,15 @@ def create_app(config_name='default'):
         # Mantido fora do create_all (que agora só corre em testes) para que o
         # arranque em dev/prod nunca rebente numa BD sem upgrade nem crie a linha
         # duas vezes. A existência da tabela é checada antes de qualquer acesso.
-        if db.inspect(db.engine).has_table('combustiveis_estado_atualizacao'):
-            from app.combustiveis.models import EstadoAtualizacaoCombustiveis
-            if EstadoAtualizacaoCombustiveis.query.get(1) is None:
-                db.session.add(EstadoAtualizacaoCombustiveis(id=1))
-                db.session.commit()
+        try:
+            from sqlalchemy import inspect
+            if inspect(db.engine).has_table('combustiveis_estado_atualizacao'):
+                from app.combustiveis.models import EstadoAtualizacaoCombustiveis
+                if EstadoAtualizacaoCombustiveis.query.get(1) is None:
+                    db.session.add(EstadoAtualizacaoCombustiveis(id=1))
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()
+            app.logger.warning('Seed EstadoAtualizacaoCombustiveis ignorado (BD indisponível?)')
 
     return app
