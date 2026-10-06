@@ -114,14 +114,12 @@ pipe-app/
 │   ├── icon48.png / icon128.png # ícones gerados por scripts/gerar_icones_extensao.py
 │   └── README.md            # instalação, permissões e fluxo de uso
 ├── docs/
-│   ├── plano-cofre-passwords.md   # plano de correcção do Cofre (mantido no repositório)
 │   ├── guia-extensao-chrome.md    # guia passo a passo da extensão (instalar e usar)
 │   └── historico/           # briefings e relatórios antigos
+│       └── plano-cofre-passwords.md  # plano de correcção do Cofre
 ├── scripts/
 │   ├── criar_admin.py
 │   ├── promover_admin.py
-│   ├── adicionar_is_admin.py    # migração de BD: colunas is_admin em utilizadores (v1.1.6)
-│   ├── migrar_notificada_em.py  # migração: tarefas.notificada → tarefas.notificada_em
 │   ├── pipe_tasks.py            # única scheduled task do PythonAnywhere
 │   ├── popular_combustiveis.py  # recolha manual de combustíveis (helper)
 │   ├── remover_postos_ignorados.py  # limpeza dos postos em services.NOMES_IGNORADOS
@@ -130,7 +128,6 @@ pipe-app/
 │   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
 │   ├── gerar_icones_extensao.py # gera icon48/icon128 da extensão Chrome (Pillow, sem Flask)
 │   ├── verificar_mailjet.py     # estado real dos emails no Mailjet + `--apenas-hoje`
-│   ├── verificar_resultados.py  # verifica resultados dos últimos sorteios (Euromilhões)
 │   └── smoke_combustiveis.py    # smoke test da ferramenta get_combustiveis (Assistente IA)
 ├── tests/
 │   ├── conftest.py              # guarda-civil: bloqueia `db.drop_all()` com BD de ficheiro (obrigatório create_app('testing'))
@@ -172,7 +169,6 @@ pipe-app/
 
 - Modelo `Jogo` — `jogos_euromilhoes` (numeros, estrelas, data_sorteio, filtrado por `user_id`)
 - Interface de registo de combinações e visualização do histórico; cálculo do próximo sorteio
-- `scripts/verificar_resultados.py` — verifica automaticamente os resultados dos últimos sorteios e envia notificação em caso de vitória
 
 ### Módulo Tarefas (`app/tarefas/`)
 
@@ -387,7 +383,7 @@ OPENROUTER_MODEL=inclusionai/ling-3.0-flash-sante:free
 
 ## Armadilhas conhecidas
 
-- **`create_all()` não faz `ALTER TABLE`** — a migração da v1.5.2 adicionou colunas do Mailjet em `convites`; a v1.3.2 adicionou `ativo`/`ciclos_ausente` em `combustiveis_postos`; a migração `notificada_em` alterou `tarefas`. Em PythonAnywhere é necessário executar os scripts de migração manuais (`migrar_convites_mailjet.py`, `reset_postos_combustiveis.py`, `migrar_notificada_em.py`), nunca confiar no `db.create_all()` numa BD já existente
+- **`create_all()` não faz `ALTER TABLE`** — a migração da v1.5.2 adicionou colunas do Mailjet em `convites`; a v1.3.2 adicionou `ativo`/`ciclos_ausente` em `combustiveis_postos`; a migração `notificada_em` alterou `tarefas`. Em PythonAnywhere é necessário executar os scripts de migração manuais (`migrar_convites_mailjet.py`, `reset_postos_combustiveis.py`), nunca confiar no `db.create_all()` numa BD já existente
 - **Engine fixado em `db.init_app()`** — atribuir `app.config['SQLALCHEMY_DATABASE_URI']` **depois** de `create_app()` não tem efeito sobre o engine já construído; por isso os testes têm de usar `create_app('testing')` antes de qualquer reatribuição (o conftest bloqueia `db.drop_all()` com BD de ficheiro)
 - **Cache do nginx do PythonAnywhere** — serve ficheiros estáticos com cache de longo prazo e **ignora parâmetros de query**; quando se altera o CSS é preciso actualizar o `cache-buster` em `base.html` (`?v=...`) para forçar o reload no browser
 - **OpenRouter pode devolver HTTP 200 com erro** — quando o provider upstream falha, o corpo é `{"error": ...}`; o código do Assistente IA deve usar `_classificar_resposta()` em vez de confiar só em `raise_for_status()`; há fila de fallback de modelos gratuitos
