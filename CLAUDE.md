@@ -8,7 +8,7 @@
 - **Versão actual:** v1.5.10 (Combustíveis: heurística de dedup de postos por nome+morada+concelho) — detalhe em `Estado_Atual.md`
 
 ## Referência principal
-**Ler `Estado_Atual.md`** (nome com maiúsculas nesta platforma — em Linux/PA o sistema de ficheiros é case-sensitive) para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade; é grande (~118 KB) porque acumula o histórico de versões — ler por secções, não de seguida.
+**Ler `Estado_Atual.md`** (nome com maiúsculas nesta platforma — em Linux/PA o sistema de ficheiros é case-sensitive) para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.
 
 ## Regras inegociáveis
 - Usar **sempre** Português Europeu (PT-PT) em comentários, mensagens e documentação
@@ -33,7 +33,7 @@
 | `notifications` | — | Com BD (UserNotificationPreferences) |
 | `admin` | `/admin/` | Sem BD |
 | `settings` | `/definicoes/` | Sem BD |
-| `assistente` | `/assistente/` | Em desenvolvimento (WIP) |
+| `assistente` | `/assistente/` | Em desenvolvimento |
 
 ## Para adicionar módulo
 1. Criar `app/<modulo>/` com `__init__.py` + `routes.py` (+ `models.py` se BD)
@@ -54,11 +54,11 @@ Flask 3.0, SQLAlchemy, Flask-Login, Flask-WTF, Werkzeug, Flask-Limiter, Pillow, 
 ## Scheduled tasks
 `scripts/pipe_tasks.py` — corre 1x/dia às 07:00 no PythonAnywhere
 
-## Assistente IA (WIP)
+## Assistente IA
 Módulo de chat com IA via OpenRouter, com tool use para consultar dados reais dos módulos do PIPE. Card no dashboard com badge "IA" e destaque visual. **Nota:** fila de modelos gratuitos validada contra o catálogo do OpenRouter (v1.4.6) — se a API ficar instável, confirmar que os IDs da fila ainda existem em `https://openrouter.ai/api/v1/models`.
 
 ### Arquitectura
-- **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo default via `OPENROUTER_MODEL` env var (default: `inclusionai/ling-3.0-flash-fin:free`). Auth por `OPENROUTER_API_KEY`. Retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback entre modelos. Fila de fallbacks: `nex-agi/nex-n2.5-mini:free`, `inclusionai/ling-3.0-flash-sante:free`, `liquid/lfm-2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`.
+- **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo default via `OPENROUTER_MODEL` env var (default: `inclusionai/ling-3.0-flash-sante:free`) — **5 modelos no total (1 principal + 4 fallbacks)**. Auth por `OPENROUTER_API_KEY`. Retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback entre modelos. Fila de fallbacks: `poolside/laguna-s-2.1:free`, `liquid/lfm-2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`.
 - **Contexto** (`contexto.py`): `processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None)` — orquestra o fluxo: monta prompt + histórico, chama LLM, executa tool calls se necessário, guarda resposta. Histórico em Flask session (limite 20 mensagens = 10 trocas). O resultado de cada ferramenta é cortado antes de ser enviado ao modelo: listas a `LIMITE_ITENS_LISTA_TOOL` (10) itens e JSON a `LIMITE_CHARS_TOOL_RESULT` (2000) chars, com **degradação progressiva** (`LIMITES_ITENS_DEGRADACAO` = 10 → 8 → 5 → 3 → 1) — se exceder o tecto encolhem-se as listas em vez de se descartar o resultado (o aviso genérico é só o último recurso). Ferramentas com listas grandes devem devolver poucos campos por registo.
 - **Ferramentas** (`ferramentas.py`): tool use com 7 funções de leitura — `get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis` — e 10 de escrita. Todas filtram por `user_id` (obrigatório, injetado pelo caller — nunca vem do modelo). Nota: no módulo Combustíveis os `Posto` são globais e sem `user_id`, pelo que o isolamento de `get_combustiveis` é feito pelos concelhos de `UtilizadorConcelho` do utilizador. `get_combustiveis` aceita `tipo_combustivel`, `concelho`, `posto` (nome **ou** marca, insensível a acentos e maiúsculas — usar sempre que a pergunta nomeie um posto), `apenas_mais_barato` e `limite`.
 - **Rotas** (`routes.py`):
