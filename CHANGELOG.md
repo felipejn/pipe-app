@@ -2,8 +2,6 @@
 
 Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de verdade é o histórico Git (https://github.com/felipejn/pipe-app); as descrições de versão foram extraídas e condensadas de `Estado_Atual.md`, e as datas correspondem à data do commit no Git (a menos que indicado).
 
-**Nota sobre a ordem das versões:** o Git mostra `v1.5.10` (commit `9990f4b`, 2026-10-02) como HEAD, e `v1.6.0` (commit `f1e7c61`, 2026-10-01) como um commit anterior — ou seja, cronologicamente a v1.5.10 foi implementada *depois* da v1.6.0, mas foi numerada por baixo. O `Estado_Atual.md` inverteu esta ordem. Seguindo o Git como fonte de verdade, as versões ficam ordenadas pela data de implementação (mais recente para a mais antiga). A última versão real é **v1.5.10**.
-
 **Notas de deploy:** todas as alterações de BD requerem um script manual no PythonAnywhere — indicado em `Notas de deploy`. Onde diz "Sem alteração de BD — no PA basta o push + Reload", a versão está no GitHub e o deploy consiste num push seguido de Reload da aplicação no PythonAnywhere.
 
 ---
@@ -27,8 +25,8 @@ Combustíveis — heurística de deduplicação de postos pela chave conservador
 
 ---
 
-## [v1.6.0] — 2026-10-01
-Assistente IA — cores e contraste dos balões de conversa (claro e escuro).
+## [v1.5.9.1] — 2026-10-01
+Ajuste visual — Assistente IA: cores e contraste dos balões de conversa (claro e escuro).
 
 **Adicionado**
 - Novos tokens semânticos no `app/static/css/pipe.css`: `--cor-balao-assistente` (escuro `#2b3149`, claro `#eff2f8`) + `--cor-balao-assistente-borda` (escuro: tinte âmbar `rgba(245,158,11,0.45)`, claro `#c9cdd8`), faixa lateral âmbar de 3px (`border-left`) e relevo subtil (`box-shadow`).
@@ -503,7 +501,7 @@ Todas as entradas "Versão vX" da `Estado_Atual.md` têm entrada correspondente 
 
 | Versão do documento | Entrada no CHANGELOG | Notas |
 |---|---|---|
-| v1.6.0 | v1.6.0 — 2026-10-01 | ✅ balões alta contraste (`--cor-balao-assistente*`, `?v=7`) |
+| v1.5.9.1 | v1.5.9.1 — 2026-10-01 | ✅ balões alta contraste (`--cor-balao-assistente*`, `?v=7`) |
 | v1.5.10 | v1.5.10 — 2026-10-02 | ✅ dedup postos (`obter_ids_duplicados`) |
 | v1.5.9 | v1.5.9 — 2026-10-01 | ✅ detalhe read-only Calendário |
 | v1.5.8 | v1.5.8 — 2026-10-01 | ✅ tarefas dia prazo + calendário lembretes |
@@ -532,13 +530,13 @@ Todas as entradas "Versão vX" da `Estado_Atual.md` têm entrada correspondente 
 | v1.4.1 | v1.4.1 — 2026-09-16 | ✅ paleta Keep |
 | v1.4.0 | v1.4.0 — 2026-09-16 | ✅ tema claro/escuro |
 
-**Total: 28 versões incluídas (v1.4.0 a v1.6.0), todas com entrada.**
+**Total: 28 versões incluídas (v1.4.0 a v1.5.10), todas com entrada.**
 
 **Resoluções de inconsistências aplicadas:**
 - **(a)** A v1.4.10 pertence à **obsolescência de postos** (commit `c0f20b8`, 2026-09-18); a **renderização Markdown** (plain) pertence à v1.4.11 (`f6575d2`); as **tabelas Markdown** pertencem à v1.4.13 (`ab83a6a`) — confirmado pelo histórico Git, igual ao documento.
 - **(b)** A v1.4.15 está duplicada na `Estado_Atual.md`; aparece **uma única vez** (commit `34ff462`).
 - **(c)** As fases dos Combustíveis mapeadas para o número do projeto: **v1.3** (implementação + API Aberta) → v1.4.2; **v1.3.1** (bug paginação, blocklist, dedup, rate limit) → v1.4.2; **v1.3.2** (arquivamento automático, colunas `ativo`/`ciclos_ausente`) → v1.4.8; **v1.3.3** (blocklist `NOMES_IGNORADOS`) → v1.4.9. Identificadas como "Combustíveis fase 1.3.x" dentro de cada entrada.
 - **(d)** Versões ordenadas **da mais recente para a mais antiga** por data de commit.
-- **(e)** Última versão real confirmada pelo Git: **v1.5.10** (HEAD `9990f4b`, 2026-10-02). A v1.6.0 (`f1e7c61`, 2026-10-01) é um commit intermédio — aparece listada, mas numa posição cronológica anterior, corrigindo a inversão do documento.
+- **(e)** Última versão real confirmada pelo Git: **v1.5.10** (HEAD `9990f4b`, 2026-10-02); o commit `f1e7c61` (2026-10-01) é a **v1.5.9.1**, numerada entre a v1.5.9 e a v1.5.10 por ordem de implementação.
 
 **Versões do documento SEM entrada directa:** v1.2 (Calendário) e v1.3 (Combustíveis) — não são secções "Versão vX" autónomas na `Estado_Atual.md`, foram integradas como "fase 1.3.x" dentro da v1.4.2 e referidas no Histórico anterior. Nenhuma informação foi omitida.
