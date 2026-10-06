@@ -6,6 +6,20 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.6.0] — 2026-10-06
+Flask-Migrate — adoção do versionamento de esquema com revisão única de baseline.
+
+**Adicionado**
+- Extensão Flask-Migrate: `migrate = Migrate()` em `app/extensions.py`, `migrate.init_app(app, db, render_as_batch=True)` em `app/__init__.py` (linha 54) e `Flask-Migrate` no `requirements.txt`.
+- Pasta `migrations/` com **uma única revisão** de baseline `3b14f5bd26a5` (`down_revision = None`) — `op.create_table` para as 22 tabelas do modelo (inclui `ativo`/`ciclos_ausente`, `mailjet_message_id`/`email_estado`/`email_verificado_em`, `evento`, `cofre_configs`/`cofre_passwords`), sem `if_not_exists` nem condicionais. Validado de ponta a ponta numa BD vazia: `flask db upgrade` sem erros, `flask db check` → "No new upgrade operations detected.".
+- `db.create_all()` passou a correr **só** em ambiente de testes (`TestingConfig.TESTING`); o seed de `EstadoAtualizacaoCombustiveis` usa `sqlalchemy.inspect` dentro de `try/except` com rollback e log.
+- Teste `test_calendario_avisa_no_dia` deixa de depender da hora do dia (subclasse `_DatetimeFixo` fixada às 09:00 de `hoje`, evento às 15:00, com verificação do assunto/corpo "hoje"). Suite: 146 testes.
+
+**Notas de deploy**
+- **Alteração de BD: não.** No PythonAnywhere: `flask db check` e, se limpo, `flask db stamp head`; **nunca** `flask db upgrade` no PA.
+
+---
+
 ## [v1.5.10] — 2026-10-02
 Combustíveis — heurística de deduplicação de postos pela chave conservadora nome+morada+concelho.
 

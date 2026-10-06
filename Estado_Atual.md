@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.5.10
+# PIPE — Estado Actual do Projecto — v1.6.0
 
 ## O que é o PIPE
 
@@ -145,6 +145,8 @@ pipe-app/
 │   ├── test_assistente_contexto_truncagem.py # 10 testes
 │   ├── test_combustiveis_dedup.py     # 11 testes
 │   └── smoke/                 # smoke tests (ex.: test smoke api de conversoes)
+├── migrations/             # Flask-Migrate — revisão única de baseline 3b14f5bd26a5 (22 tabelas)
+│   └── versions/           # 3b14f5bd26a5_baseline.py (create_table de tudo; sem if_not_exists)
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -380,9 +382,28 @@ OPENROUTER_MODEL=inclusionai/ling-3.0-flash-sante:free
 
 ---
 
+## Procedimento de deploy no PythonAnywhere
+
+1. `python scripts/backup_bd.py` e **descarregar a cópia** de `instance/backups/` para a máquina local
+2. `git pull`
+3. `pip install -r requirements.txt`
+4. `flask db check`
+   - **Se limpo** (sem diferenças): `flask db stamp head` → Reload
+   - **Se houver diferenças**: **NÃO** fazer `stamp` — parar e analisar as diferenças antes de qualquer passo adicional
+5. Reload da aplicação
+
+**Nunca correr `flask db upgrade` no PythonAnywhere.**
+
+### Restauro de backup
+
+Com a **app parada**, copiar o ficheiro mais recente de `instance/backups/` para `instance/pipe.db` e arrancar a app.
+
+---
+
 ## Armadilhas conhecidas
 
-- **`create_all()` não faz `ALTER TABLE`** — a migração da v1.5.2 adicionou colunas do Mailjet em `convites`; a v1.3.2 adicionou `ativo`/`ciclos_ausente` em `combustiveis_postos`; a migração `notificada_em` alterou `tarefas`. Em PythonAnywhere é necessário executar os scripts de migração manuais (`migrar_convites_mailjet.py`, `reset_postos_combustiveis.py`), nunca confiar no `db.create_all()` numa BD já existente
+- **`create_all()` só corre em testes (v1.6.0)** — nunca altera uma BD existente (não faz `ALTER TABLE`); o esquema evolui com Flask-Migrate: alterar o modelo → `flask db migrate -m "..."` → rever o diff → `python scripts/backup_bd.py` → `flask db upgrade`. BD local perdida ou para recriar de zero: `del instance\pipe.db` → `flask db upgrade` → `python scripts/criar_admin.py`
+- **Scripts de migração manuais são históricos** — `scripts/migrar_convites_mailjet.py` (e outros `migrar_*.py`) e `scripts/reset_postos_combustiveis.py` estão **OBSOLETOS** desde a v1.6.0 (o baseline do Flask-Migrate cobre o schema); ficam só como documentação — **NÃO alterar os scripts**
 - **Engine fixado em `db.init_app()`** — atribuir `app.config['SQLALCHEMY_DATABASE_URI']` **depois** de `create_app()` não tem efeito sobre o engine já construído; por isso os testes têm de usar `create_app('testing')` antes de qualquer reatribuição (o conftest bloqueia `db.drop_all()` com BD de ficheiro)
 - **Cache do nginx do PythonAnywhere** — serve ficheiros estáticos com cache de longo prazo e **ignora parâmetros de query**; quando se altera o CSS é preciso actualizar o `cache-buster` em `base.html` (`?v=...`) para forçar o reload no browser
 - **OpenRouter pode devolver HTTP 200 com erro** — quando o provider upstream falha, o corpo é `{"error": ...}`; o código do Assistente IA deve usar `_classificar_resposta()` em vez de confiar só em `raise_for_status()`; há fila de fallback de modelos gratuitos
