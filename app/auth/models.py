@@ -16,7 +16,7 @@ class User(UserMixin, db.Model):
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     ultimo_login = db.Column(db.DateTime)
     activo = db.Column(db.Boolean, default=True)
-    is_admin = db.Column(db.Boolean, default=False)
+    is_admin = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
 
     # 2FA — Telegram
     dois_fa_activo = db.Column(db.Boolean, default=False)

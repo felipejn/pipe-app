@@ -50,7 +50,7 @@ def upgrade():
     sa.Column('data_criacao', sa.DateTime(), nullable=True),
     sa.Column('ultimo_login', sa.DateTime(), nullable=True),
     sa.Column('activo', sa.Boolean(), nullable=True),
-    sa.Column('is_admin', sa.Boolean(), nullable=True),
+    sa.Column('is_admin', sa.Boolean(), server_default=sa.text('0'), nullable=False),
     sa.Column('dois_fa_activo', sa.Boolean(), nullable=True),
     sa.Column('dois_fa_chat_id', sa.String(length=64), nullable=True),
     sa.Column('dois_fa_email_activo', sa.Boolean(), nullable=True),
