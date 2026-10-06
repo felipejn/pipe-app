@@ -9,7 +9,7 @@ Spec: docs/historico/superpowers-2026-10-01/2026-10-01-notificacoes-tarefas-cale
 """
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest import mock
 
 import pytest
@@ -181,14 +181,24 @@ def test_calendario_avisa_dia_anterior(app, enviar):
 def test_calendario_avisa_no_dia(app, enviar):
     hoje = date.today()
     user, _ = _criar_user('util-cal-hoje')
-    e = _criar_evento(user, datetime.now() + timedelta(hours=2), titulo='Consulta')
 
-    pipe_tasks.tarefa_calendario(hoje)
+    # Subclasse com now() fixado às 09:00 de hoje — o teste deixa de depender
+    # da hora real de execução (now()+2h atravessava a meia-noite após as 22:00).
+    class _DatetimeFixo(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.combine(hoje, time(9, 0))
+
+    # Evento às 15:00 desse dia: date(data_inicio) == hoje e 15:00 > agora (09:00).
+    with mock.patch.object(pipe_tasks, 'datetime', _DatetimeFixo):
+        e = _criar_evento(user, datetime.combine(hoje, time(15, 0)), titulo='Consulta')
+        pipe_tasks.tarefa_calendario(hoje)
 
     assert enviar.call_count == 1
     kw = enviar.call_args_list[0].kwargs
     assert 'hoje' in kw['subject'].lower()
     assert 'Consulta' in kw['body']
+    assert 'hoje' in kw['body'].lower()
     db.session.refresh(e)
     assert e.notificado_em == hoje
 
