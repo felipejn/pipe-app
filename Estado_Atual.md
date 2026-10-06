@@ -147,7 +147,6 @@ pipe-app/
 │   └── smoke/                 # smoke tests (ex.: test smoke api de conversoes)
 ├── .env.example
 ├── requirements.txt
-├── scripts/
 └── README.md
 
 ```
