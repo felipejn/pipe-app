@@ -121,7 +121,7 @@
     .then(function (res) {
       if (res.ok) {
         estado.textContent = 'Localização guardada.';
-        window.location.reload();
+        window.location.href = '{{ url_for("meteorologia.index") }}';
       } else {
         estado.textContent = (res.dados && res.dados.erro) || 'Não foi possível guardar.';
       }
