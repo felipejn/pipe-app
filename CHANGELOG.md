@@ -26,6 +26,19 @@ Dashboard — resumos por provider + módulo Meteorologia (previsão do tempo).
 
 ---
 
+## [v1.7.1] — 2026-10-07
+Dashboard — badge de estado removido dos cards.
+
+**Alterado**
+
+- **Dashboard** — o badge de estado (`ok` / `nao_configurado` / `indisponivel`) deixou de ser exibido nos cards de resumo (`app/templates/dashboard.html`). Quando o módulo tem dados, apenas as contagens aparecem (ex: "3 Pendentes", "12 Total"); quando não tem dados, o card fica só com ícone + nome. A mudança foi feita por considerar o estado **redundante**: a própria presença das contagens confirma que o módulo está activo e a fornecer informação. A lógica dos providers (`app/tarefas/dashboard.py`, `app/calendario/dashboard.py`) e o contrato (`app/dashboard/base.py`) mantêm-se intactos — o `estado` continua a ser calculado internamente (SQL por utilizador, `try/except` que transforma falhas em `indisponivel`), e os 14 testes `tests/test_dashboard.py` continuam a passar. CSS removida: `.card-status`, `.status--ok/--nao_configurado/--indisponivel`, `.card-sin-dados` em `pipe.css`.
+
+**Notas de deploy**
+
+- Sem alteração de BD nem de JS — no PythonAnywhere: push + Reload.
+
+---
+
 ## [v1.6.0] — 2026-10-06
 Flask-Migrate — adoção do versionamento de esquema com revisão única de baseline.
 

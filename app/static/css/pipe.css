@@ -327,29 +327,6 @@ a:hover { text-decoration: underline; }
 .modulo-info p { font-size: 0.83rem; color: var(--cor-texto-suave); }
 .modulo-seta { margin-left: auto; color: var(--cor-texto-suave); font-size: 1.2rem; }
 
-/* ---- Dashboard: resumos por provider ---- */
-.cartao-modulo--resumo .modulo-info { position: relative; }
-
-.card-status {
-    position: absolute;
-    top: 0.2rem;
-    right: 0.4rem;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.1rem 0.45rem;
-    border-radius: 999px;
-    line-height: 1.15;
-}
-
-.status {
-    display: inline-block;
-    color: #fff;
-}
-.status--ok { background: var(--cor-sucesso); }
-.status--nao_configurado { background: var(--cor-texto-suave); color: var(--cor-superficie); }
-.status--indisponivel { background: var(--cor-aviso); color: #1c1c1c; }
 
 .card-metricas {
     display: flex;
@@ -367,11 +344,6 @@ a:hover { text-decoration: underline; }
 }
 .metrica small { font-size: 0.72rem; color: var(--cor-texto-suave); font-weight: 600; }
 
-.card-sin-dados {
-    font-size: 0.83rem;
-    color: var(--cor-texto-suave);
-    font-style: italic;
-}
 
 /* ---- Euromilhões ---- */
 .modulo-cabecalho { margin-bottom: 1.5rem; }

@@ -295,7 +295,7 @@ pipe-app/
 
 ### Interface / Navegação (frontend)
 
-- **Dashboard** — grelha híbrida de cartões dos módulos activos; lida com `MODULOS_DISPONIVEIS` e, para cada módulo activo, consulta o provider correspondente em `app/dashboard/registry.py` e exibe um resumo de métricas (`resumo` de Tarefas e Calendário na v1.7.0), com badge de estado (`ok`/`nao_configurado`/`indisponivel`); módulos sem provider ficam no layout clássico; renderização 100 % SQL local, sem HTTP externo. Card clássico com fallback automático (sem parâmetro `resumos`) — regressão zero.
+- **Dashboard** — grelha híbrida de cartões dos módulos activos; lida com `MODULOS_DISPONIVEIS` e, para cada módulo activo, consulta o provider correspondente em `app/dashboard/registry.py` e exibe um resumo de métricas (`resumo` de Tarefas e Calendário na v1.7.0 — quando há dados: contagens como "3 Pendentes", "12 Total"; sem dados: card fica só com ícone + nome). O **badge de estado foi removido** — os três estados (`ok` / `nao_configurado` / `indisponivel`) mantêm-se a ser calculados internamente pelos providers, mas deixam de ser exibidos porque são redundantes: a própria presença das contagens confirma que o módulo está activo. Módulos sem provider ficam no layout clássico; renderização 100 % SQL local, sem HTTP externo. Card clássico com fallback automático (sem parâmetro `resumos`) — regressão zero.
 - **Padrão AJAX/fetch no PIPE:**
   - Passar sempre `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch
   - Backend usa `request.get_json()` — não usa `validate_on_submit()`

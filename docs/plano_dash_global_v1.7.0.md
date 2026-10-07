@@ -208,9 +208,8 @@ A renderização do card fica **genérica**:
 ## 8. UX e estados
 
 - Card do módulo mantém ícone, nome, link (já existentes).
-- Sobreposição de resumo: badge de estado + métricas definidas pelo provider (`campos`).
-- Estados: `ok` (verde) | `nao_configurado` (cinzento) | `indisponivel` (amarelo).
-- Sem dados nenhuns → mensagem amigável.
+- Sobreposição de resumo: apenas as métricas definidas pelo provider (`campos`); o badge de estado foi removido por ser redundante.
+- Sem dados nenhuns → card fica apenas com ícone + nome.
 - Mobile/PWA: grelha CSS grid já usada; `dark/light` via variáveis CSS semânticas (`--cor-sucesso`, `--cor-aviso`, `--cor-erro`, `--cor-texto-secundario`).
 
 ---
@@ -234,8 +233,8 @@ Suite: `tests/`, 146 testes existentes, SQLite em memória (`create_app('testing
 1. **Registry:** provider registado pelo slug correto; `DASHBOARD_PROVIDERS` vazio antes de o blueprint ser importado.
 2. **Módulo sem provider:** dashboard renderiza card clássico — regressão.
 3. **Provider + dados:** utilizador com 3 tarefas pendentes → card mostra "3 pendentes".
-4. **Provider em erro:** provider lança exceção → card `indisponivel`, dashboard carrega, log warning.
-5. **Dados vazios / não configurado:** utilizador sem eventos → `nao_configurado` (ou zero).
+4. **Provider em erro:** provider lança exceção → `indisponivel`; dashboard carrega e faz log warning — o estado é calculado, mas **não é exibido** (badge removido).
+5. **Dados vazios / não configurado:** utilizador sem eventos → `nao_configurado` (ou zero); o estado é calculado, mas **não é exibido** — o card fica apenas com ícone + nome.
 6. **Isolamento:** utilizador A não vê contagem do utilizador B.
 7. **Privacidade:** resposta do provider de Passwords não contém contagem/títulos.
 8. **Sem rede:** o carregamento de `/` não faz chamadas HTTP externas (test de registo de `requests`/`urllib`).

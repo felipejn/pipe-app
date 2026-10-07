@@ -29,11 +29,6 @@
                         <div class="modulo-icone">{{ modulo.icone }}</div>
                         <div class="modulo-info">
                             <h2>{{ modulo.nome }}</h2>
-                            <div class="card-status">
-                                <span class="status status--{{ r.estado }}">
-                                    {{ r.estado }}
-                                </span>
-                            </div>
                             {% if r.metricas %}
                             <div class="card-metricas">
                                 {% for m in r.metricas %}
@@ -42,8 +37,6 @@
                                 </span>
                                 {% endfor %}
                             </div>
-                            {% else %}
-                            <p class="card-sin-dados">Sem dados registados.</p>
                             {% endif %}
                         </div>
                         <span class="modulo-seta">→</span>
