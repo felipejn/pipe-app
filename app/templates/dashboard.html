@@ -11,14 +11,55 @@
     {% if modulos_ativos %}
     <div class="modulos-grid">
         {% for modulo in modulos_ativos %}
-        <a href="{{ url_for(modulo.url_endpoint) }}" class="cartao-modulo">
-            <div class="modulo-icone">{{ modulo.icone }}</div>
-            <div class="modulo-info">
-                <h2>{{ modulo.nome }}</h2>
-                <p>{{ modulo.descricao }}</p>
-            </div>
-            <span class="modulo-seta">→</span>
-        </a>
+            {% if resumos is none %}
+                <!-- Fallback: layout clássico (regressão zero — dashboard sem provider) -->
+                <a href="{{ url_for(modulo.url_endpoint) }}" class="cartao-modulo">
+                    <div class="modulo-icone">{{ modulo.icone }}</div>
+                    <div class="modulo-info">
+                        <h2>{{ modulo.nome }}</h2>
+                        <p>{{ modulo.descricao }}</p>
+                    </div>
+                    <span class="modulo-seta">→</span>
+                </a>
+            {% else %}
+                <!-- Layout híbrido: provider ou fallback clássico para módulos sem provider -->
+                {% if resumos.get(modulo.slug) %}
+                    {% set r = resumos[modulo.slug] %}
+                    <a href="{{ url_for(modulo.url_endpoint) }}" class="cartao-modulo cartao-modulo--resumo">
+                        <div class="modulo-icone">{{ modulo.icone }}</div>
+                        <div class="modulo-info">
+                            <h2>{{ modulo.nome }}</h2>
+                            <div class="card-status">
+                                <span class="status status--{{ r.estado }}">
+                                    {{ r.estado }}
+                                </span>
+                            </div>
+                            {% if r.metricas %}
+                            <div class="card-metricas">
+                                {% for m in r.metricas %}
+                                <span class="metrica" title="{{ r.campos.get(m.label, m.label) }}">
+                                    {{ m.valor }} <small>{{ r.campos.get(m.label, m.label) }}</small>
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="card-sin-dados">Sem dados registados.</p>
+                            {% endif %}
+                        </div>
+                        <span class="modulo-seta">→</span>
+                    </a>
+                {% else %}
+                    <!-- Fallback: módulo ativo, mas sem provider de resumo -->
+                    <a href="{{ url_for(modulo.url_endpoint) }}" class="cartao-modulo">
+                        <div class="modulo-icone">{{ modulo.icone }}</div>
+                        <div class="modulo-info">
+                            <h2>{{ modulo.nome }}</h2>
+                            <p>{{ modulo.descricao }}</p>
+                        </div>
+                        <span class="modulo-seta">→</span>
+                    </a>
+                {% endif %}
+            {% endif %}
         {% endfor %}
     </div>
     {% else %}

@@ -98,8 +98,15 @@ def create_app(config_name='default'):
     from app.combustiveis import bp as combustiveis_bp
     app.register_blueprint(combustiveis_bp)
 
+    from app.meteorologia import bp as meteorologia_bp
+    app.register_blueprint(meteorologia_bp)
+
     # Limiter inicializado após blueprints — necessário para decoradores funcionarem
     limiter.init_app(app)
+
+    # Registry de providers — carregar uma única vez no arranque da factory.
+    from app.dashboard.registry import carregar_providers
+    carregar_providers()
 
     # Security headers
     @app.after_request
@@ -132,8 +139,28 @@ def create_app(config_name='default'):
                     'url_endpoint': info['url_endpoint'],
                     'descricao': info['descricao']
                 })
-        
-        return render_template('dashboard.html', modulos_ativos=modulos_ativos, MODULOS_DISPONIVEIS=MODULOS_DISPONIVEIS)
+
+        resumos = {}
+        for slug in modulos_ativos_slugs:
+            from app.dashboard.registry import DASHBOARD_PROVIDERS
+            prov = DASHBOARD_PROVIDERS.get(slug)
+            if prov is None:
+                # Sem provider: card clássico, sem alteração do layout.
+                continue
+            try:
+                r = prov.resumir(current_user.id)
+            except Exception:  # falha isolada do provider
+                r = {"estado": "indisponivel"}
+                app.logger.warning(
+                    "Provider %s falhou ao gerar resumo para o user %s: %s",
+                    prov.slug, current_user.id, r.get("erro")
+                    if isinstance(r, dict) and r.get("erro") else "",
+                    exc_info=False)
+            resumos[slug] = r
+
+        return render_template('dashboard.html', modulos_ativos=modulos_ativos,
+                               MODULOS_DISPONIVEIS=MODULOS_DISPONIVEIS,
+                               resumos=resumos)
 
     with app.app_context():
         # Criar tabelas SOÓ em ambiente de testes (TestingConfig.TESTING = True).
@@ -147,6 +174,7 @@ def create_app(config_name='default'):
             from app.auth.models import Convite  # noqa: F401
             from app.calendario.models import Evento  # noqa: F401
             from app.combustiveis.models import Posto, PrecoHistorico  # noqa: F401
+            from app.meteorologia.models import LocalizacaoMeteorologia  # noqa: F401
             db.create_all()
 
         # Seed idempotente da linha EstadoAtualizacaoCombustiveis(id=1).
