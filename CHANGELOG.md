@@ -6,6 +6,26 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.7.0] — 2026-10-07
+Dashboard — resumos por provider + módulo Meteorologia (previsão do tempo).
+
+**Adicionado**
+
+- **Dashboard com resumos por provider (v1.7.0):** evolução da dashboard (`/`, `app/templates/dashboard.html`) de um catálogo de links estáticos para um painel que apresenta, para cada módulo ativo, um resumo dos seus dados. Nova camada `app/dashboard/` com contrato (`base.py`: `Estado`, `Metrica`, `DashboardProvider`), registry explícito (`registry.py` com `carregar_providers()` chamado em `create_app`) e providers para **Tarefas** (`app/tarefas/dashboard.py`: total / pendentes / em atraso / concluídas_hoje) e **Calendário** (`app/calendario/dashboard.py`: hoje / próximos 7 dias / total). Template em layout híbrido com fallback clássico automático (`resumos is none` ou módulo sem provider) — regressão zero. SQLs reutilizadas das rotas existentes e de `get_resumo_geral` do Assistente IA, sempre filtradas por `user_id`, sem chamadas HTTP externas na renderização síncrona de `/`. CSS: `.cartao-modulo--resumo`, `.card-status`, `.status--ok/--nao_configurado/--indisponivel`, `.card-metricas`, `.metrica`, `.card-sin-dados` em `pipe.css`.
+- **Módulo Meteorologia** (previsão do tempo): novo módulo `app/meteorologia/` com Etapa A (localização) e Etapa B (previsão) completos. Modelo `LocalizacaoMeteorologia` (`meteorologia_localizacao`: `user_id` único, `nome`, `latitude`, `longitude`, `pais`, `regiao`, `timezone`, `atualizada_em`) — 1 localização por utilizador. Serviços em `services.py` (Open-Meteo Geocoding + Forecast, sem chave API, `timeout=8`, `User-Agent` próprio) — `pesquisar_locais`, `guardar_localizacao`, `obter_previsao`, `obter_previsao_utilizador`, mapeamento WMO + emoji + vento cardinal. Payload devolve `atual` (12 campos: temperatura, sensação térmica, humidade, precipitação, probabilidade, WMO, vento, UV, máx/mín do dia), `horaria` (24h) e `diaria` (7 dias). Rotas: `GET /meteorologia/`, `GET /meteorologia/localizacao`, `GET /meteorologia/api/pesquisar?q=` (30/min), `POST /meteorologia/api/localizacao` (10/min). Regras de resiliência: API indisponível → mensagem amigável (200, nunca 500); campos ausentes → "—"; sem localização → estado vazio com botão "Definir localização". Registado em `MODULOS_DISPONIVEIS` (`'meteorologia'`, ícone 🌤️). Migração `c420a200f2f2` (baseline `3b14f5bd26a5` → `c420a200f2f2`). Template server-side puro (Jinja), sem JS na previsão; AJAX só da pesquisa/gravação de localização. Design no padrão PIPE (tokens claro/escuro, cards, botões).
+- Testes: novo `tests/test_dashboard.py` (14) + novo `tests/test_meteorologia.py` (36).
+
+**Testes:** nova suite `tests/test_dashboard.py` (14 testes: registry, providers, isolamento de utilizador, fallback clássico, **test que `/` não faz HTTP externo**) + `tests/test_meteorologia.py` (36 testes: Etapa A — login obrigatório, pesquisa, gravação, isolamento; Etapa B — estado vazio, previsão realista, API em baixo 200, campos em falta, isolamento); suite total: **182 testes** (eram 146).
+
+**Notas de deploy**
+
+- **Sem alteração de BD para o dashboard** — no PythonAnywhere: push + Reload.
+- **Alteração de BD — obrigatório no PythonAnywhere:** `flask db upgrade` (aplica a nova migration `c420a200f2f2_adiciona_meteorologia_localizacao.py` — cria `meteorologia_localizacao`) → confirm `flask db current`/`flask db check` → **Reload**. Confirmar hosts Open-Meteo (`open-meteo.com`) com `curl` no terminal do PA antes do deploy (whitelist de endpoints públicos).
+- A baseline `3b14f5bd26a5` é imutável; esta é a primeira nova revision a partir dela.
+- Validação: todos os 182 testes a passar; renderização de `GET /` com resumos de Tarefas/Calendário; `GET /meteorologia/` com e sem localização; smoke real da previsão Open-Meteo.
+
+---
+
 ## [v1.6.0] — 2026-10-06
 Flask-Migrate — adoção do versionamento de esquema com revisão única de baseline.
 
@@ -519,6 +539,7 @@ Todas as entradas "Versão vX" da `Estado_Atual.md` têm entrada correspondente 
 
 | Versão do documento | Entrada no CHANGELOG | Notas |
 |---|---|---|
+| v1.7.0 | v1.7.0 — 2026-10-07 | ✅ dashboard resumos por provider (Tarefas + Calendário) + módulo Meteorologia |
 | v1.6.0 | v1.6.0 — 2026-10-06 | ✅ Flask-Migrate — baseline `3b14f5bd26a5` (stamped no PA) |
 | v1.5.9.1 | v1.5.9.1 — 2026-10-01 | ✅ balões alta contraste (`--cor-balao-assistente*`, `?v=7`) |
 | v1.5.10 | v1.5.10 — 2026-10-02 | ✅ dedup postos (`obter_ids_duplicados`) |
@@ -549,13 +570,13 @@ Todas as entradas "Versão vX" da `Estado_Atual.md` têm entrada correspondente 
 | v1.4.1 | v1.4.1 — 2026-09-16 | ✅ paleta Keep |
 | v1.4.0 | v1.4.0 — 2026-09-16 | ✅ tema claro/escuro |
 
-**Total: 29 versões incluídas (v1.4.0 a v1.6.0), todas com entrada.**
+**Total: 30 versões incluídas (v1.4.0 a v1.7.0), todas com entrada.**
 
 **Resoluções de inconsistências aplicadas:**
 - **(a)** A v1.4.10 pertence à **obsolescência de postos** (commit `c0f20b8`, 2026-09-18); a **renderização Markdown** (plain) pertence à v1.4.11 (`f6575d2`); as **tabelas Markdown** pertencem à v1.4.13 (`ab83a6a`) — confirmado pelo histórico Git, igual ao documento.
 - **(b)** A v1.4.15 está duplicada na `Estado_Atual.md`; aparece **uma única vez** (commit `34ff462`).
 - **(c)** As fases dos Combustíveis mapeadas para o número do projeto: **v1.3** (implementação + API Aberta) → v1.4.2; **v1.3.1** (bug paginação, blocklist, dedup, rate limit) → v1.4.2; **v1.3.2** (arquivamento automático, colunas `ativo`/`ciclos_ausente`) → v1.4.8; **v1.3.3** (blocklist `NOMES_IGNORADOS`) → v1.4.9. Identificadas como "Combustíveis fase 1.3.x" dentro de cada entrada.
 - **(d)** Versões ordenadas **da mais recente para a mais antiga** por data de commit.
-- **(e)** Última versão real confirmada pelo Git: **v1.6.0** (2026-10-06 — adoção do Flask-Migrate em `741706c`/`501b7c9`, correcção de `is_admin` integrada na baseline em `daf9ab0`); a v1.5.10 (`9990f4b`, 2026-10-02) foi a versão imediatamente anterior.
+- **(e)** Última versão real confirmada pelo Git: **v1.7.0** (2026-10-07 — dashboard resumos por provider em `fe50dc2`/`838e558` + CSS em `fe50dc2`, módulo Meteorologia em `5dfb48b` com migration `c420a200f2f2`); a v1.6.0 (`741706c`/`501b7c9`, 2026-10-06 — Flask-Migrate) foi a versão imediatamente anterior.
 
 **Versões do documento SEM entrada directa:** v1.2 (Calendário) e v1.3 (Combustíveis) — não são secções "Versão vX" autónomas na `Estado_Atual.md`, foram integradas como "fase 1.3.x" dentro da v1.4.2 e referidas no Histórico anterior. Nenhuma informação foi omitida.

@@ -1,10 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.6.0
+# PIPE — Estado Actual do Projecto — v1.7.0
 
 ## O que é o PIPE
 
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. O módulo Combustíveis é o nono módulo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. O módulo Combustíveis é o nono módulo. O módulo Meteorologia é o décimo primeiro. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -24,11 +24,14 @@ pipe-app/
 │   │       └── pipe.js      # JS base (alertas + alternância de tema claro/escuro)
 │   ├── templates/
 │   │   ├── base.html        # navbar + alternador de tema 🌙/☀️ + anti-FOUC + barra secundária «Voltar/Home» (oculta no dashboard) + meta `csrf-token` (cofre/extensão)
-│   │   ├── dashboard.html   # dashboard — grelha de cards dos módulos activos
+│   │   ├── dashboard.html   # dashboard — grelha híbrida de cards com resumos por provider (Tarefas + Calendário); fallback clássico automático se não houver provider
 │   │   ├── assistente/
 │   │   │   └── index.html   # interface de chat do Assistente IA
 │   │   ├── auth/            # login, registo (por convite), 2FA, reset password
 │   │   ├── euromilhoes/     # registo de jogos e comparação com sorteios
+│   │   ├── meteorologia/    # Previsão do tempo (Etapa A: localização; Etapa B: previsão Open-Meteo)
+│   │   │   ├── index.html   # vista de previsão: local, temperatura, sensação, 24h + 7 dias
+│   │   │   └── localizacao.html  # pesquisa e confirmação da localização geográfica
 │   │   ├── tarefas/
 │   │   │   ├── index.html   # vistas lista/detalhe + sidebar de tags
 │   │   │   └── partials/    # items, form, sidebar
@@ -87,7 +90,12 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # UserModulo
 │   │   ├── routes.py        # /modulos/loja
-│   │   └── config.py        # MODULOS_DISPONIVEIS (10 módulos)
+│   │   └── config.py        # MODULOS_DISPONIVEIS (11 módulos: adicionado `meteorologia` na v1.7.0)
+│   ├── dashboard/           # Camada de resumos por provider (v1.7.0)
+│   │   ├── base.py          # Contrato: `Estado`, `Metrica`, `DashboardProvider` (ABC)
+│   │   ├── registry.py      # Registry explícito de providers + `carregar_providers()` em `create_app()`
+│   │   ├── calendario.py    # (registo) -> provider em `app/calendario/dashboard.py`
+│   │   └── tarefas.py       # (registo) -> provider em `app/tarefas/dashboard.py`
 │   ├── calendario/          # Blueprint Calendário
 │   │   ├── __init__.py
 │   │   ├── models.py        # Evento
@@ -181,7 +189,7 @@ pipe-app/
 ### Módulo Loja de Módulos (`app/modulos/`)
 
 - Modelo `UserModulo` (`user_modulos`) — ativação/desativação de módulos por utilizador
-- `MODULOS_DISPONIVEIS` em `app/modulos/config.py` com 10 módulos (Euromilhões, Tarefas, Notas, Passwords, Câmbio, Cores, Conversões, Assistente IA, Calendário, Combustíveis)
+- `MODULOS_DISPONIVEIS` em `app/modulos/config.py` com 11 módulos (Euromilhões, Tarefas, Notas, Passwords, Câmbio, Cores, Conversões, Assistente IA, Calendário, Combustíveis, Meteorologia)
 - Rotas: `/modulos/loja` (loja), `/modulos/api/toggle` (AJAX `POST` com `request.get_json()`)
 
 ### Módulo Notas (`app/notas/`)
@@ -225,6 +233,16 @@ pipe-app/
 - `services.py`: recolha via API Aberta (`api.apiaberta.pt`) com paginação por tipo de combustível; arquivamento automático de postos ausentes (`LIMIAR_CICLOS_AUSENTE = 2` ciclos); dedup conservadora por `nome+morada+concelho` (`obter_ids_duplicados`) com exclusão apenas em leitura; blocklist `NOMES_IGNORADOS`
 - Rotas: `/combustiveis/` (dashboard + `POST /combustiveis/atualizar`, rate limit 6/hora), `/combustiveis/concelhos`, `/combustiveis/tipos`
 - Scripts auxiliares: `reset_postos_combustiveis.py` (drop + `db.create_all()` + repovoamento; cria colunas `ativo`/`ciclos_ausente` que o `create_all()` não acrescenta a uma BD existente), `remover_postos_ignorados.py` (idempotente), `popular_combustiveis.py` (recolha manual) — os dois primeiros são **históricos/obsoletos** desde a v1.6.0 (o baseline cobre o schema); não executar (ver «Armadilhas conhecidas»)
+### Módulo Meteorologia (`app/meteorologia/`)
+
+- Previsão do tempo em tempo real, com **Open-Meteo** (APIs de geocoding + forecast públicas, sem chave de API).
+- **Etapa A — Localização:** modelo `LocalizacaoMeteorologia` (`meteorologia_localizacao`): `user_id` (FK, único), `nome`, `latitude`, `longitude`, `pais`, `regiao`, `timezone` (default `Europe/Lisbon`), `atualizada_em`; **1 localização por utilizador**; pesquisa por localidade com normalização (aceita "Gerês, Braga" para desambiguar) e confirmação.
+- **Etapa B — Previsão:** `services.py` com funções puras `pesquisar_locais`, `guardar_localizacao`, `obter_previsao`, `obter_previsao_utilizador`; payload devolve `atual` (12 campos: temperatura, sensação térmica, humidade, precipitação, probabilidade de precipitação, código WMO, vento (velocidade + direção + ponto cardeal), UV, máx/mín do dia), `horaria` (próximas 24h) e `diaria` (próximos 7 dias); mapeamento WMO → descrição PT + emoji.
+- **Resiliência:** API indisponível/timeout → mensagem amigável (200, nunca 500); campos ausentes → "—"; sem localização guardada → estado vazio com botão "Definir localização"; `timeout=8`s + `User-Agent` próprio (`PIPE-Meteorologia/1.0`).
+- **Rotas:** `GET /meteorologia/` (previsão), `GET /meteorologia/localizacao` (Etapa A), `GET /meteorologia/api/pesquisar?q=` (rate limit 30/min), `POST /meteorologia/api/localizacao` (rate limit 10/min) — todas `@login_required`, filtradas por `user_id` (anti-IDOR).
+- **Template:** server-side puro (Jinja) em `app/templates/meteorologia/` — previsão renderizada no servidor; AJAX com `'X-CSRFToken'` só na pesquisa/gravação da localização. Design com tokens claro/escuro, cards e botões no padrão PIPE.
+- **Esquema:** migração `c420a200f2f2` (baseline `3b14f5bd26a5` → `c420a200f2f2`, criada com Flask-Migrate) — adiciona a tabela `meteorologia_localizacao`; aplicar no PythonAnywhere antes de abrir o módulo.
+- **Testes:** `tests/test_meteorologia.py` (36 testes).
 
 ### Assistente IA (`app/assistente/`)
 
@@ -277,7 +295,7 @@ pipe-app/
 
 ### Interface / Navegação (frontend)
 
-- **Dashboard** — grelha de cartões dos módulos activos (lida com `MODULOS_DISPONIVEIS`); módulos activos têm destaque; sem links de módulos na navbar
+- **Dashboard** — grelha híbrida de cartões dos módulos activos; lida com `MODULOS_DISPONIVEIS` e, para cada módulo activo, consulta o provider correspondente em `app/dashboard/registry.py` e exibe um resumo de métricas (`resumo` de Tarefas e Calendário na v1.7.0), com badge de estado (`ok`/`nao_configurado`/`indisponivel`); módulos sem provider ficam no layout clássico; renderização 100 % SQL local, sem HTTP externo. Card clássico com fallback automático (sem parâmetro `resumos`) — regressão zero.
 - **Padrão AJAX/fetch no PIPE:**
   - Passar sempre `'X-CSRFToken': '{{ csrf_token() }}'` no header do fetch
   - Backend usa `request.get_json()` — não usa `validate_on_submit()`
@@ -307,9 +325,9 @@ pipe-app/
 ## Testes
 
 - Execução:
-  - `pytest --collect-only -q` — recolhe todos os testes (146 colectados)
+  - `pytest --collect-only -q` — recolhe todos os testes (182 colectados)
   - `pytest -q` — executa a suite completa
-- A suite consta de 14 ficheiros de teste, totalizando **146 testes**: `test_cofre.py` (32), `test_convites_email.py` (14), `test_pipe_tasks.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_cliente.py` (13), `test_combustiveis_dedup.py` (11), `test_assistente_contexto_truncagem.py` (10), `test_assistente_contexto.py` (9), `test_extensao_distribuicao.py` (8), `test_tarefas_listas_predefinidas.py` (3), `test_extensao_js.py` (1), `test_isolamento_bd.py` (1) e helpers em `conftest.py`/`conftest_utils.py`
+- A suite consta de 16 ficheiros de teste, totalizando **182 testes**: `test_cofre.py` (32), `test_convites_email.py` (14), `test_pipe_tasks.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_cliente.py` (13), `test_combustiveis_dedup.py` (11), `test_assistente_contexto_truncagem.py` (10), `test_assistente_contexto.py` (9), `test_extensao_distribuicao.py` (8), `test_tarefas_listas_predefinidas.py` (3), `test_extensao_js.py` (1), `test_isolamento_bd.py` (1), `test_dashboard.py` (14) + `test_meteorologia.py` (36) e helpers em `conftest.py`/`conftest_utils.py`
 - **Aviso do `conftest.py`:** nenhum teste pode tocar na BD real do PIPE. O `drop_all_seguro` intercepta `flask_sqlalchemy.SQLAlchemy.drop_all` e levanta `RuntimeError` sempre que a URI da BD não for `:memory:` — obrigatoriedade de criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). O anti-padrão `db.drop_all()` com BD de ficheiro levanta erro porque o engine do SQLAlchemy fica fixado em `db.init_app()` e a reatribuição de `SQLALCHEMY_DATABASE_URI` depois de `create_app()` não tem efeito
 
 ---
@@ -322,14 +340,16 @@ pipe-app/
 - **WSGI configurado** ✅
 - **Static files** configurados ✅
 - **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às **07:00** ✅ (configuração confirmada no painel Tasks do PythonAnywhere)
-- **Flask-Migrate — baseline `3b14f5bd26a5`** ✅: a produção foi **stamped** para `3b14f5bd26a5` em 2026-10-06 (a baseline **não** foi executada sobre os dados existentes — o esquema em produção já continha todas as tabelas e colunas); confirmar com `flask db current` (deve indicar `3b14f5bd26a5 (head)`) e `flask db check` (limpo)
+- **Flask-Migrate — baseline `3b14f5bd26a5`** ✅: a produção foi **stamped** para `3b14f5bd26a5` em 2026-10-06 (a baseline **não** foi executada sobre os dados existentes — o esquema em produção já continha todas as tabelas e colunas); confirmar com `flask db current` (produção: `3b14f5bd26a5 (head)`; depois do deploy do Meteorologia: `c420a200f2f2 (head)`) e `flask db check` (limpo).
 - **Esquema (Calendário, Cofre, Combustíveis, Convites/Mailjet)** ✅ — resolvido pela baseline: `evento`, `cofre_configs`/`cofre_passwords`, as colunas `ativo`/`ciclos_ausente` e `mailjet_message_id`/`email_estado`/`email_verificado_em` já existiam em produção e estão cobertas por `3b14f5bd26a5`; a correcção de `User.is_admin` (`nullable=False`, `server_default=0`) também está integrada na baseline — **nenhum script manual de migração é necessário nem recomendado**
 - **Configuração de produção** (pacotes via `pip install -r requirements.txt`, variáveis do `.env` como `COFRE_CORS_ORIGINS`, cookies `SameSite=None`/`Secure`) — não é verificável a partir do repositório; confirmar no painel/terminal do PythonAnywhere se ainda não foi feito
 - **Extensão Chrome do Cofre** ⚠️: teste de ponta a ponta em produção pendente (ver «Pendências de deploy»)
 
 ### Migrations (Flask-Migrate)
 
-A baseline `3b14f5bd26a5` cobre todas as tabelas e colunas actuais (incluindo `evento`); no PythonAnywhere não há comandos manuais de migração a executar. Novas alterações de esquema seguem o procedimento descrito em «Procedimento de deploy no PythonAnywhere».
+A baseline `3b14f5bd26a5` cobre todas as tabelas e colunas actuais (incluindo `evento`); **exceto a migração pendente `c420a200f2f2` (Meteorologia)**; no PythonAnywhere não há outros comandos manuais de migração a executar. Novas alterações de esquema seguem o procedimento descrito em «Procedimento de deploy no PythonAnywhere».
+- **Migração pendente — Meteorologia (`c420a200f2f2_adiciona_meteorologia_localizacao.py`):** aplica a tabela `meteorologia_localizacao` (Etapa A: uma localização por utilizador) antes de usar o módulo; executar `flask db upgrade` no PythonAnywhere, depois confirmar `flask db current` (deve indicar `c420a200f2f2 (head)`) e `flask db check` (limpo).
+
 
 ### WSGI
 
@@ -370,6 +390,7 @@ OPENROUTER_MODEL=inclusionai/ling-3.0-flash-sante:free
 ---
 
 ## Pendências de deploy
+- **Módulo Meteorologia (deploy em pendência):** aplicar a migration `c420a200f2f2_adiciona_meteorologia_localizacao.py` (`flask db upgrade`) antes de usar o módulo; depois confirmar com `flask db current` (`c420a200f2f2 (head)`) e `flask db check` (limpo).
 
 - **Calendário, Cofre, Combustíveis, Convites/Mailjet** — ✅ **resolvido pela baseline do Flask-Migrate** (`3b14f5bd26a5`, stamped no PA em 2026-10-06); os scripts manuais (`migrar_convites_mailjet.py`, `reset_postos_combustiveis.py`, `remover_postos_ignorados.py`) são históricos e **não devem ser executados**
 - **Extensão Chrome do Cofre:** teste de ponta a ponta em produção seguindo `docs/guia-extensao-chrome.md` (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS e que a chave do cofre não aparece nos cookies; recarregar ⟳ o cartão da extensão em `chrome://extensions` depois das alterações
@@ -428,8 +449,8 @@ Com a **app parada**, copiar o ficheiro mais recente de `instance/backups/` para
 
 1. Criar `app/<modulo>/` com `__init__.py` + `routes.py` (+ `models.py` se BD)
 2. Registar blueprint em `app/__init__.py`
-3. Adicionar entrada em `app/modulos/config.py` (`MODULOS_DISPONIVEIS`)
-4. Adicionar card em `app/templates/dashboard.html`
+3. Adicionar entrada em `app/modulos/config.py` (`MODULOS_DISPONIVEIS`) — o card aparece **automaticamente** na dashboard (layout híbrido de v1.7.0, sem editar `dashboard.html`)
+4. Se o módulo quiser um resumo no dashboard (como Tarefas/Calendário): implementar provider em `app/<modulo>/dashboard.py` e registá-lo em `app/dashboard/registry.py::carregar_providers()`
 5. Se precisa de scheduled task: adicionar em `scripts/pipe_tasks.py`
 
 Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`; imports `from app import db` e `from app.extensions import limiter`; rate limiting nas rotas críticas; tudo filtrado por `user_id` (anti-IDOR), exceto os `Posto` do Combustíveis que são globais.
@@ -438,10 +459,12 @@ Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`;
 
 ## Próximos passos
 
-1. **Testar notificações do Calendário em produção** — via `pipe_tasks.py` (tarefa `tarefa_calendario`)
-2. **Extensão Chrome do Cofre** — teste de ponta a ponta em produção
-3. **Futuras alterações de schema** — seguir o procedimento Flask-Migrate (nunca editar a baseline `3b14f5bd26a5`)
-4. Manter `CHANGELOG.md` atualizado com cada versão — o histórico do projecto vive apenas lá a partir de agora
+1. **Deploy do módulo Meteorologia no PythonAnywhere:** `git pull` → `flask db upgrade` (aplica a migration `c420a200f2f2_adiciona_meteorologia_localizacao.py`) → check `flask db current`/`flask db check` → **Reload**; verificar a previsão com Open-Meteo real.
+2. **Testar notificações do Calendário em produção** — via `pipe_tasks.py` (tarefa `tarefa_calendario`).
+3. **Testar o dashboard com resumos em produção** — confirmar badges de estado e métricas de Tarefas/Calendário; depois expandir os providers (Combustíveis, Notas, Euromilhões, Passwords) conforme o plano `docs/plano_dash_global_v1.7.0.md`.
+4. **Extensão Chrome do Cofre** — teste de ponta a ponta em produção.
+5. **Futuras alterações de schema** — seguir o procedimento Flask-Migrate (nunca editar a baseline `3b14f5bd26a5`).
+6. Manter `CHANGELOG.md` atualizado com cada versão — o histórico do projecto vive apenas lá a partir de agora.
 
 ---
 
