@@ -23,6 +23,8 @@ from app.combustiveis.models import (
 )
 from app.combustiveis import services as combustiveis_services
 from app import db
+from app.meteorologia.models import LocalizacaoMeteorologia
+from app.meteorologia import services as meteorologia_services
 
 
 # ── Constantes de controlo (antes de DEFINICOES_FERRAMENTAS) ─────────────────
@@ -292,6 +294,22 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
             },
         },
     },
+{
+        'type': 'function',
+        'function': {
+            'name': 'get_meteorologia',
+            'description': 'Devolve a previsão do tempo (atual + 7 dias) da localização guardada pelo utilizador em Meteorologia. Usar detalhado=True apenas quando o utilizador pedir a previsão horária.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'detalhado': {
+                        'type': 'boolean',
+                        'description': 'Se True, devolve também a previsão horária reduzida (próximas 12 horas, de 2 em 2 horas), sem a previsão diária.',
+                    }
+                }
+            }
+        },
+    },
 ]
 
 DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA = [
@@ -467,6 +485,7 @@ DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA = [
             },
         },
     },
+    
 ]
 
 DEFINICOES_FERRAMENTAS_ESCRITA = DEFINICOES_FERRAMENTAS_LEITURA + DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA
@@ -480,7 +499,7 @@ REGISTO_FERRAMENTAS = {
     'get_eventos': 'get_eventos',
     'get_cambio': 'get_cambio',
     'get_combustiveis': 'get_combustiveis',
-    'criar_tarefa': 'criar_tarefa',
+    'get_meteorologia': 'get_meteorologia',
     'alternar_tarefa': 'alternar_tarefa',
     'apagar_tarefa': 'apagar_tarefa',
     'criar_nota': 'criar_nota',
@@ -1260,3 +1279,120 @@ def executar_ferramenta(nome_ferramenta, argumentos, user_id, modo='leitura'):
     except Exception as e:
         db.session.rollback()
         return {'erro': f'Falha ao executar {nome_ferramenta}: {e}'}
+# ── Meteorologia — leitura da previsão da localização guardada ─────────────
+
+
+def _num_arredondado(v, casas=1):
+    """Wrapper de services._num com arredondamento (casas >= 0)."""
+    v = meteorologia_services._num(v)
+    if v is None:
+        return None
+    return round(v, casas)
+
+
+def _previsao_compacta(previsao, local):
+    """Constrói o payload compacto (atual + 7 dias) enviado ao modelo."""
+    atual = previsao.get('atual') or {}
+    diaria = previsao.get('diaria') or []
+    return {
+        'local': {
+            'nome': local.nome,
+            'pais': local.pais,
+            'regiao': local.regiao,
+            'timezone': local.timezone,
+        },
+        'atual': {
+            'temperatura': _num_arredondado(atual.get('temperatura'), 1),
+            'sensacao_termica': _num_arredondado(atual.get('sensacao_termica'), 1),
+            'condicao': atual.get('descricao_pt'),
+            'emoji': atual.get('emoji'),
+            'humidade': _num_arredondado(atual.get('humidade'), 0),
+            'prob_precipitacao': _num_arredondado(atual.get('probabilidade_precipitacao'), 0),
+            'vento': {
+                'velocidade': _num_arredondado(atual.get('vento_velocidade'), 1),
+                'direcao_cardinal': atual.get('vento_direcao_cardinal'),
+            },
+            'uv': _num_arredondado(atual.get('uv'), 0),
+            'precipitacao': _num_arredondado(atual.get('precipitacao'), 1),
+        },
+        'diaria': [
+            {
+                'data': d.get('data'),
+                'condicao': d.get('descricao_pt'),
+                'emoji': d.get('emoji'),
+                'temp_max': _num_arredondado(d.get('temp_max'), 1),
+                'temp_min': _num_arredondado(d.get('temp_min'), 1),
+                'prob_precipitacao': _num_arredondado(d.get('prob_precipitacao'), 0),
+            }
+            for d in diaria
+        ],
+        'meta': {
+            'atualizada_em': previsao.get('atualizada_em'),
+            'fonte': previsao.get('fonte'),
+        },
+    }
+
+
+def _previsao_detalhada(previsao, local):
+    """Constrói o payload detalhado: atual + horaria reduzida (sem diaria)."""
+    atual = previsao.get('atual') or {}
+    horas = previsao.get('horaria') or []
+    return {
+        'local': {
+            'nome': local.nome,
+            'pais': local.pais,
+            'regiao': local.regiao,
+            'timezone': local.timezone,
+        },
+        'atual': {
+            'temperatura': _num_arredondado(atual.get('temperatura'), 1),
+            'sensacao_termica': _num_arredondado(atual.get('sensacao_termica'), 1),
+            'condicao': atual.get('descricao_pt'),
+            'emoji': atual.get('emoji'),
+            'humidade': _num_arredondado(atual.get('humidade'), 0),
+            'prob_precipitacao': _num_arredondado(atual.get('probabilidade_precipitacao'), 0),
+            'vento': {
+                'velocidade': _num_arredondado(atual.get('vento_velocidade'), 1),
+                'direcao_cardinal': atual.get('vento_direcao_cardinal'),
+            },
+            'uv': _num_arredondado(atual.get('uv'), 0),
+            'precipitacao': _num_arredondado(atual.get('precipitacao'), 1),
+        },
+        'horaria': [
+            {
+                'hora': h.get('hora'),
+                'temperatura': _num_arredondado(h.get('temperatura'), 1),
+                'condicao': h.get('descricao_pt'),
+                'emoji': h.get('emoji'),
+                'prob_precipitacao': _num_arredondado(h.get('prob_precipitacao'), 0),
+            }
+            for h in horas[:24:2]
+        ],
+        'meta': {
+            'atualizada_em': previsao.get('atualizada_em'),
+            'fonte': previsao.get('fonte'),
+        },
+    }
+
+
+def get_meteorologia(user_id, detalhado=False):
+    """Consulta a previsão meteorológica da localização guardada pelo utilizador.
+
+    Ferramenta de leitura. Requer que o utilizador tenha definido uma localização
+    em Meteorologia -> Definir localização; sem localização guardada devolve um
+    erro orientador (o modelo encaminha para o módulo, nunca inventa dados).
+    """
+    # Via unica: query à localização do utilizador + obter_previsao(lat, lon).
+    local = LocalizacaoMeteorologia.query.filter_by(user_id=user_id).first()
+    if local is None:
+        return {'erro': 'Defina primeiro a localização em Meteorologia -> '
+                        'Definir localização e volte a perguntar.'}
+
+    previsao = meteorologia_services.obter_previsao(local.latitude, local.longitude)
+    if previsao is None:
+        return {'erro': 'Serviço de previsão meteorológica indisponível de momento. '
+                        'Tenta novamente mais tarde.'}
+
+    if detalhado:
+        return _previsao_detalhada(previsao, local)
+    return _previsao_compacta(previsao, local)

@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.7.0
+# PIPE — Estado Actual do Projecto — v1.7.2
 
 ## O que é o PIPE
 
@@ -84,7 +84,7 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── cliente.py       # OpenRouter API, retry + fallback entre modelos
 │   │   ├── contexto.py      # orquestração do fluxo, histórico em sessão, tool use
-│   │   ├── ferramentas.py   # 7 ferramentas de leitura + 10 de escrita
+│   │   ├── ferramentas.py   # 8 ferramentas de leitura + 10 de escrita
 │   │   └── routes.py        # /assistente/ + /assistente/api/*
 │   ├── modulos/             # Blueprint Loja de Módulos
 │   │   ├── __init__.py
@@ -248,14 +248,14 @@ pipe-app/
 
 - **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo principal via `OPENROUTER_MODEL` (default: `inclusionai/ling-3.0-flash-sante:free`) — **5 modelos no total (1 principal + 4 fallbacks)**. Fila de fallback: `poolside/laguna-s-2.1:free`, `liquid/lfm-2.5-2.6b:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`. Auth por `OPENROUTER_API_KEY`; retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback imediato em qualquer falha de provider (incluindo respostas HTTP 200 com `{"error": ...}` no corpo — detetadas por `_classificar_resposta()`, com classes `RateLimitError`/`ServicoIndisponivelError`)
 - **Contexto** (`contexto.py`): `processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None)` — orquestra o fluxo: monta prompt + histórico, chama LLM, executa tool calls (máx. 4 iterações), guarda resposta. Histórico em Flask session (20 mensagens = 10 trocas, tecto de 3000 chars/mensagem e 8000 chars no total)
-- **Ferramentas** (`ferramentas.py`): tool use com **7 funções de leitura** (`get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis`) e **10 de escrita** (`criar_tarefa`, `alternar_tarefa`, `apagar_tarefa`, `criar_nota`, `alternar_nota_acao`, `apagar_nota`, `criar_evento`, `atualizar_evento`, `apagar_evento`, `gerar_credencial`). Todas filtram por `user_id` (obrigatório, injetado pelo caller); `get_combustiveis` aceita `tipo_combustivel`, `concelho`, `posto` (nome **ou** marca, insensível a acentos e maiúsculas), `apenas_mais_barato` e `limite`
+- **Ferramentas** (`ferramentas.py`): tool use com **8 funções de leitura** (`get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis`, `get_meteorologia`) e **10 de escrita** (`criar_tarefa`, `alternar_tarefa`, `apagar_tarefa`, `criar_nota`, `alternar_nota_acao`, `apagar_nota`, `criar_evento`, `atualizar_evento`, `apagar_evento`, `gerar_credencial`). Todas filtram por `user_id` (obrigatório, injetado pelo caller); `get_combustiveis` aceita `tipo_combustivel`, `concelho`, `posto` (nome **ou** marca, insensível a acentos e maiúsculas), `apenas_mais_barato` e `limite`; `get_meteorologia` recebe `detalhado` (bool) e consulta a previsão da localização guardada em Meteorologia
 - **Rotas** (`routes.py`):
   - `GET /assistente` — página de chat (tema claro/escuro)
   - `POST /assistente/api/chat` — AJAX `{mensagem: "..."}` → `{resposta: "..."}` (rate limit 30/min)
   - `POST /assistente/api/modo` — alterna modo leitura/escrita (rate limit 10/min)
   - `POST /assistente/api/limpar` — limpa histórico da sessão (rate limit 10/min)
 - **System prompt:** PT-PT; capacidades limitadas à leitura em modo leitura (não sugere acções que não pode executar — encaminha para o módulo respectivo); nunca inventar dados; tom formal e conciso
-- Testes: `test_assistente_cliente.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_contexto.py` (9), `test_assistente_contexto_truncagem.py` (10)
+- Testes: `test_assistente_cliente.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_contexto.py` (9), `test_assistente_contexto_truncagem.py` (10), `test_assistente_meteorologia.py` (14)
 
 ### Sistema de notificações (`app/notifications/`)
 
@@ -327,7 +327,7 @@ pipe-app/
 - Execução:
   - `pytest --collect-only -q` — recolhe todos os testes (182 colectados)
   - `pytest -q` — executa a suite completa
-- A suite consta de 16 ficheiros de teste, totalizando **182 testes**: `test_cofre.py` (32), `test_convites_email.py` (14), `test_pipe_tasks.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_cliente.py` (13), `test_combustiveis_dedup.py` (11), `test_assistente_contexto_truncagem.py` (10), `test_assistente_contexto.py` (9), `test_extensao_distribuicao.py` (8), `test_tarefas_listas_predefinidas.py` (3), `test_extensao_js.py` (1), `test_isolamento_bd.py` (1), `test_dashboard.py` (14) + `test_meteorologia.py` (36) e helpers em `conftest.py`/`conftest_utils.py`
+- A suite consta de 17 ficheiros de teste, totalizando **210 testes**: `test_cofre.py` (32), `test_convites_email.py` (14), `test_pipe_tasks.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_cliente.py` (13), `test_combustiveis_dedup.py` (11), `test_assistente_contexto_truncagem.py` (10), `test_assistente_contexto.py` (9), `test_assistente_meteorologia.py` (14), `test_extensao_distribuicao.py` (8), `test_tarefas_listas_predefinidas.py` (3), `test_extensao_js.py` (1), `test_isolamento_bd.py` (1), `test_dashboard.py` (14) + `test_meteorologia.py` (36) e helpers em `conftest.py`/`conftest_utils.py`
 - **Aviso do `conftest.py`:** nenhum teste pode tocar na BD real do PIPE. O `drop_all_seguro` intercepta `flask_sqlalchemy.SQLAlchemy.drop_all` e levanta `RuntimeError` sempre que a URI da BD não for `:memory:` — obrigatoriedade de criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). O anti-padrão `db.drop_all()` com BD de ficheiro levanta erro porque o engine do SQLAlchemy fica fixado em `db.init_app()` e a reatribuição de `SQLALCHEMY_DATABASE_URI` depois de `create_app()` não tem efeito
 
 ---
