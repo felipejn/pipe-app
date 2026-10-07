@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Definir localização — PIPE{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo" style="max-width: 560px;">
+
+  <div class="cabecalho-pagina">
+    <h2>📍 Definir localização</h2>
+    <p class="modulo-desc">Pesquisa a tua localidade e confirma para veres a previsão.</p>
+  </div>
+
+  {% if local %}
+  <div class="cartao" style="margin-bottom:1rem;">
+    <strong>Localização actual:</strong>
+    {{ local.nome }}{% if local.regiao %} — {{ local.regiao }}{% endif %} ({{ local.pais }})
+  </div>
+  {% endif %}
+
+  <div class="cartao" style="margin-bottom:1rem;">
+    <form id="form-pesquisa">
+      <div class="campo">
+        <label class="campo-label" for="input-pesquisa">Localidade</label>
+        <input type="text" id="input-pesquisa" class="input" name="q"
+               placeholder="Ex.: Vila Verde" autocomplete="off" minlength="2" maxlength="100">
+      </div>
+      <button type="submit" id="btn-pesquisar" class="btn btn-primario btn-bloco" style="margin-top:.75rem;">
+        Pesquisar
+      </button>
+    </form>
+    <p class="texto-subtil" style="margin-top:.5rem;">Se for ambíguo, tenta "Gerês, Braga".</p>
+  </div>
+
+  <div id="estado" class="texto-subtil" style="margin-bottom:.75rem;"></div>
+  <div id="resultados"></div>
+
+  <div id="confirmacao" class="cartao" style="display:none;margin-top:1rem;">
+    <h3 style="margin-top:0;">Confirmar localização</h3>
+    <p id="confirmacao-resumo"></p>
+    <button id="btn-confirmar" class="btn btn-primario">Confirmar localização</button>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+(function () {
+  var form = document.getElementById('form-pesquisa');
+  var input = document.getElementById('input-pesquisa');
+  var btn = document.getElementById('btn-pesquisar');
+  var estado = document.getElementById('estado');
+  var lista = document.getElementById('resultados');
+  var caixa = document.getElementById('confirmacao');
+  var resumo = document.getElementById('confirmacao-resumo');
+  var btnConfirmar = document.getElementById('btn-confirmar');
+  var CSRF = '{{ csrf_token() }}';
+  var selecionado = null;
+
+  function pesquisar() {
+    var termo = input.value.trim();
+    if (termo.length < 2) {
+      estado.textContent = 'Escreve pelo menos 2 caracteres.';
+      return;
+    }
+    btn.disabled = true;
+    estado.textContent = 'A pesquisar…';
+    lista.innerHTML = '';
+    caixa.style.display = 'none';
+    fetch('{{ url_for("meteorologia.api_pesquisar") }}?q=' + encodeURIComponent(termo), {
+      headers: { 'X-CSRFToken': CSRF }
+    })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, dados: d }; }); })
+    .then(function (res) {
+      if (!res.ok) {
+        estado.textContent = (res.dados && res.dados.erro) || 'Erro na pesquisa.';
+        return;
+      }
+      var resultados = res.dados.resultados || [];
+      if (!resultados.length) {
+        estado.textContent = 'Sem resultados. Tenta outro termo.';
+        return;
+      }
+      estado.textContent = '';
+      resultados.forEach(function (loc) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-secundario btn-bloco';
+        b.style.marginBottom = '.5rem';
+        var texto = '📍 ' + loc.nome;
+        if (loc.regiao) texto += ' — ' + loc.regiao;
+        if (loc.pais) texto += ' (' + loc.pais + ')';
+        if (loc.detalhe) texto += ' · ' + loc.detalhe;
+        b.textContent = texto;
+        b.addEventListener('click', function () {
+          selecionado = loc;
+          resumo.textContent = loc.nome +
+            (loc.regiao ? ' — ' + loc.regiao : '') +
+            (loc.pais ? ' (' + loc.pais + ')' : '');
+          caixa.style.display = 'block';
+          caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        lista.appendChild(b);
+      });
+    })
+    .catch(function () { estado.textContent = 'Serviço indisponível. Tenta mais tarde.'; })
+    .finally(function () { btn.disabled = false; });
+  }
+
+  form.addEventListener('submit', function (e) { e.preventDefault(); pesquisar(); });
+
+  btnConfirmar.addEventListener('click', function () {
+    if (!selecionado) return;
+    btnConfirmar.disabled = true;
+    fetch('{{ url_for("meteorologia.api_guardar_localizacao") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify(selecionado)
+    })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, dados: d }; }); })
+    .then(function (res) {
+      if (res.ok) {
+        estado.textContent = 'Localização guardada.';
+        window.location.reload();
+      } else {
+        estado.textContent = (res.dados && res.dados.erro) || 'Não foi possível guardar.';
+      }
+    })
+    .catch(function () { estado.textContent = 'Não foi possível guardar.'; })
+    .finally(function () { btnConfirmar.disabled = false; });
+  });
+})();
+</script>
+{% endblock %}

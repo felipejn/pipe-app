@@ -2,6 +2,17 @@
 
 > Versão consolidada após aprovação com ajustes. Open-Meteo validado com payloads reais em 06/10/2026.
 
+## Estado de implementação (2026-10-07)
+
+**Etapa A e Etapa B IMPLEMENTADAS.** Divergências entre este plano e o código (deliberadas ou de detalhe):
+
+* **WMO:** o dicionário chama-se `MAPA_WMO` (§6 sugeria `WMO`); função pública `descrever_wmo(codigo)` conforme especificado. Fallback `('—', '❔')` para códigos desconhecidos/`None`.
+* **`atualizada_em`** no payload da previsão é uma string ISO curta `YYYY-MM-DDTHH:MM` (UTC), adequada para exibição directa no template.
+* **Template `index.html`** usa render **server-side** puro (Jinja), conforme decisão §2.3 — sem JS para a previsão; AJAX continua a ser só da pesquisa/gravação de localização (Etapa A).
+* **`app/templates/meteorologia/placeholder.html`** existiu provisoriamente durante a Etapa A (rota `index` ainda sem previsão) e foi **removido** na Etapa B — não faz parte do estado final.
+* **Migração:** a Etapa B **não** criou migração nova (não havia schema a alterar); única migração do módulo é `c420a200f2f2` (Etapa A).
+* **Testes:** Etapas A+B num único `tests/test_meteorologia.py` (36 testes), como previsto em §4/§11.
+
 ## Ajustes aplicados (resumo)
 
 1. **Sem debounce/autocomplete** — pesquisa só via botão/Enter.
@@ -127,9 +138,9 @@ Dicionário `WMO = {codigo: (descricao_pt_pt, emoji)}` cobrindo 0, 1, 2, 3, 45, 
 
 **Contratos (puros, sem Flask):**
 
-* `services.obter_previsao(lat, lon, timezone=None) -> dict | None` — 1× `requests.get(FORECAST_URL, params={...§3..., timezone:'auto'}, timeout=8)`; `raise_for_status`; parse defensivo; monta `{atual: {...11 campos...}, horaria: [...×24], diaria: [...×7], timezone, atualizada_em, fonte:'Open-Meteo'}`; exceção → `None`.
+* `services.obter_previsao(lat, lon) -> dict | None` — 1× `requests.get(FORECAST_URL, params={...§3..., timezone:'auto'}, timeout=8)` (sem parâmetro `timezone` na assinatura: as coordenadas determinam o timezone via `timezone=auto`); `raise_for_status`; parse defensivo; monta `{atual: {...}, horaria: [...×24], diaria: [...×7], timezone, atualizada_em, fonte:'Open-Meteo'}`, onde `timezone` é o retornado pela API e faz parte do payload normalizado; exceção → `None`. O dicionário `atual` separa **12 campos meteorológicos normalizados** — `hora`, `temperatura`, `sensacao_termica`, `humidade`, `precipitacao`, `probabilidade_precipitacao` (de `hourly`, §3), `codigo_wmo`, `vento_velocidade`, `vento_direcao_graus`, `uv`, `temp_max_hoje`, `temp_min_hoje` (de `daily[0]`, §3) — de **3 campos de apresentação/metadata derivados sem chamada extra** — `descricao_pt`, `emoji` (via `descrever_wmo`) e `vento_direcao_cardinal`. Contagens anteriores que referiam "11 campos" ficam substituídas por esta separação (12 + 3).
 * `services.obter_previsao_utilizador(user_id) -> (payload | None, motivo)` — sem local → `(None, 'sem_localizacao')`; com local → `(obter_previsao(...), ...)`; `motivo 'api_indisponivel'` se `None`.
-* **Gancho de cache (não implementar na V1):** todo o acesso à Forecast API fica **dentro** de `obter_previsao`, assinatura estável `(lat, lon, timezone)`. Evolução futura = wrapper interno com dict `{chave: (ts, payload)}` + TTL, sem tocar rotas/templates/testes. Documentar em comentário no `services.py`.
+* **Gancho de cache (não implementar na V1):** todo o acesso à Forecast API fica **dentro** de `obter_previsao`, assinatura estável `(lat, lon)`. Evolução futura = wrapper interno com dict `{chave: (ts, payload)}` + TTL, sem tocar rotas/templates/testes. Documentar em comentário no `services.py`.
 
 **Rota B:**
 
@@ -137,7 +148,7 @@ Dicionário `WMO = {codigo: (descricao_pt_pt, emoji)}` cobrindo 0, 1, 2, 3, 45, 
 
 **Template `index.html`:** cabeçalho (nome, região/país, atualizada em, link "📍 Mudar localização"); cartão "agora" (temperatura grande + condição + grelha: sensação, máx/mín, prob. precip., precipitação mm, humidade %, vento km/h + direção por extenso — converter °→ ponto cardeal em `services.py` —, UV); faixa horária scroll-x (24 cards: hora, ícone, temp, prob); 7 dias (dia, ícone, máx/mín, prob); `None` → "—". Só classes/tokens existentes.
 
-**Aceitação B:** com local definida, página mostra os 11 campos atuais + 24h + 7 dias a partir do payload real; API em baixo → mensagem amigável sem 500; campos ausentes → "—"; testes B passam.
+**Aceitação B:** com local definida, página mostra os 12 campos meteorológicos + 3 derivados de `atual` + 24h + 7 dias a partir do payload real; API em baixo → mensagem amigável sem 500; campos ausentes → "—"; testes B passam.
 
 ## 9. Rotas (consolidado)
 
@@ -164,7 +175,7 @@ Pré-deploy: `curl` aos 2 hosts no terminal do PA (whitelist). Deploy com migra�
 
 ## 13. Futuro Assistente (só preparação)
 
-Nenhuma tool agora. O desacoplamento (`pesquisar_locais`, `obter_previsao`, `obter_previsao_utilizador` puras) permite criar depois `get_meteorologia(local=None, data=None)` em `assistente/ferramentas.py` (leitura, filtrada por `user_id`, payload enxuto para o teto de 2000 chars) + 1–2 linhas no system prompt. Decisão futura: só localização guardada vs locais arbitrários (recomendação: começar pela guardada).
+Nenhuma tool agora. O desacoplamento (`pesquisar_locais`, `obter_previsao`, `obter_previsao_utilizador` puras) permite criar depois `get_meteorologia` em `assistente/ferramentas.py` (leitura, filtrada por `user_id`, payload enxuto para o teto de 2000 chars) + 1–2 linhas no system prompt. A decisão entre usar só a localização guardada ou permitir locais arbitrários **não fica fixada neste plano** — fica para a fase de implementação da ferramenta `get_meteorologia`. O módulo mantém apenas os serviços desacoplados para permitir ambas as opções.
 
 ## 14. Sequência de implementação
 

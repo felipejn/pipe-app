@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Meteorologia — PIPE{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo" style="max-width: 560px;">
+
+  {% if erro == 'previsao_indisponivel' %}
+  <div class="cartao" style="margin-bottom:1rem;">
+    <h2 style="margin-top:0;">🌤️ Meteorologia</h2>
+    <p class="texto-subtil">A previsão está indisponível neste momento. Tenta de novo dentro de instantes.</p>
+    <a class="btn btn-secundario btn-bloco" href="{{ url_localizacao }}" style="margin-top:.5rem;">📍 Mudar localização</a>
+  </div>
+
+  {% elif not local %}
+  <div class="cartao">
+    <h2 style="margin-top:0;">🌤️ Meteorologia</h2>
+    <p class="texto-subtil">Define uma localização para veres a previsão do tempo.</p>
+    <a class="btn btn-primario btn-bloco" href="{{ url_localizacao }}">📍 Definir localização</a>
+  </div>
+
+  {% else %}
+  <div class="cabecalho-pagina">
+    <h2>🌤️ Meteorologia</h2>
+    <p class="modulo-desc">
+      {{ local.nome }}{% if local.regiao %} — {{ local.regiao }}{% endif %} ({{ local.pais }})
+      · <a href="{{ url_localizacao }}">📍 Mudar localização</a>
+    </p>
+    <p class="texto-subtil">Actualizado a {{ previsao.atualizada_em }} ({{ previsao.timezone }}) · Fonte: {{ previsao.fonte }}</p>
+  </div>
+
+  {% set a = previsao.atual %}
+  <div class="cartao" style="margin-bottom:1rem;">
+    <p style="margin:0 0 .5rem 0;">
+      <strong style="font-size:2.2rem;line-height:2.2rem;">
+        {{ '—' if a.temperatura is none else '%.1f'|format(a.temperatura) }} °C
+      </strong>
+      <span style="font-size:1.1rem;"> {{ a.emoji }} {{ a.descricao_pt }}</span>
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.6rem;">
+      <div><span class="texto-subtil">Sensação</span><br>{{ '—' if a.sensacao_termica is none else '%.1f'|format(a.sensacao_termica) }} °C</div>
+      <div><span class="texto-subtil">Umidade</span><br>{{ '—' if a.humidade is none else a.humidade|int }} %</div>
+      <div><span class="texto-subtil">Precipitação</span><br>{{ '—' if a.precipitacao is none else a.precipitacao }} mm</div>
+      <div><span class="texto-subtil">Prob. precip.</span><br>{{ '—' if a.probabilidade_precipitacao is none else a.probabilidade_precipitacao|int }} %</div>
+      <div><span class="texto-subtil">Vento</span><br>{{ '—' if a.vento_velocidade is none else a.vento_velocidade }} km/h {{ a.vento_direcao_cardinal }}</div>
+      <div><span class="texto-subtil">UV</span><br>{{ '—' if a.uv is none else a.uv }}</div>
+      <div><span class="texto-subtil">Máx hoje</span><br>{{ '—' if a.temp_max_hoje is none else '%.1f'|format(a.temp_max_hoje) }} °C</div>
+      <div><span class="texto-subtil">Mín hoje</span><br>{{ '—' if a.temp_min_hoje is none else '%.1f'|format(a.temp_min_hoje) }} °C</div>
+    </div>
+  </div>
+
+  <div class="cartao" style="margin-bottom:1rem;">
+    <h3 style="margin-top:0;">Próximas 24 horas</h3>
+    <div style="display:flex;gap:.6rem;overflow-x:auto;padding-bottom:.3rem;">
+      {% for h in previsao.horaria %}
+      <div class="cartao" style="min-width:78px;text-align:center;padding:.5rem;flex-shrink:0;">
+        <div class="texto-subtil" style="font-size:.8rem;">{{ h.hora[11:16] if h.hora and h.hora|length > 11 else '—' }}</div>
+        <div style="font-size:1.2rem;">{{ h.emoji }}</div>
+        <div><strong>{{ '—' if h.temperatura is none else '%.0f'|format(h.temperatura) }}°</strong></div>
+        <div class="texto-subtil" style="font-size:.8rem;">{{ '—' if h.prob_precipitacao is none else h.prob_precipitacao|int }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="cartao" style="margin-bottom:1rem;">
+    <h3 style="margin-top:0;">Próximos 7 dias</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;">
+      {% for d in previsao.diaria %}
+      <div class="cartao" style="text-align:center;padding:.5rem;">
+        <div class="texto-subtil" style="font-size:.8rem;">{{ d.data[8:10] }}/{{ d.data[5:7] }}</div>
+        <div style="font-size:1.3rem;">{{ d.emoji }}</div>
+        <div class="texto-subtil" style="font-size:.8rem;">{{ d.descricao_pt }}</div>
+        <div><strong>{{ '—' if d.temp_max is none else '%.0f'|format(d.temp_max) }}°</strong> / {{ '—' if d.temp_min is none else '%.0f'|format(d.temp_min) }}°</div>
+        <div class="texto-subtil" style="font-size:.8rem;">{{ '—' if d.prob_precipitacao is none else d.prob_precipitacao|int }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
