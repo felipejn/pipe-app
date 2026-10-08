@@ -101,6 +101,9 @@ def create_app(config_name='default'):
     from app.meteorologia import bp as meteorologia_bp
     app.register_blueprint(meteorologia_bp)
 
+    from app.resumo_diario import bp as resumo_diario_bp
+    app.register_blueprint(resumo_diario_bp)
+
     # Limiter inicializado após blueprints — necessário para decoradores funcionarem
     limiter.init_app(app)
 
@@ -175,6 +178,7 @@ def create_app(config_name='default'):
             from app.calendario.models import Evento  # noqa: F401
             from app.combustiveis.models import Posto, PrecoHistorico  # noqa: F401
             from app.meteorologia.models import LocalizacaoMeteorologia  # noqa: F401
+            from app.resumo_diario.models import ConfiguracaoResumoDiario  # noqa: F401
             db.create_all()
 
         # Seed idempotente da linha EstadoAtualizacaoCombustiveis(id=1).

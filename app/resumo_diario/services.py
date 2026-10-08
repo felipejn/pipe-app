@@ -3,6 +3,8 @@
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from sqlalchemy.exc import IntegrityError
+
 from app import db
 from app.auth.models import User
 from app.calendario.models import Evento
@@ -14,6 +16,7 @@ from app.combustiveis.models import (
 )
 from app.meteorologia import services as meteorologia_services
 from app.meteorologia.models import LocalizacaoMeteorologia
+from app.resumo_diario.models import ConfiguracaoResumoDiario
 from app.tarefas.models import Tarefa
 
 
@@ -23,11 +26,48 @@ FUSO_HORARIO = ZoneInfo('Europe/Lisbon')
 BRAGA_LATITUDE = 41.545448
 BRAGA_LONGITUDE = -8.426507
 LIMITE_CARACTERES = 900
+OPCOES_POR_OMISSAO = {
+    'meteorologia': True,
+    'tarefas': True,
+    'eventos': True,
+    'combustiveis': True,
+    'fim_de_semana': True,
+}
 
 
 def obter_data_local():
     """Devolve a data actual no fuso horário de Portugal continental."""
     return datetime.now(FUSO_HORARIO).date()
+
+
+def ler_configuracao_resumo_diario(user_id):
+    """Lê as opções sem criar uma linha quando o utilizador ainda não guardou.
+
+    A ausência de configuração equivale aos valores por omissão, incluindo para
+    futuras tarefas agendadas que nunca tenham aberto a página de definições.
+    """
+    configuracao = ConfiguracaoResumoDiario.query.filter_by(user_id=user_id).first()
+    if configuracao is None:
+        return dict(OPCOES_POR_OMISSAO)
+    return {nome: bool(getattr(configuracao, nome)) for nome in OPCOES_POR_OMISSAO}
+
+
+def obter_ou_criar_configuracao(user_id):
+    """Obtém ou cria as preferências, recuperando uma criação concorrente."""
+    configuracao = ConfiguracaoResumoDiario.query.filter_by(user_id=user_id).first()
+    if configuracao is not None:
+        return configuracao
+
+    configuracao = ConfiguracaoResumoDiario(user_id=user_id)
+    try:
+        # A restrição única é a autoridade final se dois pedidos criarem ao
+        # mesmo tempo; o savepoint permite recuperar sem abortar a transacção.
+        with db.session.begin_nested():
+            db.session.add(configuracao)
+            db.session.flush()
+        return configuracao
+    except IntegrityError:
+        return ConfiguracaoResumoDiario.query.filter_by(user_id=user_id).one()
 
 
 def _meteorologia_por_data(user_id, datas):
@@ -202,7 +242,7 @@ def _texto_limitado(blocos):
     return texto
 
 
-def gerar_resumo_diario(user_id, data):
+def gerar_resumo_diario(user_id, data, opcoes=None):
     """Produz secções de resumo e texto curto para o utilizador e a data."""
     if isinstance(data, datetime):
         data = data.date()
@@ -213,6 +253,12 @@ def gerar_resumo_diario(user_id, data):
     if User.query.filter_by(id=user_id).first() is None:
         raise ValueError('Utilizador inexistente.')
 
+    if opcoes is None:
+        opcoes = ler_configuracao_resumo_diario(user_id)
+    else:
+        opcoes = {nome: bool(opcoes.get(nome, True))
+                  for nome in OPCOES_POR_OMISSAO}
+
     amanha = data + timedelta(days=1)
     secoes = {}
     datas_meteo = [data, amanha]
@@ -221,36 +267,38 @@ def gerar_resumo_diario(user_id, data):
         sabado = data + timedelta(days=1)
         domingo = data + timedelta(days=2)
         datas_meteo.extend([sabado, domingo])
-    meteorologia = _meteorologia_por_data(user_id, datas_meteo)
+    meteorologia = (_meteorologia_por_data(user_id, datas_meteo)
+                    if opcoes['meteorologia'] else {})
 
     if data.isoformat() in meteorologia:
         secoes['meteorologia'] = meteorologia[data.isoformat()]
-    eventos_hoje = _eventos_do_dia(user_id, data)
+    eventos_hoje = _eventos_do_dia(user_id, data) if opcoes['eventos'] else []
     if eventos_hoje:
         secoes['eventos_hoje'] = eventos_hoje
-    tarefas_hoje, tarefas_atrasadas = _tarefas_do_dia(user_id, data)
+    tarefas_hoje, tarefas_atrasadas = (
+        _tarefas_do_dia(user_id, data) if opcoes['tarefas'] else ([], []))
     if tarefas_hoje:
         secoes['tarefas_hoje'] = tarefas_hoje
     if tarefas_atrasadas:
         secoes['tarefas_atrasadas'] = tarefas_atrasadas
     # À sexta-feira, sábado já é apresentado dentro da secção de fim-de-semana.
-    if data.weekday() != 4:
+    if opcoes['eventos'] and data.weekday() != 4:
         eventos_amanha = _eventos_do_dia(user_id, amanha)
         if eventos_amanha:
             secoes['eventos_amanha'] = eventos_amanha
 
-    if data.weekday() == 1:
+    if opcoes['combustiveis'] and data.weekday() == 1:
         combustiveis = _combustiveis_do_utilizador(user_id)
         if combustiveis:
             secoes['combustiveis'] = combustiveis
 
-    if data.weekday() == 4:
+    if opcoes['fim_de_semana'] and data.weekday() == 4:
         dias_fim_de_semana = {}
         for nome, dia in (('sabado', sabado), ('domingo', domingo)):
             dados_dia = {}
             if dia.isoformat() in meteorologia:
                 dados_dia['meteorologia'] = meteorologia[dia.isoformat()]
-            eventos = _eventos_do_dia(user_id, dia)
+            eventos = _eventos_do_dia(user_id, dia) if opcoes['eventos'] else []
             if eventos:
                 dados_dia['eventos'] = eventos
             if dados_dia:

@@ -47,7 +47,8 @@ class NotificationService:
 
         self._inicializado = True
 
-    def send(self, user, type, subject, body, data=None):
+    def send(self, user, type, subject, body, data=None, force_channel=None,
+             telegram_parse_mode=None):
         """Envia notificação ao utilizador pelos canais activos.
 
         Args:
@@ -56,6 +57,9 @@ class NotificationService:
             subject: texto curto para assunto/título
             body:    corpo da mensagem
             data:    dict opcional com dados extra
+            force_channel: envia apenas por este canal; actualmente suporta
+                           'telegram' para acções manuais explícitas.
+            telegram_parse_mode: modo de parsing opcional só para Telegram.
 
         Returns:
             dict com resultado por canal, ex: {'telegram': True, 'email': False}
@@ -65,6 +69,25 @@ class NotificationService:
 
         prefs = getattr(user, 'notificacao_prefs', None)
         resultados = {}
+
+        if force_channel is not None:
+            if force_channel != 'telegram':
+                raise ValueError('Canal forçado desconhecido.')
+            canal_tg = self._canais.get('telegram')
+            if canal_tg and prefs and prefs.telegram_chat_id:
+                user.telegram_chat_id = prefs.telegram_chat_id
+                if telegram_parse_mode:
+                    resultados['telegram'] = canal_tg.enviar(
+                        user, subject, body, data,
+                        parse_mode=telegram_parse_mode)
+                else:
+                    resultados['telegram'] = canal_tg.enviar(
+                        user, subject, body, data)
+            else:
+                resultados['telegram'] = None
+            # Um canal forçado é exclusivo; não despacha por email.
+            resultados['email'] = None
+            return resultados
 
         # Telegram
         canal_tg = self._canais.get('telegram')

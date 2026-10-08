@@ -1,3 +1,5 @@
+import html
+
 import requests
 from app.notifications.channels.base import BaseChannel
 
@@ -14,7 +16,7 @@ class TelegramChannel(BaseChannel):
         """
         self.token = token
 
-    def enviar(self, utilizador, assunto, corpo, dados=None):
+    def enviar(self, utilizador, assunto, corpo, dados=None, parse_mode='Markdown'):
         """Envia mensagem Telegram ao utilizador.
 
         Requer que utilizador.telegram_chat_id esteja preenchido.
@@ -22,7 +24,12 @@ class TelegramChannel(BaseChannel):
         if not self.esta_configurado(utilizador):
             return False
 
-        texto = f'*{assunto}*\n\n{corpo}'
+        if parse_mode == 'HTML':
+            # Chamadas HTML são para conteúdo não confiável: escapar título e
+            # corpo impede que <, &, * ou _ estraguem o parsing do Telegram.
+            texto = f'<b>{html.escape(str(assunto))}</b>\n\n{html.escape(str(corpo))}'
+        else:
+            texto = f'*{assunto}*\n\n{corpo}'
 
         try:
             resposta = requests.post(
@@ -30,7 +37,7 @@ class TelegramChannel(BaseChannel):
                 json={
                     'chat_id': utilizador.telegram_chat_id,
                     'text': texto,
-                    'parse_mode': 'Markdown',
+                    'parse_mode': parse_mode,
                 },
                 timeout=10,
             )

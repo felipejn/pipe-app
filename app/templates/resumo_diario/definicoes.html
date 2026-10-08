@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Resumo Diário — Definições{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-conteudo" style="max-width: 640px;">
+  <div class="cabecalho-pagina">
+    <h1>☀️ Resumo Diário</h1>
+    <p class="modulo-desc">Escolhe o que queres incluir no teu resumo.</p>
+  </div>
+
+  <form method="POST" action="{{ url_for('resumo_diario.definicoes') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="cartao definicoes-secao">
+      {% for nome, rotulo in [
+        ('meteorologia', 'Meteorologia'),
+        ('tarefas', 'Tarefas de hoje e em atraso'),
+        ('eventos', 'Eventos do calendário'),
+        ('combustiveis', 'Combustíveis às terças-feiras'),
+        ('fim_de_semana', 'Previsão e eventos de fim de semana às sextas-feiras')
+      ] %}
+      <label class="opcao-check" style="display:flex;margin:.75rem 0;">
+        <input type="checkbox" name="{{ nome }}" {% if opcoes[nome] %}checked{% endif %}>
+        <span>{{ rotulo }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="definicoes-acoes" style="display:flex;gap:.75rem;flex-wrap:wrap;">
+      <button type="submit" class="btn btn-primario">Guardar</button>
+      <button type="button" id="btn-previsualizar" class="btn btn-secundario">Pré-visualizar</button>
+      <button type="button" id="btn-enviar" class="btn btn-secundario">Enviar agora</button>
+    </div>
+  </form>
+
+  <p id="estado-acao" class="texto-subtil" role="status" aria-live="polite"></p>
+  <pre id="texto-resumo" class="cartao" style="white-space:pre-wrap;display:none;"></pre>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+(function () {
+  var csrf = document.querySelector('meta[name="csrf-token"]').content;
+  var estado = document.getElementById('estado-acao');
+  var texto = document.getElementById('texto-resumo');
+
+  function pedir(url, botao) {
+    botao.disabled = true;
+    estado.textContent = 'A processar…';
+    fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+      body: '{}'
+    })
+    .then(function (resposta) {
+      return resposta.json().then(function (dados) {
+        return { ok: resposta.ok, dados: dados };
+      });
+    })
+    .then(function (resultado) {
+      estado.textContent = resultado.dados.mensagem ||
+        (resultado.ok ? 'Pré-visualização pronta.' : 'Não foi possível concluir o pedido.');
+      if (Object.prototype.hasOwnProperty.call(resultado.dados, 'texto')) {
+        texto.textContent = resultado.dados.texto;
+        texto.style.display = 'block';
+      }
+    })
+    .catch(function () { estado.textContent = 'Serviço indisponível. Tenta novamente.'; })
+    .finally(function () { botao.disabled = false; });
+  }
+
+  document.getElementById('btn-previsualizar').addEventListener('click', function () {
+    pedir('{{ url_for("resumo_diario.previsualizar") }}', this);
+  });
+  document.getElementById('btn-enviar').addEventListener('click', function () {
+    pedir('{{ url_for("resumo_diario.enviar") }}', this);
+  });
+})();
+</script>
+{% endblock %}

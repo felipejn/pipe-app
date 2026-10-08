@@ -16,4 +16,5 @@ MODULOS_DISPONIVEIS = {
     },
     'combustiveis': {'nome': 'Combustíveis', 'icone': '⛽', 'url_endpoint': 'combustiveis.dashboard', 'descricao': 'Preços de combustíveis nos concelhos que escolheres.'},
     'meteorologia': {'nome': 'Meteorologia', 'icone': '🌤️', 'url_endpoint': 'meteorologia.index', 'descricao': 'Previsão do tempo para a tua localização.'},
+    'resumo_diario': {'nome': 'Resumo Diário', 'icone': '☀️', 'url_endpoint': 'resumo_diario.definicoes', 'descricao': 'Pré-visualiza e envia um resumo curto do teu dia por Telegram.'},
 }
