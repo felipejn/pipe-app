@@ -188,10 +188,10 @@ def direcao_cardinal(graus):
 
 PARAMS_FORECAST = {
     'current': ('temperature_2m,relative_humidity_2m,apparent_temperature,'
-                'precipitation,weathercode,wind_speed_10m,'
+                'precipitation,weather_code,wind_speed_10m,'
                 'wind_direction_10m,uv_index'),
-    'hourly': 'temperature_2m,weathercode,precipitation_probability',
-    'daily': ('weathercode,temperature_2m_max,temperature_2m_min,'
+    'hourly': 'temperature_2m,weather_code,precipitation_probability',
+    'daily': ('weather_code,temperature_2m_max,temperature_2m_min,'
               'precipitation_probability_max'),
     'timezone': 'auto',
     'forecast_days': 7,
@@ -241,6 +241,11 @@ def _wmo_seguro(lista, i):
         return None
 
 
+def _campo_compat(dados, nome_documentado, nome_antigo):
+    """Lê o nome actual da API ou o nome antigo usado por respostas existentes."""
+    return dados.get(nome_documentado, dados.get(nome_antigo))
+
+
 def obter_previsao(lat, lon):
     """Previsao normalizada para (lat, lon) ou None se a API falhar."""
     coords = _coordenadas_validas(lat, lon)
@@ -267,14 +272,14 @@ def obter_previsao(lat, lon):
         horas = horaria_api.get('time') or []
         probs = horaria_api.get('precipitation_probability') or []
         temps_h = horaria_api.get('temperature_2m') or []
-        wmos_h = horaria_api.get('weathercode') or []
+        wmos_h = _campo_compat(horaria_api, 'weather_code', 'weathercode') or []
         idx = _indice_hora_atual(atual_api.get('time'), horas)
         prob_atual = None
         if idx is not None and idx < len(probs):
             prob_atual = _num(probs[idx])
         max_hoje = (diaria_api.get('temperature_2m_max') or [None])[0]
         min_hoje = (diaria_api.get('temperature_2m_min') or [None])[0]
-        codigo = atual_api.get('weathercode')
+        codigo = _campo_compat(atual_api, 'weather_code', 'weathercode')
         try:
             codigo_int = int(codigo) if codigo is not None else None
         except (TypeError, ValueError):
@@ -312,7 +317,7 @@ def obter_previsao(lat, lon):
             })
         diaria = []
         dias = diaria_api.get('time') or []
-        wmos_d = diaria_api.get('weathercode') or []
+        wmos_d = _campo_compat(diaria_api, 'weather_code', 'weathercode') or []
         maxs = diaria_api.get('temperature_2m_max') or []
         mins = diaria_api.get('temperature_2m_min') or []
         probs_d = diaria_api.get('precipitation_probability_max') or []

@@ -11,6 +11,7 @@ Werkzeug==3.0.3
 WTForms==3.1.2
 python-dotenv==1.0.1
 requests==2.32.3
+tzdata>=2025.2
 email-validator==2.2.0
 pyotp==2.9.0
 qrcode==7.4.2
