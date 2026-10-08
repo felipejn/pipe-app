@@ -1,10 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.7.5
+# PIPE — Estado Actual do Projecto — v1.8.0
 
 ## O que é o PIPE
 
 Plataforma Inteligente Pessoal e Expansível — aplicação web Flask modular.
 O nome é simultaneamente um acrónimo e o apelido do utilizador (Felipe = Pipe).
-O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. O módulo Combustíveis é o nono módulo. O módulo Meteorologia é o décimo primeiro. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
+O módulo Euromilhões é o primeiro módulo, o módulo Tarefas é o segundo, o módulo Notas é o terceiro, o módulo Passwords é o quarto. O módulo Loja de Módulos é o sistema de personalização. O módulo Calendário é o oitavo módulo. O módulo Combustíveis é o nono módulo. O módulo Meteorologia é o décimo primeiro e o Resumo Diário é o décimo segundo. A arquitectura suporta adição de novos módulos com a mesma identidade visual.
 
 ---
 
@@ -32,6 +32,8 @@ pipe-app/
 │   │   ├── meteorologia/    # Previsão do tempo (Etapa A: localização; Etapa B: previsão Open-Meteo)
 │   │   │   ├── index.html   # vista de previsão: local, temperatura, sensação, 24h + 7 dias
 │   │   │   └── localizacao.html  # pesquisa e confirmação da localização geográfica
+│   │   ├── resumo_diario/   # resumo determinístico, configuração e envio manual por Telegram
+│   │   │   └── definicoes.html  # opções, pré-visualização e envio
 │   │   ├── tarefas/
 │   │   │   ├── index.html   # vistas lista/detalhe + sidebar de tags
 │   │   │   └── partials/    # items, form, sidebar
@@ -90,7 +92,11 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # UserModulo
 │   │   ├── routes.py        # /modulos/loja
-│   │   └── config.py        # MODULOS_DISPONIVEIS (11 módulos: adicionado `meteorologia` na v1.7.0)
+│   │   └── config.py        # MODULOS_DISPONIVEIS (12 módulos: Resumo Diário adicionado na v1.8.0)
+│   ├── resumo_diario/       # Blueprint Resumo Diário, serviços e configuração por utilizador
+│   │   ├── models.py        # ConfiguracaoResumoDiario (`resumo_diario_configuracoes`)
+│   │   ├── routes.py        # definições, pré-visualização e envio manual
+│   │   └── services.py      # recolha e composição determinística do resumo
 │   ├── dashboard/           # Camada de resumos por provider (v1.7.0)
 │   │   ├── base.py          # Contrato: `Estado`, `Metrica`, `DashboardProvider` (ABC)
 │   │   ├── registry.py      # Registry explícito de providers + `carregar_providers()` em `create_app()`
@@ -144,7 +150,7 @@ pipe-app/
 │   ├── conftest_utils.py        # helpers de fixture de app
 │   ├── test_cofre.py            # 32 testes
 │   ├── test_convites_email.py   # 14 testes
-│   ├── test_pipe_tasks.py       # 13 testes (tarefa_tarefas + tarefa_calendario, mocks)
+│   ├── test_pipe_tasks.py       # 16 testes (tarefas, calendário e integração do resumo)
 │   ├── test_tarefas_listas_predefinidas.py  # 3 testes
 │   ├── test_extensao_js.py      # 1 teste
 │   ├── test_extensao_distribuicao.py  # 8 testes
@@ -158,9 +164,13 @@ pipe-app/
 │   ├── test_combustiveis_dedup.py     # 11 testes
 │   ├── test_combustiveis_seed.py      # 3 testes (seed de concelhos predefinidos)
 │   ├── test_criar_admin.py            # 7 testes (criar admin + seed + recolha inicial)
+│   ├── test_modulos_security.py       # 1 teste (isolamento da activação de módulos)
+│   ├── test_resumo_diario.py          # 8 testes (serviço, isolamento, datas e limite de texto)
+│   ├── test_resumo_diario_fase2.py     # 16 testes (configuração, rotas, Telegram e rate limits)
+│   ├── test_resumo_diario_fase3.py     # 8 testes (elegibilidade, envio automático, simulação e datas)
 │   └── smoke/                 # smoke tests (ex.: test smoke api de conversoes)
-├── migrations/             # Flask-Migrate — revisão única de baseline 3b14f5bd26a5 (22 tabelas)
-│   └── versions/           # 3b14f5bd26a5_baseline.py (create_table de tudo; sem if_not_exists)
+├── migrations/             # Flask-Migrate — baseline + revisões incrementais
+│   └── versions/           # baseline 3b14f5bd26a5; c420a200f2f2 (Meteorologia); 3058f716df40 + 8f3b90a1c2d4 (Resumo Diário)
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -195,8 +205,8 @@ pipe-app/
 ### Módulo Loja de Módulos (`app/modulos/`)
 
 - Modelo `UserModulo` (`user_modulos`) — ativação/desativação de módulos por utilizador
-- `MODULOS_DISPONIVEIS` em `app/modulos/config.py` com 11 módulos (Euromilhões, Tarefas, Notas, Passwords, Câmbio, Cores, Conversões, Assistente IA, Calendário, Combustíveis, Meteorologia)
-- Rotas: `/modulos/loja` (loja), `/modulos/api/toggle` (AJAX `POST` com `request.get_json()`)
+- `MODULOS_DISPONIVEIS` em `app/modulos/config.py` com 12 módulos (inclui Meteorologia e Resumo Diário)
+- Rotas: `/modulos/loja` (loja), `/modulos/api/toggle` (AJAX `POST` com `request.get_json()`); a identidade vem de `current_user.id`, nunca do `user_id` do browser (correcção de segurança v1.7.6, sem alteração de BD)
 
 ### Módulo Notas (`app/notas/`)
 
@@ -251,6 +261,15 @@ pipe-app/
 - **Template:** server-side puro (Jinja) em `app/templates/meteorologia/` — previsão renderizada no servidor; AJAX com `'X-CSRFToken'` só na pesquisa/gravação da localização. Design com tokens claro/escuro, cards e botões no padrão PIPE.
 - **Esquema:** migração `c420a200f2f2` (baseline `3b14f5bd26a5` → `c420a200f2f2`, criada com Flask-Migrate) — adiciona a tabela `meteorologia_localizacao`; aplicar no PythonAnywhere antes de abrir o módulo.
 - **Testes:** `tests/test_meteorologia.py` (36 testes).
+
+### Módulo Resumo Diário (`app/resumo_diario/`)
+
+- Serviço determinístico em PT-PT que reúne meteorologia Open-Meteo, eventos, tarefas em prazo/atraso e, nos dias definidos, combustíveis e previsão/eventos de fim de semana. Sem LLM. Envio automático diário apenas por Telegram para utilizadores com módulo instalado, chat_id e Telegram activo; guarda a data do último envio bem-sucedido em Europe/Lisbon.
+- A scheduled task executa combustíveis → resumo diário → avisos de tarefas → avisos de calendário. Quem recebeu o resumo nesse dia salta os dois avisos antigos; falhas mantêm a degradação graciosa.
+- Configuração por utilizador: meteorologia, tarefas, eventos, combustíveis e fim de semana; todos activos por omissão. A ausência de linha equivale aos defaults; a leitura não grava. A tabela `resumo_diario_configuracoes` tem uma constraint única em `user_id` e é criada ao guardar as definições.
+- Página `/resumo-diario/definicoes` com guardar, pré-visualização sem envio e envio manual apenas por Telegram. O envio manual aceita `chat_id` mesmo quando `telegram_activo` está desligado. Pré-visualização: 10/minuto; envio manual: 5/hora. A task permite `--so-resumo` e `--simular-resumo`.
+- **Esquema:** migration `3058f716df40_adiciona_configuracao_resumo_diario.py` (`c420a200f2f2` → `3058f716df40`) e `8f3b90a1c2d4_regista_ultimo_envio_resumo.py`; baseline e revisões anteriores inalteradas.
+- **Testes:** `tests/test_resumo_diario.py` (8) e `tests/test_resumo_diario_fase2.py` (16).
 
 ### Assistente IA (`app/assistente/`)
 
@@ -333,9 +352,9 @@ pipe-app/
 ## Testes
 
 - Execução:
-  - `pytest --collect-only -q` — recolhe todos os testes (228 colectados)
+  - `pytest --collect-only -q` — recolhe todos os testes (259 colectados)
   - `pytest -q` — executa a suite completa
-- A suite consta de 18 ficheiros de teste, totalizando **228 testes**: `test_cofre.py` (32), `test_convites_email.py` (14), `test_pipe_tasks.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_cliente.py` (13), `test_combustiveis_dedup.py` (11), `test_assistente_contexto_truncagem.py` (10), `test_assistente_contexto.py` (9), `test_assistente_meteorologia.py` (14), `test_assistente_registo.py` (8), `test_extensao_distribuicao.py` (8), `test_tarefas_listas_predefinidas.py` (3), `test_extensao_js.py` (1), `test_isolamento_bd.py` (1), `test_dashboard.py` (14) + `test_meteorologia.py` (36), `test_criar_admin.py` (7), `test_combustiveis_seed.py` (3) e helpers em `conftest.py`/`conftest_utils.py`
+- A suite contém agora **22 ficheiros e 270 testes recolhidos**, mais 26 subtests: inclui `test_resumo_diario_fase3.py` (8) e mais três casos em `test_pipe_tasks.py`. Os 48 testes de resumo e tasks passaram. A cadeia de migrations foi aplicada numa SQLite `:memory:` vazia e `flask db check` não encontrou operações pendentes. Suite integral: 83 passaram, 65 falharam, 122 erros e 26 subtests passaram; Pillow no `.venv` foi compilado para Python 3.11 e não carrega no Python 3.14 disponível.
 - **Aviso do `conftest.py`:** nenhum teste pode tocar na BD real do PIPE. O `drop_all_seguro` intercepta `flask_sqlalchemy.SQLAlchemy.drop_all` e levanta `RuntimeError` sempre que a URI da BD não for `:memory:` — obrigatoriedade de criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). O anti-padrão `db.drop_all()` com BD de ficheiro levanta erro porque o engine do SQLAlchemy fica fixado em `db.init_app()` e a reatribuição de `SQLALCHEMY_DATABASE_URI` depois de `create_app()` não tem efeito
 
 ---

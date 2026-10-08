@@ -268,3 +268,48 @@ def test_calendario_ignora_eventos_antigos(app, enviar):
     pipe_tasks.tarefa_calendario(hoje)
 
     assert enviar.call_count == 0
+
+
+def test_utilizador_com_resumo_no_dia_salta_avisos_antigos(app, enviar):
+    hoje = date.today()
+    user, lista = _criar_user('util-resumo-hoje')
+    tarefa = _criar_tarefa(lista, user, 'Entrega', hoje)
+    evento = _criar_evento(
+        user, datetime.now() + timedelta(days=1), titulo='Reunião amanhã')
+
+    pipe_tasks.tarefa_tarefas(hoje, {user.id})
+    pipe_tasks.tarefa_calendario(hoje, {user.id})
+
+    assert enviar.call_count == 0
+    db.session.refresh(tarefa)
+    db.session.refresh(evento)
+    assert tarefa.notificada_em is None
+    assert evento.notificado_em is None
+
+
+def test_falha_do_resumo_preserva_avisos_antigos(app, enviar):
+    hoje = date.today()
+    user, lista = _criar_user('util-resumo-falhou')
+    _criar_tarefa(lista, user, 'Entrega', hoje)
+    _criar_evento(user, datetime.now() + timedelta(days=1), titulo='Reunião amanhã')
+
+    # Uma falha do resumo produz o mesmo conjunto vazio que o orquestrador usa.
+    pipe_tasks.tarefa_tarefas(hoje, set())
+    pipe_tasks.tarefa_calendario(hoje, set())
+
+    assert enviar.call_count == 2
+
+
+def test_falha_de_uma_notificacao_de_tarefa_nao_bloqueia_outro_utilizador(app, enviar):
+    hoje = date.today()
+    user_a, lista_a = _criar_user('util-falha-aviso-a')
+    user_b, lista_b = _criar_user('util-falha-aviso-b')
+    _criar_tarefa(lista_a, user_a, 'Tarefa A', hoje)
+    _criar_tarefa(lista_b, user_b, 'Tarefa B', hoje)
+    enviar.side_effect = [RuntimeError('falha simulada'), {'telegram': True, 'email': None}]
+
+    pipe_tasks.tarefa_tarefas(hoje)
+
+    assert enviar.call_count == 2
+    assert {c.kwargs['user'].username for c in enviar.call_args_list} == {
+        'util-falha-aviso-a', 'util-falha-aviso-b'}

@@ -1,6 +1,7 @@
 """Recolha de dados e composição determinística do Resumo Diário."""
 
 from datetime import date, datetime, time, timedelta
+import logging
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +19,8 @@ from app.meteorologia import services as meteorologia_services
 from app.meteorologia.models import LocalizacaoMeteorologia
 from app.resumo_diario.models import ConfiguracaoResumoDiario
 from app.tarefas.models import Tarefa
+from app.modulos.models import UserModulo
+from app.notifications import notification_service
 
 
 FUSO_HORARIO = ZoneInfo('Europe/Lisbon')
@@ -38,6 +41,59 @@ OPCOES_POR_OMISSAO = {
 def obter_data_local():
     """Devolve a data actual no fuso horário de Portugal continental."""
     return datetime.now(FUSO_HORARIO).date()
+
+
+def utilizador_elegivel_para_resumo(user):
+    """Verifica as três condições necessárias para o envio automático."""
+    prefs = getattr(user, 'notificacao_prefs', None)
+    return bool(
+        user and user.activo
+        and UserModulo.query.filter_by(user_id=user.id, modulo_slug='resumo_diario', ativo=True).first()
+        and prefs and (prefs.telegram_chat_id or '').strip() and prefs.telegram_activo
+    )
+
+
+def enviar_resumos_diarios(data=None, simular=False):
+    """Envia os resumos elegíveis; devolve IDs com envio concluído hoje."""
+    from app.auth.models import User
+    data = data or obter_data_local()
+    recebidos = set()
+    for user in User.query.filter_by(activo=True).all():
+        try:
+            configuracao = ConfiguracaoResumoDiario.query.filter_by(user_id=user.id).first()
+            if configuracao and configuracao.ultimo_envio == data:
+                recebidos.add(user.id)
+                continue
+            prefs = getattr(user, 'notificacao_prefs', None)
+            if not prefs or not (prefs.telegram_chat_id or '').strip():
+                logging.warning('[Resumo Diário] %s sem chat_id de Telegram.', user.username)
+                continue
+            if not utilizador_elegivel_para_resumo(user):
+                continue
+            resumo = gerar_resumo_diario(user.id, data)
+            if simular:
+                print(f'[{user.username}]\n{resumo["texto"] or "Não há novidades para hoje."}')
+                continue
+            resultado = notification_service.send(
+                user=user, type='resumo_diario', subject='Resumo Diário',
+                body=resumo['texto'] or 'Não há novidades para hoje.',
+                force_channel='telegram', telegram_parse_mode='HTML')
+            if resultado.get('telegram'):
+                configuracao = configuracao or obter_ou_criar_configuracao(user.id)
+                configuracao.ultimo_envio = data
+                db.session.commit()
+                recebidos.add(user.id)
+            else:
+                db.session.rollback()
+                print(f'[Resumo Diário] {user.username}: envio Telegram falhou ({resultado.get("telegram")}).')
+                logging.error('[Resumo Diário] Falha de envio para %s: telegram=%r',
+                              user.username, resultado.get('telegram'))
+        except Exception as erro:
+            db.session.rollback()
+            print(f'[Resumo Diário] Erro para utilizador {getattr(user, "username", user.id)}: {erro}')
+            logging.exception('[Resumo Diário] Excepção para utilizador %s',
+                              getattr(user, 'username', user.id))
+    return recebidos
 
 
 def ler_configuracao_resumo_diario(user_id):

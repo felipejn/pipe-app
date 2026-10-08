@@ -8,20 +8,17 @@ Configuração no PA:
   Hora:    07:00
 
 Módulos activos:
-  1. Euromilhões — verifica resultados às terças e sextas
-  2. Tarefas     — avisa no dia do prazo e em atraso (diariamente até concluir)
-  3. Combustíveis — actualiza preços às terças
-  4. Calendário  — lembretes de eventos no dia anterior e no dia
+  Euromilhões — verifica resultados às terças e sextas
+  Combustíveis → Resumo Diário → Tarefas → Calendário
 """
 
 import sys
 import os
+import argparse
+import logging
 from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
 from app import create_app, db
 
@@ -112,7 +109,7 @@ def tarefa_euromilhoes(hoje):
 # Usa o campo notificada_em (Date) — se for diferente de hoje, volta a notificar.
 # ══════════════════════════════════════════════════════════════════════════════
 
-def tarefa_tarefas(hoje):
+def tarefa_tarefas(hoje, resumo_recebido=None):
     print(f'  [Tarefas] A verificar prazos...')
 
     from app.tarefas.models import Tarefa
@@ -141,6 +138,8 @@ def tarefa_tarefas(hoje):
 
     notificados = 0
     for user_id, lista in por_user.items():
+        if resumo_recebido and user_id in resumo_recebido:
+            continue
         user = User.query.get(user_id)
         if not user or not user.activo:
             continue
@@ -179,17 +178,27 @@ def tarefa_tarefas(hoje):
             + '\n\nAcede ao PIPE para concluir ou actualizar os prazos.'
         )
 
-        res = notification_service.send(
-            user=user, type='tarefa_lembrete',
-            subject=subject, body=body,
-            data={'total_hoje': n_hoje, 'total_atraso': n_atraso})
+        try:
+            res = notification_service.send(
+                user=user, type='tarefa_lembrete',
+                subject=subject, body=body,
+                data={'total_hoje': n_hoje, 'total_atraso': n_atraso})
+        except Exception:
+            db.session.rollback()
+            logging.exception('[Tarefas] Falha ao notificar %s', user.username)
+            continue
         print(f'  [Tarefas] {user.username}: hoje={n_hoje} atraso={n_atraso} '
               f'— telegram={res.get("telegram")}  email={res.get("email")}')
 
         # Marcar com a data de hoje — amanhã, se ainda faltar, volta a notificar
-        for t in lista:
-            t.notificada_em = hoje
-        db.session.commit()
+        try:
+            for t in lista:
+                t.notificada_em = hoje
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logging.exception('[Tarefas] Falha ao registar avisos de %s', user.username)
+            continue
         notificados += len(lista)
 
     print(f'  [Tarefas] {notificados} tarefa(s) notificada(s) em {len(por_user)} utilizador(es).')
@@ -227,7 +236,7 @@ def tarefa_combustiveis(hoje):
 # Eventos já iniciados à hora da task (não dia inteiro) são ignorados.
 # ══════════════════════════════════════════════════════════════════════════════
 
-def tarefa_calendario(hoje):
+def tarefa_calendario(hoje, resumo_recebido=None):
     print(f'  [Calendário] A verificar eventos...')
 
     from app.calendario.models import Evento
@@ -271,6 +280,8 @@ def tarefa_calendario(hoje):
 
     notificados = 0
     for user_id, lista in por_user.items():
+        if resumo_recebido and user_id in resumo_recebido:
+            continue
         user = User.query.get(user_id)
         if not user or not user.activo:
             continue
@@ -300,17 +311,27 @@ def tarefa_calendario(hoje):
             + '\n\nAcede ao PIPE ao Calendário para ver os detalhes.'
         )
 
-        res = notification_service.send(
-            user=user, type='evento_lembrete',
-            subject=subject, body=body,
-            data={'total_amanha': n_a, 'total_hoje': n_h})
+        try:
+            res = notification_service.send(
+                user=user, type='evento_lembrete',
+                subject=subject, body=body,
+                data={'total_amanha': n_a, 'total_hoje': n_h})
+        except Exception:
+            db.session.rollback()
+            logging.exception('[Calendário] Falha ao notificar %s', user.username)
+            continue
         print(f'  [Calendário] {user.username}: amanhã={n_a} hoje={n_h} '
               f'— telegram={res.get("telegram")}  email={res.get("email")}')
 
         # Um único campo cobre os dois avisos — amanhã passa a «hoje» e notifica
-        for e in lista:
-            e.notificado_em = hoje
-        db.session.commit()
+        try:
+            for e in lista:
+                e.notificado_em = hoje
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logging.exception('[Calendário] Falha ao registar avisos de %s', user.username)
+            continue
         notificados += len(lista)
 
     print(f'  [Calendário] {notificados} evento(s) notificado(s) em {len(por_user)} utilizador(es).')
@@ -320,25 +341,44 @@ def tarefa_calendario(hoje):
 # ADICIONAR NOVOS MÓDULOS AQUI
 # ══════════════════════════════════════════════════════════════════════════════
 
-TAREFAS = [
-    tarefa_euromilhoes,
-    tarefa_tarefas,
-    tarefa_combustiveis,
-    tarefa_calendario,
-]
+def executar_tarefas_diarias(hoje, apenas_resumo=False, simular_resumo=False):
+    """Executa módulos isoladamente e devolve quem recebeu o resumo hoje."""
+    from app.resumo_diario.services import enviar_resumos_diarios
+    if apenas_resumo or simular_resumo:
+        return enviar_resumos_diarios(hoje, simular=simular_resumo)
+
+    # O sorteio mantém-se fora da sequência de combustíveis/resumo/avisos.
+    for tarefa in (tarefa_euromilhoes, tarefa_combustiveis):
+        try:
+            tarefa(hoje)
+        except Exception:
+            logging.exception('Falha na tarefa agendada %s',
+                              getattr(tarefa, '__name__', repr(tarefa)))
+    try:
+        recebidos = enviar_resumos_diarios(hoje)
+    except Exception:
+        logging.exception('Falha na tarefa agendada Resumo Diário')
+        recebidos = set()
+    for tarefa in (tarefa_tarefas, tarefa_calendario):
+        try:
+            tarefa(hoje, recebidos)
+        except Exception:
+            logging.exception('Falha na tarefa agendada %s',
+                              getattr(tarefa, '__name__', repr(tarefa)))
+    return recebidos
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--so-resumo', action='store_true')
+    parser.add_argument('--simular-resumo', action='store_true')
+    argumentos = parser.parse_args()
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
     app = create_app()
-    hoje = date.today()
+    from app.resumo_diario.services import obter_data_local
+    hoje = obter_data_local()
     print(f'╔══ PIPE Tasks — {hoje} ══╗')
     with app.app_context():
-        for tarefa in TAREFAS:
-            print(f'┌─ {tarefa.__name__}')
-            try:
-                tarefa(hoje)
-            except Exception as e:
-                print(f'  [{tarefa.__name__}] ERRO: {e}')
-                import traceback
-                traceback.print_exc()
-            print(f'└─ concluído')
+        executar_tarefas_diarias(hoje, apenas_resumo=argumentos.so_resumo,
+                                 simular_resumo=argumentos.simular_resumo)
     print(f'╚══ Fim ══╝')

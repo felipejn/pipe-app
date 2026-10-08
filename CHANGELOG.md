@@ -6,6 +6,34 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.0] — 2026-10-08
+Resumo Diário — módulo completo, incluindo envio automático diário por Telegram e substituição dos avisos de tarefas e calendário para quem recebeu o resumo.
+
+**Adicionado**
+- **Resumo Diário completo** — geração determinística e configuração por utilizador, pré-visualização e envio manual, mais envio automático elegível por Telegram. A task diária executa combustíveis, resumo, avisos de tarefas e calendário nessa ordem; quem recebeu o resumo não recebe os dois avisos antigos nesse dia. Falhas do resumo preservam os avisos existentes. Sem LLM.
+- **Tabela e migrations** — `resumo_diario_configuracoes`, uma linha por utilizador com constraint única, criada pela revisão `3058f716df40` (`c420a200f2f2` → `3058f716df40`); `8f3b90a1c2d4` acrescenta `ultimo_envio`. A baseline e as migrations anteriores mantêm-se inalteradas.
+- Migration `8f3b90a1c2d4`: acrescenta apenas a data do último envio bem-sucedido à configuração.
+- **Testes** — `tests/test_resumo_diario.py` (8) e `tests/test_resumo_diario_fase2.py` (16). Suite total: **259 testes** (eram 243), mais 26 subtests.
+- **Fase 3** — `tests/test_resumo_diario_fase3.py` (8 testes) e três casos em `tests/test_pipe_tasks.py` cobrem elegibilidade, sucesso/falha, token/chat em falta, reexecução, simulação, isolamento e precedência da task. Total: 270 testes recolhidos. Os 48 testes de resumo e tasks passaram com Python 3.14 e shim de Pillow. A cadeia completa de migrations foi aplicada numa SQLite `:memory:` vazia; `flask db check` reportou “No new upgrade operations detected”. Suite integral: 83 passaram, 65 falharam, 122 erros e 26 subtests passaram; a falha de arranque é a extensão Pillow compilada para o Python 3.11 do `.venv`, incompatível com o Python 3.14 disponível.
+
+**Notas de deploy**
+- **Flask-Migrate:** fazer backup com `python scripts/backup_bd.py` → `flask db upgrade` (aplica `3058f716df40` e `8f3b90a1c2d4`) → confirmar com `flask db current` e `flask db check` → Reload. Não executar scripts manuais nem alterar/stampar a baseline.
+- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → procedimento de migration acima → **Reload**. A cadeia foi validada numa SQLite `:memory:` vazia; `flask db check` não detectou operações pendentes. O ambiente local não permitiu validar a suite integral após a actualização.
+
+---
+
+## [v1.7.6] — 2026-10-08
+Loja de Módulos — correcção de autorização no endpoint de activação.
+
+**Corrigido**
+- **Correcção de segurança — Loja de Módulos:** o endpoint `POST /modulos/api/toggle` deixou de confiar no `user_id` enviado pelo browser e usa `current_user.id`. Um utilizador autenticado já não pode activar ou desactivar módulos de outra conta. Incluído teste de regressão `tests/test_modulos_security.py`. **Sem alteração de BD.**
+
+**Notas de deploy**
+- **Sem alteração de BD** — no PythonAnywhere basta `git pull` e Reload da aplicação.
+- Suite total após esta correcção: **243 testes** (eram 242), mais 26 subtests.
+
+---
+
 ## [v1.7.5] — 2026-10-08
 Assistente IA — anti-alucinação de meteorologia + validação em produção.
 

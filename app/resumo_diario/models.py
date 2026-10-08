@@ -14,3 +14,4 @@ class ConfiguracaoResumoDiario(db.Model):
     eventos = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     combustiveis = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     fim_de_semana = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
+    ultimo_envio = db.Column(db.Date, nullable=True)
