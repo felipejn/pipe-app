@@ -16,9 +16,10 @@ def loja():
 def toggle():
     data = request.get_json()
     modulo_slug = data.get('modulo_slug')
-    user_id = data.get('user_id')
     ativo = data.get('ativo')
 
+    # A identidade do utilizador vem sempre da sessão autenticada, nunca do pedido.
+    user_id = current_user.id
     user_modulo = UserModulo.query.filter_by(user_id=user_id, modulo_slug=modulo_slug).first()
     if user_modulo:
         user_modulo.ativo = ativo
