@@ -6,7 +6,7 @@
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
 - **Versão actual:** v1.6.0 (Flask-Migrate — baseline `3b14f5bd26a5`; produção stamped em 2026-10-06) — detalhe em `Estado_Atual.md`
-- **Testes:** 146 (pytest — nunca tocam na BD real)
+- **Testes:** 220 (pytest — nunca tocam na BD real)
 
 ## Referência principal
 **Ler `Estado_Atual.md`** (nome com maiúsculas nesta platforma — em Linux/PA o sistema de ficheiros é case-sensitive) para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.

@@ -104,7 +104,8 @@ pipe-app/
 │   │   ├── __init__.py
 │   │   ├── models.py        # 5 tabelas (postos, preços, utilizador_concelho, utilizador_combustivel, estado_atualizacao)
 │   │   ├── routes.py        # /combustiveis/ (dashboard, concelhos, tipos de combustível, actualização)
-│   │   └── services.py      # API Aberta (api.apiaberta.pt), obsolescência de postos, dedup
+│   │   ├── services.py      # API Aberta (api.apiaberta.pt), obsolescência de postos, dedup
+│   │   └── seed.py          # semear_concelhos_predefinidos (Braga, Vila Verde, Amares) — seed no criar_admin.py
 │   ├── notifications/       # Sistema de notificações
 │   │   ├── __init__.py
 │   │   ├── models.py        # UserNotificationPreferences
@@ -126,7 +127,8 @@ pipe-app/
 │   └── historico/           # briefings e relatórios antigos
 │       └── plano-cofre-passwords.md  # plano de correcção do Cofre
 ├── scripts/
-│   ├── criar_admin.py
+│   ├── __init__.py                # package marker (permite import em testes)
+│   ├── criar_admin.py            # cria admin + seed de listas/concelhos/recolha de postos
 │   ├── promover_admin.py
 │   ├── pipe_tasks.py            # única scheduled task do PythonAnywhere
 │   ├── popular_combustiveis.py  # recolha manual de combustíveis (helper)
@@ -152,6 +154,8 @@ pipe-app/
 │   ├── test_assistente_contexto.py    # 9 testes
 │   ├── test_assistente_contexto_truncagem.py # 10 testes
 │   ├── test_combustiveis_dedup.py     # 11 testes
+│   ├── test_combustiveis_seed.py      # 3 testes (seed de concelhos predefinidos)
+│   ├── test_criar_admin.py            # 7 testes (criar admin + seed + recolha inicial)
 │   └── smoke/                 # smoke tests (ex.: test smoke api de conversoes)
 ├── migrations/             # Flask-Migrate — revisão única de baseline 3b14f5bd26a5 (22 tabelas)
 │   └── versions/           # 3b14f5bd26a5_baseline.py (create_table de tudo; sem if_not_exists)
@@ -233,6 +237,8 @@ pipe-app/
 - `services.py`: recolha via API Aberta (`api.apiaberta.pt`) com paginação por tipo de combustível; arquivamento automático de postos ausentes (`LIMIAR_CICLOS_AUSENTE = 2` ciclos); dedup conservadora por `nome+morada+concelho` (`obter_ids_duplicados`) com exclusão apenas em leitura; blocklist `NOMES_IGNORADOS`
 - Rotas: `/combustiveis/` (dashboard + `POST /combustiveis/atualizar`, rate limit 6/hora), `/combustiveis/concelhos`, `/combustiveis/tipos`
 - Scripts auxiliares: `reset_postos_combustiveis.py` (drop + `db.create_all()` + repovoamento; cria colunas `ativo`/`ciclos_ausente` que o `create_all()` não acrescenta a uma BD existente), `remover_postos_ignorados.py` (idempotente), `popular_combustiveis.py` (recolha manual) — os dois primeiros são **históricos/obsoletos** desde a v1.6.0 (o baseline cobre o schema); não executar (ver «Armadilhas conhecidas»)
+- `seed.py`: `semear_concelhos_predefinidos` — cria concelhos por defeito (Braga, Vila Verde, Amares) para o primeiro admin (idempotente, não sobrescreve concelhos existentes)
+- `scripts/criar_admin.py`: cria o admin + aplica seed de listas + concelhos + recolha inicial de postos (API Aberta, se tabela vazia e `APIABERTA_API_KEY` definida)
 ### Módulo Meteorologia (`app/meteorologia/`)
 
 - Previsão do tempo em tempo real, com **Open-Meteo** (APIs de geocoding + forecast públicas, sem chave de API).

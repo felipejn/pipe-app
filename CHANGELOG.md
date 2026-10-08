@@ -10,13 +10,15 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 Assistente IA — ferramenta de leitura `get_meteorologia` (previsão Open-Meteo da localização guardada).
 
 **Adicionado**
+- **Seed de admin** — `app/combustiveis/seed.py` com `semear_concelhos_predefinidos` (constante `CONCELHOS_PREDEFINIDAS`: Braga, Vila Verde, Amares). `scripts/criar_admin.py` agora, após criar o admin (ou detectar que existe), aplica seed de listas de tarefas + concelhos + recolha inicial de postos (API Aberta, se tabela vazia e `APIABERTA_API_KEY` definida). Recolha envolvida em try/except — nunca falha a criação do admin; salta com aviso se sem chave; não recolhe se já existem postos. Ambas as funções de seed são idempotentes (nunca duplicam nem sobrescrevem).
+- **Testes**: novos `tests/test_criar_admin.py` (7 testes) e `tests/test_combustiveis_seed.py` (3 testes). Suite total: **220 testes** (eram 210).
 - **Assistente IA** — nova ferramenta de leitura `get_meteorologia(user_id, detalhado=False)` em `app/assistente/ferramentas.py`. Consulta a previsão meteorológica (atual + 7 dias) da localização que o utilizador guardou no módulo Meteorologia (Etapa A). Via única: query à `LocalizacaoMeteorologia` do utilizador + `obter_previsao(latitude, longitude)` do serviço. Payload compacto (`local`, `atual`, `diaria`×7, `meta`) e detalhado (`horaria` reduzida — 12 itens de 2 em 2 h — sem `diaria`). Mensagens de erro em PT-PT formal, conciso, sem exclamações, com `→` para UI (ex: "Defina primeiro a localização em Meteorologia → Definir localização e volte a perguntar."). Registada em `DEFINICOES_FERRAMENTAS_LEITURA` e `REGISTO_FERRAMENTAS` (8.ª ferramenta de leitura). **Sem alteração de BD**.
 - **System prompts** actualizados em `app/assistente/contexto.py`: `SYSTEM_PROMPT_LEITURA` e `SYSTEM_PROMPT_ESCRITA` incluem meteorologia nas capacidades; regra explícita de que a ferramenta devolve **só a localização guardada** (para outra localidade, o modelo encaminha para o módulo sem reutilizar os dados).
 - **Testes**: novo `tests/test_assistente_meteorologia.py` (14 testes, `unittest.TestCase` + `create_app('testing')` + `unittest.mock.patch('app.meteorologia.services.requests.get')`). Cobrem: registo/definição, sem localização, API indisponível, payload compacto com chaves esperadas, detalhado sem `diaria` e com `horaria` reduzida, isolamento entre utilizadores, tamanho do JSON SERIALIZADO (`_serializar_resultado_tool`) ≤ 2000 chars em compacto (7 dias), detalhado e pior-caso (nome de local no teto de 120 chars). Suite total: **210 testes** (eram 196).
 
 **Notas de deploy**
 - **Sem alteração de BD** — a ferramenta lê a tabela `meteorologia_localizacao` (já criada pela migration `c420a200f2f2` do módulo Meteorologia).
-- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → **Reload** da aplicação. Validar `flask db check` (limpo) e a suite `pytest -q` (210 testes).
+- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → **Reload** da aplicação. Validar `flask db check` (limpo) e a suite `pytest -q` (220 testes).
 
 ---
 
