@@ -6,19 +6,56 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
-## [v1.7.2] — 2026-10-07
-Assistente IA — ferramenta de leitura `get_meteorologia` (previsão Open-Meteo da localização guardada).
+## [v1.7.4] — 2026-10-08
+Assistente IA — reposição de `criar_tarefa` no `REGISTO_FERRAMENTAS` + teste de invariante registo↔definições.
+
+**Corrigido**
+- **Assistente IA** — reposta a entrada `'criar_tarefa': 'criar_tarefa'` em `REGISTO_FERRAMENTAS` (`app/assistente/ferramentas.py`). Tinha sido removida por engano no commit `0072033` (v1.7.2 — `get_meteorologia` substituiu a linha em vez de se somar a ela): a ferramenta continuava anunciada ao LLM (`DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA`), mas o despachante `executar_ferramenta()` devolvia `{'erro': 'Ferramenta desconhecida: criar_tarefa'}`. O assistente reportava honestamente a falha («não foi possível criar… pede apoio técnico») em vez de fingir sucesso. **Sem alteração de BD**.
+- **Testes**: novo `tests/test_assistente_registo.py` (8 testes, `unittest.TestCase` + `create_app('testing')`). Cinco testes de invariante que cruzam as três estruturas nos dois sentidos — toda a definição anunciada ao LLM tem registo, todo o registo tem definição, todo o registo aponta para função existente e chamável, `FERRAMENTAS_ESCRITA` coincide com as definições extra, sem nomes repetidos entre leitura/escrita — mais três de regressão (`criar_tarefa` registada; executa em modo escrita e cria na BD; bloqueada em modo leitura). Qualquer futura adição/remoção inconsistente falha aqui. Suite total: **228 testes** (eram 220).
+
+**Notas de deploy**
+- **Sem alteração de BD.**
+- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → **Reload** da aplicação. Validar `flask db check` (limpo) e a suite `pytest -q` (228 testes).
+
+---
+
+## [v1.7.3] — 2026-10-08
+Seed de listas/concelhos + recolha inicial no `criar_admin.py`.
 
 **Adicionado**
 - **Seed de admin** — `app/combustiveis/seed.py` com `semear_concelhos_predefinidos` (constante `CONCELHOS_PREDEFINIDAS`: Braga, Vila Verde, Amares). `scripts/criar_admin.py` agora, após criar o admin (ou detectar que existe), aplica seed de listas de tarefas + concelhos + recolha inicial de postos (API Aberta, se tabela vazia e `APIABERTA_API_KEY` definida). Recolha envolvida em try/except — nunca falha a criação do admin; salta com aviso se sem chave; não recolhe se já existem postos. Ambas as funções de seed são idempotentes (nunca duplicam nem sobrescrevem).
 - **Testes**: novos `tests/test_criar_admin.py` (7 testes) e `tests/test_combustiveis_seed.py` (3 testes). Suite total: **220 testes** (eram 210).
+
+**Notas de deploy**
+- **Sem alteração de BD.**
+- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → **Reload** da aplicação. Validar `flask db check` (limpo) e a suite `pytest -q` (220 testes).
+
+---
+
+## [v1.7.2] — 2026-10-07
+Assistente IA — ferramenta de leitura `get_meteorologia` (previsão Open-Meteo da localização guardada).
+
+**Adicionado**
 - **Assistente IA** — nova ferramenta de leitura `get_meteorologia(user_id, detalhado=False)` em `app/assistente/ferramentas.py`. Consulta a previsão meteorológica (atual + 7 dias) da localização que o utilizador guardou no módulo Meteorologia (Etapa A). Via única: query à `LocalizacaoMeteorologia` do utilizador + `obter_previsao(latitude, longitude)` do serviço. Payload compacto (`local`, `atual`, `diaria`×7, `meta`) e detalhado (`horaria` reduzida — 12 itens de 2 em 2 h — sem `diaria`). Mensagens de erro em PT-PT formal, conciso, sem exclamações, com `→` para UI (ex: "Defina primeiro a localização em Meteorologia → Definir localização e volte a perguntar."). Registada em `DEFINICOES_FERRAMENTAS_LEITURA` e `REGISTO_FERRAMENTAS` (8.ª ferramenta de leitura). **Sem alteração de BD**.
 - **System prompts** actualizados em `app/assistente/contexto.py`: `SYSTEM_PROMPT_LEITURA` e `SYSTEM_PROMPT_ESCRITA` incluem meteorologia nas capacidades; regra explícita de que a ferramenta devolve **só a localização guardada** (para outra localidade, o modelo encaminha para o módulo sem reutilizar os dados).
 - **Testes**: novo `tests/test_assistente_meteorologia.py` (14 testes, `unittest.TestCase` + `create_app('testing')` + `unittest.mock.patch('app.meteorologia.services.requests.get')`). Cobrem: registo/definição, sem localização, API indisponível, payload compacto com chaves esperadas, detalhado sem `diaria` e com `horaria` reduzida, isolamento entre utilizadores, tamanho do JSON SERIALIZADO (`_serializar_resultado_tool`) ≤ 2000 chars em compacto (7 dias), detalhado e pior-caso (nome de local no teto de 120 chars). Suite total: **210 testes** (eram 196).
 
 **Notas de deploy**
 - **Sem alteração de BD** — a ferramenta lê a tabela `meteorologia_localizacao` (já criada pela migration `c420a200f2f2` do módulo Meteorologia).
-- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → **Reload** da aplicação. Validar `flask db check` (limpo) e a suite `pytest -q` (220 testes).
+- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → **Reload** da aplicação. Validar `flask db check` (limpo) e a suite `pytest -q` (210 testes).
+
+---
+
+## [v1.7.1] — 2026-10-07
+Dashboard — badge de estado removido dos cards.
+
+**Alterado**
+
+- **Dashboard** — o badge de estado (`ok` / `nao_configurado` / `indisponivel`) deixou de ser exibido nos cards de resumo (`app/templates/dashboard.html`). Quando o módulo tem dados, apenas as contagens aparecem (ex: "3 Pendentes", "12 Total"); quando não tem dados, o card fica só com ícone + nome. A mudança foi feita por considerar o estado **redundante**: a própria presença das contagens confirma que o módulo está activo e a fornecer informação. A lógica dos providers (`app/tarefas/dashboard.py`, `app/calendario/dashboard.py`) e o contrato (`app/dashboard/base.py`) mantêm-se intactos — o `estado` continua a ser calculado internamente (SQL por utilizador, `try/except` que transforma falhas em `indisponivel`), e os 14 testes `tests/test_dashboard.py` continuam a passar. CSS removida: `.card-status`, `.status--ok/--nao_configurado/--indisponivel`, `.card-sin-dados` em `pipe.css`.
+
+**Notas de deploy**
+
+- Sem alteração de BD nem de JS — no PythonAnywhere: push + Reload.
 
 ---
 
@@ -39,19 +76,6 @@ Dashboard — resumos por provider + módulo Meteorologia (previsão do tempo).
 - **Alteração de BD — obrigatório no PythonAnywhere:** `flask db upgrade` (aplica a nova migration `c420a200f2f2_adiciona_meteorologia_localizacao.py` — cria `meteorologia_localizacao`) → confirm `flask db current`/`flask db check` → **Reload**. Confirmar hosts Open-Meteo (`open-meteo.com`) com `curl` no terminal do PA antes do deploy (whitelist de endpoints públicos).
 - A baseline `3b14f5bd26a5` é imutável; esta é a primeira nova revision a partir dela.
 - Validação: todos os 182 testes a passar; renderização de `GET /` com resumos de Tarefas/Calendário; `GET /meteorologia/` com e sem localização; smoke real da previsão Open-Meteo.
-
----
-
-## [v1.7.1] — 2026-10-07
-Dashboard — badge de estado removido dos cards.
-
-**Alterado**
-
-- **Dashboard** — o badge de estado (`ok` / `nao_configurado` / `indisponivel`) deixou de ser exibido nos cards de resumo (`app/templates/dashboard.html`). Quando o módulo tem dados, apenas as contagens aparecem (ex: "3 Pendentes", "12 Total"); quando não tem dados, o card fica só com ícone + nome. A mudança foi feita por considerar o estado **redundante**: a própria presença das contagens confirma que o módulo está activo e a fornecer informação. A lógica dos providers (`app/tarefas/dashboard.py`, `app/calendario/dashboard.py`) e o contrato (`app/dashboard/base.py`) mantêm-se intactos — o `estado` continua a ser calculado internamente (SQL por utilizador, `try/except` que transforma falhas em `indisponivel`), e os 14 testes `tests/test_dashboard.py` continuam a passar. CSS removida: `.card-status`, `.status--ok/--nao_configurado/--indisponivel`, `.card-sin-dados` em `pipe.css`.
-
-**Notas de deploy**
-
-- Sem alteração de BD nem de JS — no PythonAnywhere: push + Reload.
 
 ---
 

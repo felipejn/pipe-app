@@ -500,6 +500,7 @@ REGISTO_FERRAMENTAS = {
     'get_cambio': 'get_cambio',
     'get_combustiveis': 'get_combustiveis',
     'get_meteorologia': 'get_meteorologia',
+    'criar_tarefa': 'criar_tarefa',
     'alternar_tarefa': 'alternar_tarefa',
     'apagar_tarefa': 'apagar_tarefa',
     'criar_nota': 'criar_nota',
