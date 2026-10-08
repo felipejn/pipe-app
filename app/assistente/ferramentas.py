@@ -298,7 +298,7 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
         'type': 'function',
         'function': {
             'name': 'get_meteorologia',
-            'description': 'Devolve a previsão do tempo (atual + 7 dias) da localização guardada pelo utilizador em Meteorologia. Usar detalhado=True apenas quando o utilizador pedir a previsão horária.',
+            'description': 'OBRIGATÓRIO chamar antes de responder a perguntas sobre tempo, temperatura, chuva, vento ou previsão; nunca estimar valores. Devolve a previsão (atual + 7 dias) da localização em Meteorologia. Usar detalhado=True só para previsão horária.',
             'parameters': {
                 'type': 'object',
                 'properties': {

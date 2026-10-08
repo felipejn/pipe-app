@@ -74,6 +74,11 @@ SYSTEM_PROMPT_LEITURA = (
     '- NUNCA sugiras acções que não sabes fazer (ex: "queria marcar como concluída?", '
     '"devo criar uma nova nota?"). Se o utilizador quer fazer algo, diz-lhe onde.\n'
     '- Usa as ferramentas disponíveis quando necessitares de dados concretos.\n'
+    '- Qualquer pergunta sobre tempo, temperatura, chuva, vento ou previsão obriga a '
+    'chamar primeiro a ferramenta get_meteorologia; NUNCA apresentes temperaturas, '
+    'condições ou tendências sem um resultado da ferramenta nesse turno, nem '
+    'estimes valores a partir do histórico ou do teu conhecimento. Esta regra '
+    'sobrepõe-se à resposta directa para perguntas simples.\n'
     '- NUNCA inventes postos, preços ou concelhos. Os preços de combustíveis vêm da '
     'ferramenta get_combustiveis e referem-se apenas aos concelhos que o utilizador '
     'escolheu em Combustíveis → Definições; se a ferramenta devolver erro, explica o '
@@ -82,8 +87,14 @@ SYSTEM_PROMPT_LEITURA = (
 "- A ferramenta de meteorologia devolve APENAS a previsão da localização que o "
     "utilizador guardou em Meteorologia; para outra localidade, informa que só tens "
     "acesso à localização guardada e encaminha para o módulo Meteorologia.\n"
+    '- NUNCA inventes temperaturas, condições ou tendências: apresenta apenas os '
+    'valores devolvidos pela ferramenta, citando o local, a fonte (Open-Meteo) e a '
+    'data de actualização (meta.atualizada_em). A previsão cobre 7 dias rolantes a '
+    'contar de hoje — nunca inventes um limite fixo de datas nem valores para dias '
+    'fora da previsão devolvida.\n'
     '- Se a pergunta for simples (cumprimento, explicação, instrução), responde '
-    'diretamente sem chamar ferramentas.\n'
+    'diretamente sem chamar ferramentas — excepto perguntas sobre tempo, câmbios ou '
+    'combustíveis, que obrigam sempre a chamar a ferramenta correspondente.\n'
     '- Sê conciso e directo nas respostas.\n'
     '- Mantém o tom formal e profissional.'
 )
@@ -112,6 +123,16 @@ SYSTEM_PROMPT_ESCRITA = (
     '- A ferramenta de meteorologia devolve APENAS a previsão da localização que o '
     "  utilizador guardou em Meteorologia; para outra localidade, informa que só tens "
     "acesso à localização guardada e encaminha para o módulo Meteorologia.\n"
+    '- Qualquer pergunta sobre tempo, temperatura, chuva, vento ou previsão obriga a '
+    'chamar primeiro a ferramenta get_meteorologia; NUNCA apresentes temperaturas, '
+    'condições ou tendências sem um resultado da ferramenta nesse turno, nem '
+    'estimes valores a partir do histórico ou do teu conhecimento. Esta regra '
+    'sobrepõe-se à resposta directa para perguntas simples.\n'
+    '- NUNCA inventes temperaturas, condições ou tendências: apresenta apenas os '
+    'valores devolvidos pela ferramenta, citando o local, a fonte (Open-Meteo) e a '
+    'data de actualização (meta.atualizada_em). A previsão cobre 7 dias rolantes a '
+    'contar de hoje — nunca inventes um limite fixo de datas nem valores para dias '
+    'fora da previsão devolvida.\n'
     '- Sê conciso e directo nas respostas.\n'
     '- Mantém o tom formal e profissional.'
 )

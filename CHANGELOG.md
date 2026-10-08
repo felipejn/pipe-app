@@ -6,6 +6,19 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.7.5] — 2026-10-08
+Assistente IA — anti-alucinação de meteorologia + validação em produção.
+
+**Corrigido**
+- **Assistente IA — anti-alucinação de meteorologia:** em 08/10/2026 o modelo respondeu com tabelas de temperaturas inventadas sem chamar `get_meteorologia` e inventou um falso limite ("previsão apenas até 14/10"), corrigindo só após o utilizador confrontar. Endurecidos `SYSTEM_PROMPT_LEITURA` e `SYSTEM_PROMPT_ESCRITA` (`app/assistente/contexto.py`): qualquer pergunta sobre tempo obriga a chamar primeiro a ferramenta, proibido apresentar valores sem resultado da ferramenta no turno, obrigatório citar local + fonte (Open-Meteo) + `meta.atualizada_em`, horizonte de 7 dias rolantes sem limite fixo inventado; a excepção de "pergunta simples" já não dispensa a ferramenta do tempo. Descrição de `get_meteorologia` (`app/assistente/ferramentas.py`) agora imperativa (OBRIGATÓRIO chamar antes de responder; nunca estimar). **Sem alteração de BD**.
+- **Testes**: novo `tests/test_assistente_prompt_meteorologia.py` (6 testes + 8 subtests, asserções puras sobre strings sem BD/HTTP). Suite total: **234 testes** (eram 228).
+
+**Notas de deploy**
+- **Sem alteração de BD.**
+- **PythonAnywhere:** `git pull` → `pip install -r requirements.txt` → **Reload** da aplicação. Validar `flask db check` (limpo) e a suite `pytest -q` (234 testes).
+
+---
+
 ## [v1.7.4] — 2026-10-08
 Assistente IA — reposição de `criar_tarefa` no `REGISTO_FERRAMENTAS` + teste de invariante registo↔definições.
 

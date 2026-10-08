@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.7.4
+# PIPE — Estado Actual do Projecto — v1.7.5
 
 ## O que é o PIPE
 
@@ -262,7 +262,7 @@ pipe-app/
   - `POST /assistente/api/chat` — AJAX `{mensagem: "..."}` → `{resposta: "..."}` (rate limit 30/min)
   - `POST /assistente/api/modo` — alterna modo leitura/escrita (rate limit 10/min)
   - `POST /assistente/api/limpar` — limpa histórico da sessão (rate limit 10/min)
-- **System prompt:** PT-PT; capacidades limitadas à leitura em modo leitura (não sugere acções que não pode executar — encaminha para o módulo respectivo); nunca inventar dados; tom formal e conciso
+- **System prompt:** PT-PT; capacidades limitadas à leitura em modo leitura (não sugere acções que não pode executar — encaminha para o módulo respectivo); nunca inventar dados; tom formal e conciso. **Anti-alucinação de meteorologia (08/10/2026):** qualquer pergunta sobre tempo obriga a chamar primeiro `get_meteorologia`, proibido apresentar valores sem resultado da ferramenta no turno, obrigatório citar local + fonte (Open-Meteo) + `meta.atualizada_em`, horizonte de 7 dias rolantes; garantido por `tests/test_assistente_prompt_meteorologia.py`
 - Testes: `test_assistente_cliente.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_contexto.py` (9), `test_assistente_contexto_truncagem.py` (10), `test_assistente_meteorologia.py` (14), `test_assistente_registo.py` (8 — invariante registo↔definições + regressão `criar_tarefa`)
 
 ### Sistema de notificações (`app/notifications/`)
