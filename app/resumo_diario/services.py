@@ -266,12 +266,29 @@ def _renderizar_eventos(titulo, eventos):
     return '\n'.join(linhas)
 
 
-def _renderizar_tarefas(tarefas, atrasadas):
+def _formatar_prazo(prazo_iso, referencia):
+    """'2026-10-07' (ISO) → '07/10' (PT-PT).
+
+    Acrescenta o ano apenas quando difere do ano do resumo (ex.: uma tarefa
+    de Dezembro atrasada até ao ano seguinte mostra '30/12/2025').
+    """
+    try:
+        prazo = date.fromisoformat(str(prazo_iso))
+    except (TypeError, ValueError):
+        return str(prazo_iso)
+    if prazo.year != referencia.year:
+        return prazo.strftime('%d/%m/%Y')
+    return prazo.strftime('%d/%m')
+
+
+def _renderizar_tarefas(tarefas, atrasadas, referencia):
     if not tarefas and not atrasadas:
         return None
     linhas = ['Tarefas']
     linhas.extend(f"Vencem hoje: {t['titulo']}" for t in tarefas)
-    linhas.extend(f"Em atraso ({t['prazo']}): {t['titulo']}" for t in atrasadas)
+    linhas.extend(
+        f"Em atraso ({_formatar_prazo(t['prazo'], referencia)}): {t['titulo']}"
+        for t in atrasadas)
     return '\n'.join(linhas)
 
 
@@ -402,7 +419,8 @@ def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
         blocos['eventos_hoje'] = _renderizar_eventos('Hoje', secoes['eventos_hoje'])
     if 'tarefas_hoje' in secoes or 'tarefas_atrasadas' in secoes:
         blocos['tarefas'] = _renderizar_tarefas(
-            secoes.get('tarefas_hoje', []), secoes.get('tarefas_atrasadas', []))
+            secoes.get('tarefas_hoje', []), secoes.get('tarefas_atrasadas', []),
+            data)
     if 'eventos_amanha' in secoes:
         blocos['eventos_amanha'] = _renderizar_eventos(
             'Amanhã', secoes['eventos_amanha'])

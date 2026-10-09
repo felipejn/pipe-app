@@ -8,6 +8,7 @@ determinístico antes dela:
 3. Rótulos "Vencem hoje"/"Em atraso" no bloco de tarefas.
 4. "precipitação 0%" é omitida da linha de meteorologia.
 5. Preços com vírgula decimal (1,789 €/L) e data da recolha em dd/mm/aaaa hh:mm.
+6. Prazo de tarefas em atraso em dd/mm (ano só quando diferente do do resumo).
 
 Tudo em SQLite em memória, sem rede.
 """
@@ -119,10 +120,33 @@ def test_task_completa_resumo_chega_sozinho_sem_aviso_antigo(contexto):
 def test_rotulos_vencem_hoje_e_em_atraso():
     bloco = services._renderizar_tarefas(
         [{'titulo': 'Relatório', 'prioridade': 2, 'prazo': '2026-10-09'}],
-        [{'titulo': 'Factura', 'prioridade': 1, 'prazo': '2026-10-07'}])
+        [{'titulo': 'Factura', 'prioridade': 1, 'prazo': '2026-10-07'}],
+        date(2026, 10, 9))
     assert 'Vencem hoje: Relatório' in bloco
-    assert 'Em atraso (2026-10-07): Factura' in bloco
+    assert 'Em atraso (07/10): Factura' in bloco
     assert '\nHoje:' not in bloco
+
+
+def test_prazo_em_atraso_sem_ano_quando_igual_ao_do_resumo():
+    bloco = services._renderizar_tarefas(
+        [], [{'titulo': 'Factura', 'prioridade': 1, 'prazo': '2026-01-05'}],
+        date(2026, 10, 9))
+    assert 'Em atraso (05/01): Factura' in bloco
+    assert '/2026' not in bloco
+
+
+def test_prazo_em_atraso_com_ano_quando_diferente():
+    bloco = services._renderizar_tarefas(
+        [], [{'titulo': 'Factura', 'prioridade': 1, 'prazo': '2025-12-30'}],
+        date(2026, 10, 9))
+    assert 'Em atraso (30/12/2025): Factura' in bloco
+
+
+def test_prazo_invalido_cai_no_valor_original():
+    bloco = services._renderizar_tarefas(
+        [], [{'titulo': 'Factura', 'prioridade': 1, 'prazo': None}],
+        date(2026, 10, 9))
+    assert 'Em atraso (None): Factura' in bloco
 
 
 @pytest.mark.parametrize('prob,esperado', [
