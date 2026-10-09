@@ -313,3 +313,24 @@ def test_falha_de_uma_notificacao_de_tarefa_nao_bloqueia_outro_utilizador(app, e
     assert enviar.call_count == 2
     assert {c.kwargs['user'].username for c in enviar.call_args_list} == {
         'util-falha-aviso-a', 'util-falha-aviso-b'}
+
+
+# ═══════════════ VALIDAÇÃO DE ARGUMENTOS (--data / --simular-resumo) ═══════════════
+
+def test_validar_argumentos_rejeita_data_sem_simulacao():
+    """--data sem --simular-resumo é erro: nunca num envio real."""
+    with pytest.raises(ValueError, match='--data só é permitido'):
+        pipe_tasks.validar_argumentos(simular_resumo=False, data='2026-10-13')
+
+
+def test_validar_argumentos_aceita_data_com_simulacao():
+    assert pipe_tasks.validar_argumentos(True, '2026-10-13') == date(2026, 10, 13)
+
+
+def test_validar_argumentos_rejeita_data_fora_do_formato_iso():
+    with pytest.raises(ValueError, match='AAAA-MM-DD'):
+        pipe_tasks.validar_argumentos(True, '13-10-2026')
+
+
+def test_validar_argumentos_sem_data_devolve_none():
+    assert pipe_tasks.validar_argumentos(False, None) is None

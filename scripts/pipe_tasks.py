@@ -380,6 +380,35 @@ def executar_tarefas_diarias(hoje, apenas_resumo=False, simular_resumo=False):
                               getattr(tarefa, '__name__', repr(tarefa)))
     return recebidos
 
+def validar_argumentos(simular_resumo, data):
+    """Valida a combinação dos argumentos da linha de comandos.
+
+    A regra de segurança: ``--data`` só é aceite em simulação, nunca num
+    envio real, para o resumo não sair com a data errada nem gravar
+    ``ultimo_envio`` com ela.
+
+    Args:
+        simular_resumo: valor de ``--simular-resumo``.
+        data: valor de ``--data`` (string ISO ``AAAA-MM-DD`` ou None).
+
+    Returns:
+        datetime.date quando ``--data`` foi indicado; None caso contrário.
+
+    Raises:
+        ValueError: ``--data`` sem ``--simular-resumo`` ou data inválida.
+    """
+    if data and not simular_resumo:
+        raise ValueError('--data só é permitido com --simular-resumo '
+                         '(nunca num envio real).')
+    if not data:
+        return None
+    try:
+        return date.fromisoformat(data)
+    except ValueError:
+        raise ValueError(
+            '--data tem de ser AAAA-MM-DD (ex.: 2026-10-13).') from None
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--so-resumo', action='store_true')
@@ -388,20 +417,16 @@ if __name__ == '__main__':
                         help='Força a data (AAAA-MM-DD) em vez da data local. '
                              'Só é aceite com --simular-resumo.')
     argumentos = parser.parse_args()
-    if argumentos.data and not argumentos.simular_resumo:
-        parser.error('--data só é permitido com --simular-resumo '
-                     '(nunca num envio real).')
+    try:
+        data_forcada = validar_argumentos(argumentos.simular_resumo,
+                                          argumentos.data)
+    except ValueError as erro:
+        parser.error(str(erro))
     from dotenv import load_dotenv
     load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
     app = create_app()
     from app.resumo_diario.services import obter_data_local
-    if argumentos.data:
-        try:
-            hoje = date.fromisoformat(argumentos.data)
-        except ValueError:
-            parser.error('--data tem de ser AAAA-MM-DD (ex.: 2026-10-13).')
-    else:
-        hoje = obter_data_local()
+    hoje = data_forcada or obter_data_local()
     print(f'╔══ PIPE Tasks — {hoje} ══╗')
     with app.app_context():
         executar_tarefas_diarias(hoje, apenas_resumo=argumentos.so_resumo,
