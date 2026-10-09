@@ -19,6 +19,11 @@ from flask import current_app
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# O LLM do Resumo Diário fica desligado por omissão nos testes (o .env do
+# projecto é carregado no import de config.py e continha a OPENROUTER_API_KEY):
+# nenhum teste pode ir à rede. Os testes da fase 4 ligam-no explicitamente.
+os.environ.setdefault('RESUMO_LLM_ATIVO', '0')
+
 
 @pytest.fixture(autouse=True)
 def _proteger_bd_real(monkeypatch):

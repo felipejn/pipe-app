@@ -17,6 +17,7 @@ from app.combustiveis.models import (
 )
 from app.meteorologia import services as meteorologia_services
 from app.meteorologia.models import LocalizacaoMeteorologia
+from app.resumo_diario import redacao
 from app.resumo_diario.models import ConfiguracaoResumoDiario
 from app.tarefas.models import Tarefa
 from app.modulos.models import UserModulo
@@ -72,7 +73,10 @@ def enviar_resumos_diarios(data=None, simular=False):
                 continue
             resumo = gerar_resumo_diario(user.id, data)
             if simular:
-                print(f'[{user.username}]\n{resumo["texto"] or "Não há novidades para hoje."}')
+                origem = ('LLM' if resumo.get('origem') == 'llm'
+                          else f"determinístico — {resumo.get('motivo')}")
+                print(f'[{user.username}] (origem: {origem})\n'
+                      f'{resumo["texto"] or "Não há novidades para hoje."}')
                 continue
             resultado = notification_service.send(
                 user=user, type='resumo_diario', subject='Resumo Diário',
@@ -309,8 +313,25 @@ def _texto_limitado(blocos):
     return texto
 
 
-def gerar_resumo_diario(user_id, data, opcoes=None):
-    """Produz secções de resumo e texto curto para o utilizador e a data."""
+def _titulos_das_secoes(secoes):
+    """Títulos de eventos e tarefas presentes nas secções do resumo."""
+    titulos = []
+    for chave in ('eventos_hoje', 'eventos_amanha'):
+        titulos.extend(evento['titulo'] for evento in secoes.get(chave, []))
+    for chave in ('tarefas_hoje', 'tarefas_atrasadas'):
+        titulos.extend(tarefa['titulo'] for tarefa in secoes.get(chave, []))
+    for dados_dia in secoes.get('fim_de_semana', {}).values():
+        titulos.extend(evento['titulo'] for evento in dados_dia.get('eventos', []))
+    return [titulo for titulo in titulos if titulo and str(titulo).strip()]
+
+
+def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
+    """Produz secções de resumo e texto curto para o utilizador e a data.
+
+    O texto é redigido por LLM quando disponível e validado; em qualquer
+    falha volta ao determinístico. ``modo`` controla o orçamento de tempo
+    do LLM: 'web' para a página interactiva, 'task' para a scheduled task.
+    """
     if isinstance(data, datetime):
         data = data.date()
     elif isinstance(data, str):
@@ -401,4 +422,8 @@ def gerar_resumo_diario(user_id, data, opcoes=None):
 
     # A ordem dos blocos define prioridade e também a ordem de apresentação.
     texto = _texto_limitado(blocos)
-    return {'data': data.isoformat(), 'secoes': secoes, 'texto': texto}
+    texto_final, origem, motivo = redacao.redigir(
+        texto, data, modo=modo, titulos=_titulos_das_secoes(secoes),
+        limite=LIMITE_CARACTERES)
+    return {'data': data.isoformat(), 'secoes': secoes, 'texto': texto_final,
+            'origem': origem, 'motivo': motivo}

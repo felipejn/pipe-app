@@ -6,6 +6,7 @@ from unittest import mock, TestCase
 import requests
 
 from app.assistente.cliente import (
+    PrazoExcedidoError,
     RateLimitError,
     ServicoIndisponivelError,
     _listar_modelos,
@@ -156,4 +157,73 @@ class ChamarLlmTests(TestCase):
     def test_chave_api_em_branco_levanta_value_error(self, _):
         with self.assertRaises(ValueError):
             chamar_llm([{"role": "user", "content": "cria evento"}])
+
+
+class _RelogioFalso:
+    """Relógio controlável: cada consulta avança ``incremento`` segundos."""
+
+    def __init__(self, incremento=0.0):
+        self.tempo = 1000.0
+        self.incremento = incremento
+
+    def __call__(self):
+        self.tempo += self.incremento
+        return self.tempo
+
+
+class PrazoTotalTests(TestCase):
+    """Testes do parâmetro opcional ``prazo_total`` de ``chamar_llm``."""
+
+    @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
+    def test_sem_prazo_mantem_timeout_de_60_segundos(self, post):
+        post.return_value = _resposta_valida()
+
+        chamar_llm([{"role": "user", "content": "cria evento"}])
+
+        self.assertEqual(post.call_args.kwargs["timeout"], 60)
+
+    @mock.patch("app.assistente.cliente.time.monotonic", _RelogioFalso())
+    @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
+    def test_prazo_limita_timeout_do_pedido_ao_tempo_restante(self, post):
+        post.return_value = _resposta_valida()
+
+        chamar_llm([{"role": "user", "content": "cria evento"}], prazo_total=7)
+
+        self.assertEqual(post.call_args.kwargs["timeout"], 7)
+
+    @mock.patch("app.assistente.cliente.time.monotonic", _RelogioFalso(incremento=5))
+    @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
+    def test_prazo_excedido_entre_modelos_para_antes_do_segundo(self, post):
+        # A resposta de erro consome tempo; o 2.º modelo já não é chamado.
+        post.side_effect = [_resposta_erro_servico()]
+
+        with self.assertRaises(PrazoExcedidoError):
+            chamar_llm([{"role": "user", "content": "cria evento"}], prazo_total=8)
+
+        self.assertEqual(post.call_count, 1)
+
+    @mock.patch("app.assistente.cliente.time.monotonic", _RelogioFalso(incremento=1))
+    @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
+    def test_prazo_excedido_antes_do_primeiro_pedido(self, post):
+        with self.assertRaises(PrazoExcedidoError):
+            chamar_llm([{"role": "user", "content": "cria evento"}], prazo_total=0.5)
+
+        post.assert_not_called()
+
+    @mock.patch("app.assistente.cliente.time.sleep")
+    @mock.patch("app.assistente.cliente.time.monotonic", _RelogioFalso(incremento=2))
+    @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
+    def test_prazo_corta_backoff_de_rede(self, post, sleep):
+        post.side_effect = requests.exceptions.RequestException("rede")
+
+        with self.assertRaises(PrazoExcedidoError):
+            chamar_llm([{"role": "user", "content": "cria evento"}], prazo_total=5)
+
+        # O backoff de 2s não cabe no ~1s restante: falha sem dormir.
+        sleep.assert_not_called()
 

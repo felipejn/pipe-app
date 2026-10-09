@@ -26,6 +26,10 @@ class ServicoIndisponivelError(Exception):
     """Erro quando nenhum modelo conseguiu processar o pedido."""
 
 
+class PrazoExcedidoError(Exception):
+    """Erro quando o prazo total indicado expira antes de haver resposta."""
+
+
 def _listar_modelos():
     """Devolve lista de modelos gratuitos disponiveis, ordenados por preferencia."""
     padrao = os.environ.get('OPENROUTER_MODEL') or 'inclusionai/ling-3.0-flash-sante:free'
@@ -125,7 +129,7 @@ def _registar_falha(modelo, motivo):
     print(f'[Assistente] Modelo {modelo} indisponivel: {motivo}')
 
 
-def chamar_llm(mensagens, ferramentas=None):
+def chamar_llm(mensagens, ferramentas=None, prazo_total=None):
     """Chama a API OpenRouter com retry e fallback automatico.
 
     Para cada modelo disponivel, sao feitas até ``_MAX_TENTATIVAS`` em caso de
@@ -135,6 +139,11 @@ def chamar_llm(mensagens, ferramentas=None):
     Args:
         mensagens: lista de dicts no formato OpenAI (role, content).
         ferramentas: lista de tool definitions (opcional).
+        prazo_total: prazo total em segundos (opcional). Quando definido, o
+            tempo total da chamada — tentativas e modelos — respeita este
+            valor: as esperas de backoff sao cortadas e o timeout de cada
+            pedido e limitado ao tempo restante. None (omissao) mantem o
+            comportamento historical do Assistente, sem prazo.
 
     Returns:
         dict com a resposta da API.
@@ -143,10 +152,18 @@ def chamar_llm(mensagens, ferramentas=None):
         ValueError: chave de API nao configurada.
         RateLimitError: todos os modelos devolveram rate limit.
         ServicoIndisponivelError: todos os modelos falharam por indisponibilidade.
+        PrazoExcedidoError: ``prazo_total`` expirou antes de haver resposta.
     """
     api_key = os.environ.get('OPENROUTER_API_KEY')
     if not api_key or not api_key.strip():
         raise ValueError('OPENROUTER_API_KEY nao configurada.')
+
+    prazo_fim = time.monotonic() + prazo_total if prazo_total else None
+
+    def tempo_restante():
+        if prazo_fim is None:
+            return None
+        return prazo_fim - time.monotonic()
 
     payload_base = {
         'messages': mensagens,
@@ -162,6 +179,12 @@ def chamar_llm(mensagens, ferramentas=None):
         payload = dict(payload_base, model=modelo)
 
         for i, espera in enumerate(_ESPERA_RETRY):
+            restante = tempo_restante()
+            if restante is not None and restante <= 0:
+                raise PrazoExcedidoError(
+                    f'Prazo total de {prazo_total:.0f}s excedido antes de '
+                    'haver resposta.')
+            timeout_pedido = 60 if restante is None else min(60, restante)
             try:
                 resposta = requests.post(
                     OPENROUTER_URL,
@@ -170,10 +193,15 @@ def chamar_llm(mensagens, ferramentas=None):
                         'Content-Type': 'application/json',
                     },
                     json=payload,
-                    timeout=60,
+                    timeout=timeout_pedido,
                 )
             except requests.RequestException as erro:
                 if i < len(_ESPERA_RETRY) - 1:
+                    restante = tempo_restante()
+                    if restante is not None and espera >= restante:
+                        raise PrazoExcedidoError(
+                            f'Prazo total de {prazo_total:.0f}s excedido '
+                            'durante o backoff de rede.') from erro
                     time.sleep(espera)
                     continue
 

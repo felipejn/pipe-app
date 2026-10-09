@@ -38,8 +38,9 @@ def definicoes():
 @login_required
 @limiter.limit('10/minute')
 def previsualizar():
-    resumo = gerar_resumo_diario(current_user.id, obter_data_local())
-    return jsonify({'ok': True, 'data': resumo['data'], 'texto': resumo['texto']})
+    resumo = gerar_resumo_diario(current_user.id, obter_data_local(), modo='web')
+    return jsonify({'ok': True, 'data': resumo['data'], 'texto': resumo['texto'],
+                    'origem': resumo.get('origem'), 'motivo': resumo.get('motivo')})
 
 
 @bp.route('/api/enviar', methods=['POST'])
@@ -54,7 +55,7 @@ def enviar():
             'mensagem': 'Configura primeiro o chat_id do Telegram nas definições de notificações.',
         }), 400
 
-    resumo = gerar_resumo_diario(current_user.id, obter_data_local())
+    resumo = gerar_resumo_diario(current_user.id, obter_data_local(), modo='web')
     # O envio manual é uma acção explícita do utilizador: exige chat_id, mas
     # ignora telegram_activo. A futura entrega automática deverá respeitar essa
     # preferência e continuar a usar o comportamento normal do serviço.

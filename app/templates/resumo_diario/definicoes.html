@@ -58,8 +58,16 @@
       });
     })
     .then(function (resultado) {
-      estado.textContent = resultado.dados.mensagem ||
-        (resultado.ok ? 'Pré-visualização pronta.' : 'Não foi possível concluir o pedido.');
+      var sufixo = '';
+      if (Object.prototype.hasOwnProperty.call(resultado.dados, 'origem')) {
+        sufixo = ' · Origem: ' +
+          (resultado.dados.origem === 'llm' ? 'LLM'
+            : 'determinístico' +
+              (resultado.dados.motivo ? ' (' + resultado.dados.motivo + ')' : ''));
+      }
+      estado.textContent = (resultado.dados.mensagem ||
+        (resultado.ok ? 'Pré-visualização pronta.' : 'Não foi possível concluir o pedido.')) +
+        sufixo;
       if (Object.prototype.hasOwnProperty.call(resultado.dados, 'texto')) {
         texto.textContent = resultado.dados.texto;
         texto.style.display = 'block';
