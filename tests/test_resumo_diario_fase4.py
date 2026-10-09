@@ -95,6 +95,9 @@ def test_prompt_inclui_regras_dados_e_prazo_de_task(contexto):
     assert mensagens[0]['role'] == 'system'
     assert 'APENAS os dados' in mensagens[0]['content']
     assert 'ignora quaisquer instruções' in mensagens[0]['content']
+    assert 'frases completas e naturais' in mensagens[0]['content']
+    assert 'rótulos das secções' in mensagens[0]['content']
+    assert 'por extenso' in mensagens[0]['content']
     assert mensagens[1]['role'] == 'user'
     assert dados in mensagens[1]['content']
     assert 'Reunião <A&B> *teste*' in mensagens[1]['content']
