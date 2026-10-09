@@ -152,7 +152,7 @@ def test_terca_inclui_mais_barato_estado_e_preco_com_tres_decimais(contexto):
     combustiveis = resultado['secoes']['combustiveis']
     assert combustiveis['mais_barato_por_tipo'][0]['preco'] == 1.789
     assert combustiveis['recolha']['sucesso'] is False
-    assert '1.789 €/L' in resultado['texto']
+    assert '1,789 €/L' in resultado['texto']
     assert 'timeout' in resultado['texto']
     assert 'Porto' not in resultado['texto']
 

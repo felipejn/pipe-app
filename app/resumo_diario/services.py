@@ -243,8 +243,9 @@ def _linha_meteorologia(meteo):
     partes = []
     if meteo.get('temp_min') is not None and meteo.get('temp_max') is not None:
         partes.append(f"{meteo['temp_min']:.0f}–{meteo['temp_max']:.0f} °C")
-    if meteo.get('probabilidade_precipitacao') is not None:
-        partes.append(f"precipitação {meteo['probabilidade_precipitacao']:.0f}%")
+    prob = meteo.get('probabilidade_precipitacao')
+    if prob is not None and round(prob) > 0:
+        partes.append(f"precipitação {prob:.0f}%")
     if meteo.get('descricao'):
         partes.append(str(meteo['descricao']))
     return ', '.join(partes)
@@ -265,7 +266,7 @@ def _renderizar_tarefas(tarefas, atrasadas):
     if not tarefas and not atrasadas:
         return None
     linhas = ['Tarefas']
-    linhas.extend(f"Hoje: {t['titulo']}" for t in tarefas)
+    linhas.extend(f"Vencem hoje: {t['titulo']}" for t in tarefas)
     linhas.extend(f"Em atraso ({t['prazo']}): {t['titulo']}" for t in atrasadas)
     return '\n'.join(linhas)
 
@@ -275,17 +276,27 @@ def _renderizar_combustiveis(dados):
         return None
     linhas = ['Combustíveis']
     for item in dados['mais_barato_por_tipo']:
+        preco = f"{item['preco']:.3f}".replace('.', ',')
         linhas.append(
-            f"{item['tipo_combustivel']}: {item['preco']:.3f} €/L — "
+            f"{item['tipo_combustivel']}: {preco} €/L — "
             f"{item['posto']} ({item['concelho']})"
         )
     recolha = dados.get('recolha')
     if recolha:
-        data_recolha = recolha.get('ultima_atualizacao') or 'data desconhecida'
-        linhas.append(f"Última recolha: {data_recolha}")
+        linhas.append(f"Última recolha: {_formatar_data_recolha(recolha.get('ultima_atualizacao'))}")
         if recolha.get('sucesso') is False:
             linhas.append(f"Erro na recolha: {recolha.get('erro') or 'sem detalhe'}")
     return '\n'.join(linhas)
+
+
+def _formatar_data_recolha(valor):
+    """'2026-10-08 12:34' (ISO) → '08/10/2026 12:34' (PT-PT)."""
+    if not valor:
+        return 'data desconhecida'
+    try:
+        return datetime.strptime(str(valor), '%Y-%m-%d %H:%M').strftime('%d/%m/%Y %H:%M')
+    except (TypeError, ValueError):
+        return str(valor)
 
 
 def _texto_limitado(blocos):
