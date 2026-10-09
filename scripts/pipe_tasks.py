@@ -422,6 +422,15 @@ if __name__ == '__main__':
                                           argumentos.data)
     except ValueError as erro:
         parser.error(str(erro))
+    # A origem do texto (LLM/determinístico + modelo) é registada em INFO
+    # pelo logger do Resumo Diário; sem handler o root só emite WARNING+ e
+    # o log da task no PA não serviria para calibrar a taxa de fallback.
+    _logger_resumo = logging.getLogger('app.resumo_diario')
+    if not _logger_resumo.handlers:
+        _tratador = logging.StreamHandler()
+        _tratador.setFormatter(logging.Formatter('%(levelname)s %(message)s'))
+        _logger_resumo.addHandler(_tratador)
+    _logger_resumo.setLevel(logging.INFO)
     from dotenv import load_dotenv
     load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
     app = create_app()

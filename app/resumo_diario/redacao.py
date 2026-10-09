@@ -18,6 +18,11 @@ from app.assistente.cliente import (
     chamar_llm,
 )
 
+# Logger nomeado: o root só emite WARNING+ sem handler configurado, e a
+# origem/modelo do texto têm de aparecer no log da scheduled task (INFO)
+# para calibrar a taxa de fallback em produção.
+logger = logging.getLogger('app.resumo_diario.redacao')
+
 ORCAMENTO_WEB_POR_OMISSAO = 10.0   # segundos — página interactiva
 ORCAMENTO_TASK_POR_OMISSAO = 30.0  # segundos — scheduled task e simulação
 
@@ -123,13 +128,13 @@ def validar_resposta(conteudo, dados, data, titulos, limite):
 def _registar_origem(origem, motivo=None, modelo=None):
     """Regista em log a origem do texto; no determinístico, também o motivo."""
     if origem == 'llm':
-        logging.info('[Resumo Diário] Texto redigido por LLM (modelo=%s).',
-                     modelo or 'desconhecido')
+        logger.info('[Resumo Diário] Texto redigido por LLM (modelo=%s).',
+                    modelo or 'desconhecido')
     elif modelo:
-        logging.info('[Resumo Diário] Texto determinístico (%s; modelo=%s).',
-                     motivo, modelo)
+        logger.info('[Resumo Diário] Texto determinístico (%s; modelo=%s).',
+                    motivo, modelo)
     else:
-        logging.info('[Resumo Diário] Texto determinístico (%s).', motivo)
+        logger.info('[Resumo Diário] Texto determinístico (%s).', motivo)
 
 
 def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900):
@@ -169,7 +174,7 @@ def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900):
         _registar_origem('deterministico', 'timeout')
         return dados, 'deterministico', 'timeout'
     except Exception as erro:  # o LLM nunca pode partir o resumo
-        logging.warning('[Resumo Diário] LLM indisponível: %s', str(erro)[:200])
+        logger.warning('[Resumo Diário] LLM indisponível: %s', str(erro)[:200])
         _registar_origem('deterministico', 'falha')
         return dados, 'deterministico', 'falha'
 
