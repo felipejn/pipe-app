@@ -18,6 +18,19 @@ import argparse
 import logging
 from datetime import date, datetime, timedelta
 
+# Consola Windows (cp1252) não suporta os caracteres de caixa ═/╔/╗/╚/╝
+# nem emojis — força UTF-8 com substituição segura para não rebentar.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except Exception:
+        pass
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app import create_app, db
@@ -371,12 +384,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--so-resumo', action='store_true')
     parser.add_argument('--simular-resumo', action='store_true')
+    parser.add_argument('--data', default=None,
+                        help='Força a data (AAAA-MM-DD) em vez da data local. '
+                             'Só é aceite com --simular-resumo.')
     argumentos = parser.parse_args()
+    if argumentos.data and not argumentos.simular_resumo:
+        parser.error('--data só é permitido com --simular-resumo '
+                     '(nunca num envio real).')
     from dotenv import load_dotenv
     load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
     app = create_app()
     from app.resumo_diario.services import obter_data_local
-    hoje = obter_data_local()
+    if argumentos.data:
+        try:
+            hoje = date.fromisoformat(argumentos.data)
+        except ValueError:
+            parser.error('--data tem de ser AAAA-MM-DD (ex.: 2026-10-13).')
+    else:
+        hoje = obter_data_local()
     print(f'╔══ PIPE Tasks — {hoje} ══╗')
     with app.app_context():
         executar_tarefas_diarias(hoje, apenas_resumo=argumentos.so_resumo,
