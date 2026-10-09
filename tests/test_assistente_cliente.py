@@ -46,13 +46,13 @@ def _resposta_erro_servico():
     })
 
 
-MODELO_DEFAULT = "inclusionai/ling-3.0-flash-sante:free"  # hardcoded para consistência entre testes e cliente
+MODELO_DEFAULT = "cohere/north-mini-code:free"  # hardcoded para consistência entre testes e cliente
 _MODELOS_FALLBACK_BRUTOS = [
-    "inclusionai/ling-3.0-flash-sante:free",
-    "poolside/laguna-s-2.1:free",
-    "liquid/lfm-2.5-2.6b:free",
+    "cohere/north-mini-code:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
-    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "liquid/lfm-2.5-2.6b:free",
+    "dots-studio/dots-3-note-preview:free",
+    "poolside/laguna-s-2.1:free",
 ]
 MODELOS_FALLBACK = [m for m in _MODELOS_FALLBACK_BRUTOS if m != MODELO_DEFAULT]
 
