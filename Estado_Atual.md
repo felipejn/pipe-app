@@ -487,7 +487,8 @@ Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`;
 
 ## Próximos passos
 
-1. **Deploy do módulo Meteorologia no PythonAnywhere:** `git pull` → `flask db upgrade` (aplica a migration `c420a200f2f2_adiciona_meteorologia_localizacao.py`) → check `flask db current`/`flask db check` → **Reload**; verificar a previsão com Open-Meteo real.
+1. **Resumo Diário v1.8.3 (plano aprovado, por implementar)** — ver `docs/plano-resumo-completude-condicional-v1.8.3.md`. Contexto: pré-visualização com origem LLM mencionou tópicos ausentes pela negativa («Não há…», «não há dados meteorológicos fornecidos») porque a regra v1.8.2 «têm todos de aparecer» é incondicional; a meteorologia nem estava no input (falha transitória Open-Meteo, agora com `logging.warning`). Plano: confirmar causa no error log do PA → prompt com cobertura condicional + proibição de metalinguagem → validação anti-metalinguagem estreita (títulos isentos) → testes → commit + push (`git pull` + Reload, sem BD). Âmbito por decidir: completo ou essencial.
+2. **Deploy do módulo Meteorologia no PythonAnywhere:** `git pull` → `flask db upgrade` (aplica a migration `c420a200f2f2_adiciona_meteorologia_localizacao.py`) → check `flask db current`/`flask db check` → **Reload**; verificar a previsão com Open-Meteo real.
 2. **Testar notificações do Calendário em produção** — via `pipe_tasks.py` (tarefa `tarefa_calendario`).
 3. **Testar o dashboard com resumos em produção** — confirmar badges de estado e métricas de Tarefas/Calendário; depois expandir os providers (Combustíveis, Notas, Euromilhões, Passwords) conforme o plano `docs/plano_dash_global_v1.7.0.md`.
 4. **Extensão Chrome do Cofre** — teste de ponta a ponta em produção.
