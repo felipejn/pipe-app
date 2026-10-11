@@ -136,9 +136,12 @@ def _meteorologia_por_data(user_id, datas):
     longitude = local.longitude if local else BRAGA_LONGITUDE
     try:
         previsao = meteorologia_services.obter_previsao(latitude, longitude)
-    except Exception:
+    except Exception as erro:
+        logging.warning('[Resumo Diário] Meteorologia em falha: %s', erro)
         return {}
     if not isinstance(previsao, dict):
+        logging.warning('[Resumo Diário] Meteorologia sem dados para %s/%s.',
+                        latitude, longitude)
         return {}
 
     diaria = previsao.get('diaria') or []

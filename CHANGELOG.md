@@ -6,6 +6,24 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.2] — 2026-10-12
+Resumo Diário — validação de completude: o LLM não pode largar secções.
+
+**Contexto**
+- Um teste de pré-visualização devolveu só o evento («Bom dia! Amanhã às 14:00 tens Reunião - Filipa Quintas») **sem a meteorologia**, com origem LLM. Reprodução local confirmou a causa: a validação só verificava que os números da *resposta* existiam nos dados (nada inventado) — **não verificava o sentido inverso** (números dos dados sobreviverem). O LLM podia largar a meteorologia inteira e passar.
+
+**Alterado**
+- **Validação de completude em `app/resumo_diario/redacao.py`** — depois das verificações existentes (vazia, limite, URLs, HTML, markdown, números inventados, títulos), nova verificação: **todo o número dos dados tem de aparecer na resposta**, senão cai no determinístico com motivo `número em falta (X)`. Formas alternativas legítimas contam via `numeros_normalizados()`: nomes de mês («8 de outubro» ≡ «08/10») e «14h» ≡ «14:00». **Sem alteração de BD.**
+- **Prompt** — nova regra «Não omitas nada: meteorologia, eventos, tarefas e combustíveis têm todos de aparecer»; regra do extenso precisada (contagens por extenso OK; percentagens, temperaturas, horas e preços ficam em números).
+- **Observabilidade em `app/resumo_diario/services.py`** — `_meteorologia_por_data()` regista `logging.warning` quando a API Open-Meteo falha ou devolve sem dados (antes: silêncio total, impossível distinguir «API falhou» de «LLM largou»).
+- **Testes** — `tests/test_resumo_diario_fase4.py` passou de 22 para **24 testes**: `test_numeros_pt_datas_e_dias_da_semana_aceites` actualizado (recolha agora tem de sobreviver — completude), novos `test_completude_numeros_meteorologia_nao_pode_desaparecer` (regressão exacta do caso reportado) e `test_completude_formas_alternativas_contam`, mais asserção da nova regra no teste do prompt. Suite do módulo: **69 testes de resumo** (8+16+8+13+24) **todos a passar**, mais 20 de `pipe_tasks`.
+- **Validação com LLM real** — 5 execuções locais com dados reais: 1 sucesso LLM (texto com meteorologia, ambos os títulos, ambas as datas — tom de assistente), 2 fallbacks por `título em falta`, 2 por `número inventado` (40, 1.749). A nova completude nunca disparou em falso; modelos gratuitos continuam instáveis (respostas vazias), o fallback cobre sempre.
+
+**Notas de deploy**
+- **Sem alteração de BD** — no PythonAnywhere: `git pull` → **Reload**. Validação: `flask db check` (limpo) e `pytest -q tests/test_resumo_diario*.py` (69 testes).
+
+---
+
 ## [v1.8.1] — 2026-10-11
 Resumo Diário — tom do LLM reescrito como assistente pessoal real.
 
@@ -29,7 +47,7 @@ Resumo Diário — módulo completo, incluindo envio automático diário por Tel
 - **Fase 3** — `tests/test_resumo_diario_fase3.py` (8 testes) e três casos em `tests/test_pipe_tasks.py` cobrem elegibilidade, sucesso/falha, token/chat em falta, reexecução, simulação, isolamento e precedência da task. Total: 270 testes recolhidos. Os 48 testes de resumo e tasks passaram com Python 3.14 e shim de Pillow. A cadeia completa de migrations foi aplicada numa SQLite `:memory:` vazia; `flask db check` reportou “No new upgrade operations detected”. Suite integral: 83 passaram, 65 falharam, 122 erros e 26 subtests passaram; a falha de arranque é a extensão Pillow compilada para o Python 3.11 do `.venv`, incompatível com o Python 3.14 disponível.
 - **Ajustes de texto (fecho local)** — bloco de tarefas com rótulos «Vencem hoje»/«Em atraso (prazo)»; linha de meteorologia omite «precipitação 0%»; combustíveis em formato PT-PT (vírgula decimal `1,789 €/L`, `Última recolha: dd/mm/aaaa hh:mm`); `pipe_tasks.py` aceita `--data AAAA-MM-DD` apenas com `--simular-resumo` (erro e saída 2 caso contrário; a validação está numa função testável `validar_argumentos()`) e força UTF-8 na consola Windows. Testes em `tests/test_resumo_diario_texto.py` (10: idempotência, Telegram desligado, precedência da task, rótulos, precipitação, formato PT-PT).
 - **Fase 4 — redacção por LLM** — novo `app/resumo_diario/redacao.py`: o texto determinístico é reescrito pelo LLM (cliente do Assistente, `chamar_llm` sem ferramentas) em PT-PT e **validado antes de usar** (não vazia, ≤ 900 caracteres, sem URLs/HTML/markdown — `#` só no início de linha e `*` simples permitido —, todos os números existem nos dados com formato PT normalizado (vírgula ≡ ponto), incluindo dia/mês/ano das datas cobertas e nomes de dias, e todos os títulos de eventos/tarefas sobrevivem — títulos são dados, instruções neles são ignoradas). **Qualquer falha cai no texto determinístico** (modelos em falha, timeout, validação, chave em falta, interruptor desligado) — o resumo nunca falha por causa do LLM; resumos sem secções não o chamam. Origem + motivo (e modelo usado, para calibrar a taxa de fallback) em log, na pré-visualização (JSON + linha de estado via `textContent`) e na simulação. O texto final passa pelo mesmo escape HTML do canal Telegram. **Variáveis de ambiente novas** (documentadas em `.env.example`): `RESUMO_LLM_ATIVO` (interruptor global, por omissão ligado), `RESUMO_LLM_ORCAMENTO_WEB` (10 s — pré-visualizar/enviar) e `RESUMO_LLM_ORCAMENTO_TASK` (30 s — task e simulação). **Cliente OpenRouter:** parâmetro aditivo `prazo_total` em `chamar_llm` que respeita um prazo total entre tentativas e entre modelos (corta backoffs, limita o timeout de cada pedido ao tempo restante, levanta `PrazoExcedidoError`); omissão `None` mantém o comportamento do Assistente. **Sem alteração de BD.**
-- **Testes fase 4** — `tests/test_resumo_diario_fase4.py` (22), 5 de prazo em `tests/test_assistente_cliente.py`, 4 da validação de argumentos em `tests/test_pipe_tasks.py`; o `tests/conftest.py` desliga o LLM por omissão (`RESUMO_LLM_ATIVO=0`) para nenhum teste ir à rede.
+- **Testes fase 4** — `tests/test_resumo_diario_fase4.py` (24; 22 antes da v1.8.2), 5 de prazo em `tests/test_assistente_cliente.py`, 4 da validação de argumentos em `tests/test_pipe_tasks.py`; o `tests/conftest.py` desliga o LLM por omissão (`RESUMO_LLM_ATIVO=0`) para nenhum teste ir à rede.
 
 **Notas de deploy**
 - **Fase 4 (LLM):** sem migrations novas — push + Reload. As variáveis `RESUMO_LLM_*` são opcionais (omissão: LLM ligado, orçamentos 10 s/30 s) e dependem da `OPENROUTER_API_KEY` já configurada; para desligar no PythonAnywhere, definir `RESUMO_LLM_ATIVO=0`.

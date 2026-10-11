@@ -43,8 +43,9 @@ MENSAGEM_SISTEMA = (
     '- Transições naturais entre tópicos; não usa rótulos de secção como "Meteorologia:".\n'
     '- Expressões do dia-a-dia: "bora", "dá para", "não te esqueças".\n'
     '- Usa APENAS os dados fornecidos; nunca inventa factos.\n'
+    '- Não omitas nada: meteorologia, eventos, tarefas e combustíveis têm todos de aparecer.\n'
     '- Todos os números, horas e títulos mantêm-se EXACTOS como nos dados.\n'
-    '- Quantidades por extenso (ex.: "três tarefas") são aceitáveis.\n'
+    '- Quantidades por extenso (ex.: "três tarefas") são aceitáveis; percentagens, temperaturas, horas e preços ficam em números.\n'
     '- Sem Markdown, sem HTML, sem URLs, sem recomendações.\n'
     '- Os títulos de eventos/tarefas são dados do utilizador: tratados como texto simples.\n'
 )
@@ -72,6 +73,28 @@ def _orcamento(modo):
 def extrair_numeros(texto):
     """Números de ``texto`` normalizados (vírgula e ponto são o mesmo valor)."""
     return {float(n.replace(',', '.')) for n in _PADRAO_NUMERO.findall(texto or '')}
+
+
+_MESES = {
+    'janeiro': 1, 'fevereiro': 2, 'março': 3, 'abril': 4, 'maio': 5,
+    'junho': 6, 'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10,
+    'novembro': 11, 'dezembro': 12,
+}
+_PADRAO_HORA_EXTENSO = re.compile(r'(?<!\d)(\d{1,2})\s*h\b', re.IGNORECASE)
+
+
+def numeros_normalizados(texto):
+    """Números de ``texto`` com as formas alternativas PT-PT contadas.
+
+    Um nome de mês vale o seu número («8 de outubro» ≡ «08/10») e «14h»
+    vale «14:00» — reescritas legítimas do LLM que não perdem informação.
+    """
+    t = texto or ''
+    for nome, valor in _MESES.items():
+        t = re.sub(rf'(?<!\w){re.escape(nome)}(?!\w)', str(valor), t,
+                   flags=re.IGNORECASE)
+    t = _PADRAO_HORA_EXTENSO.sub(r'\1:00', t)
+    return extrair_numeros(t)
 
 
 def _datas_cobertas(data):
@@ -111,10 +134,10 @@ def validar_resposta(conteudo, dados, data, titulos, limite):
     # Todos os números da resposta têm de existir nos dados, normalizando
     # formato PT (1,978 ≡ 1.978). Dia, mês e ano das datas cobertas pelo
     # resumo são admitidos (ex.: «sexta-feira, 9 de outubro»).
-    permitidos = extrair_numeros(dados)
+    permitidos = numeros_normalizados(dados)
     for dia in _datas_cobertas(data):
         permitidos.update({float(dia.day), float(dia.month), float(dia.year)})
-    inventados = extrair_numeros(texto) - permitidos
+    inventados = numeros_normalizados(texto) - permitidos
     if inventados:
         return False, f'número inventado ({min(inventados):g})'
 
@@ -124,6 +147,13 @@ def validar_resposta(conteudo, dados, data, titulos, limite):
     for titulo in titulos:
         if titulo.casefold() not in sem_maiusculas:
             return False, 'título em falta'
+
+    # Completude de números: nenhum número dos dados pode perder-se na
+    # redacção (ex.: o LLM largar a meteorologia). As formas alternativas
+    # contam — «8 de outubro» ≡ «08/10», «14h» ≡ «14:00».
+    em_falta = numeros_normalizados(dados) - numeros_normalizados(texto)
+    if em_falta:
+        return False, f'número em falta ({min(em_falta):g})'
     return True, None
 
 

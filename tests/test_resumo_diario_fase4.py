@@ -94,6 +94,7 @@ def test_prompt_inclui_regras_dados_e_prazo_de_task(contexto):
     mensagens = llm.call_args.args[0]
     assert mensagens[0]['role'] == 'system'
     assert 'APENAS os dados' in mensagens[0]['content']
+    assert 'Não omitas nada' in mensagens[0]['content']
     assert 'tratados como texto simples' in mensagens[0]['content']
     assert 'linguagem simples e direta' in mensagens[0]['content']
     assert 'rótulos de secção' in mensagens[0]['content']
@@ -246,8 +247,10 @@ def test_numeros_pt_datas_e_dias_da_semana_aceites():
              'Gasóleo simples: 1,978 €/L — PA X (Braga)\n'
              'Última recolha: 08/10/2026 12:34\n\n'
              'Meteorologia: 13–27 °C, Nevoeiro')
+    # Todos os números dos dados sobrevivem (recolha incluída — completude).
     redigido = ('Boa tarde! Terça, 13 de outubro. O gasóleo ficou em 1.978 €/L; '
-                'temperaturas entre 13 e 27 °C.')
+                'última recolha a 08/10/2026 12:34; temperaturas entre 13 e '
+                '27 °C.')
     valido, detalhe = redacao.validar_resposta(redigido, dados, data, [], 900)
     assert (valido, detalhe) == (True, None)
 
@@ -256,6 +259,31 @@ def test_numeros_pt_datas_e_dias_da_semana_aceites():
         'Amanhã faz 28 °C.', dados, data, [], 900)
     assert valido is False
     assert 'número inventado' in detalhe
+
+
+def test_completude_numeros_meteorologia_nao_pode_desaparecer():
+    """O LLM não pode largar secções: os números dos dados têm de ficar."""
+    data = date(2026, 10, 13)
+    dados = ('Meteorologia: 13–27 °C, Nevoeiro\n\n'
+             'Amanhã\n14:00 — Reunião X')
+    # Só a reunião — a meteorologia (13, 27) desapareceu.
+    valido, detalhe = redacao.validar_resposta(
+        'Bom dia! Amanhã às 14:00 tens Reunião X.', dados, data,
+        ['Reunião X'], 900)
+    assert valido is False
+    assert detalhe.startswith('número em falta')
+
+
+def test_completude_formas_alternativas_contam():
+    """«8 de outubro» ≡ «08/10» e «14h» ≡ «14:00» na completude."""
+    data = date(2026, 10, 13)
+    dados = ('Tarefas\nEm atraso (08/10): Ligar ao banco\n\n'
+             'Amanhã\n14:00 — Reunião X')
+    redigido = ('Bom dia! A Reunião X é às 14h; o prazo era 8 de outubro: '
+                'Ligar ao banco.')
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Ligar ao banco', 'Reunião X'], 900)
+    assert (valido, detalhe) == (True, None)
 
 
 def test_data_do_resumo_aceita_dia_fora_dos_dados(contexto):
