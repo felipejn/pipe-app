@@ -6,6 +6,18 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.1] — 2026-10-11
+Resumo Diário — tom do LLM reescrito como assistente pessoal real.
+
+**Alterado**
+- **System prompt do Resumo Diário (fase 4)** — `MENSAGEM_SISTEMA` em `app/resumo_diario/redacao.py` reescrito para soar a assistente pessoal real, não a resumo gerado por máquina: cumprimento pelo nome do dia («Bom dia, sexta-feira!»), linguagem natural e descontraída («bora», «dá para», «não te esqueças»), transições suaves entre tópicos, sem rótulos secção («Meteorologia:», «Tarefas:»). Todas as regras de segurança (números exactos, títulos preservados, sem markdown/HTML/URLs, fallback determinístico) mantêm-se intactas. **Sem alteração de BD.**
+- **Testes** — `tests/test_resumo_diario_fase4.py::test_prompt_inclui_regras_dados_e_prazo_de_task` actualizado para verificar as novas strings do prompt (`tratados como texto simples`, `linguagem simples e direta`, `rótulos de secção`). Suite total: **67 testes de resumo** (8+16+8+13+22) a passar.
+
+**Notas de deploy**
+- **Sem alteração de BD** — no PythonAnywhere: `git pull` → **Reload** da aplicação. Validação: `flask db check` (limpo) e `pytest -q tests/test_resumo_diario*.py` (67 testes).
+
+---
+
 ## [v1.8.0] — 2026-10-08
 Resumo Diário — módulo completo, incluindo envio automático diário por Telegram e substituição dos avisos de tarefas e calendário para quem recebeu o resumo.
 
