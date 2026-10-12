@@ -6,6 +6,27 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.3] — 2026-10-12
+Resumo Diário — cobertura condicional no prompt + anti-metalinguagem + validação de títulos por palavras-chave.
+
+**Contexto**
+- Um diagnóstico com **LLM real** (`cohere/north-mini-code:free`) sobre 3 cenários revelou dois problemas que o plano v1.8.2 não cobria: (1) com input só-com-evento, o LLM enchia o texto de ausências («Meteorologia: não há dados disponíveis… Eventos: não há… Tarefas: não há…») por causa da regra incondicional «Não omitas nada» — fuga de linguagem do prompt, erro nosso; (2) respostas de **qualidade excelente** (o cenário completo, com meteorologia + evento + tarefa + combustível) eram **rejeitadas** por `título em falta`, porque a validação exigia o título literal («Comprar pão») e o LLM reescreve naturalmente («comprar pão», «uma reunião com a Filipa Quintas»). Este segundo ponto era a causa principal de o LLM «não estar a funcionar» em produção: o texto bom caía sempre no determinístico.
+
+**Alterado** (`app/resumo_diario/redacao.py`, **sem alteração de BD**)
+- **Prompt — cobertura condicional (`MENSAGEM_SISTEMA`)** — a regra incondicional «Não omitas nada: meteorologia, eventos, tarefas e combustíveis têm todos de aparecer» foi substituída por duas: «Todos os tópicos PRESENTES nos dados têm de aparecer; se um tópico não está nos dados, não o menciones» e «Nunca escrevas frases sobre o que falta («não há…», «sem…», «não foi fornecido») nem uses as palavras «dados», «secção» ou «resumo»».
+- **Validação — anti-metalinguagem (`validar_resposta`)** — nova verificação `_tem_metalinguagem()` (depois de markdown): rejeita a resposta com motivo `metalinguagem` se contiver «sem dados», «fornecid-» (fornecido/fornecida), «secção/seção» ou «tópico». **Versão estreita:** negações legítimas («não há chuva», «sem vento») não casam. **Títulos isentos:** palavras como «dados»/«secção» vindas de um título do utilizador («Limpar base de dados», «Rever secção de código») não disparam o fallback.
+- **Validação — títulos por palavras-chave** — deixou de exigir o título literal; uma tarefa/evento conta como presente se a **maioria (≥50%) das suas palavras-chave** sobreviver à redacção (stopwords PT — de, com, o, ao… — não contam; mínimo 1 palavra). Tolera a condensação/flexão que o LLM faz em nomes longos («Revisar… e enviar ao supervisor» ≡ «rever… e enviá-lo ao supervisor»; substantivos sobrevivem, verbos flexionam), mas continua a detectar uma tarefa **omitida por completo** (nenhuma palavra-chave sobrevive). Título só com stopwords exige a ocorrência literal como salvaguarda.
+- **Prompt — data do resumo no prompt (v1.8.3)** — o prompt ao LLM passou a incluir a data/dia da semana do resumo (`_contexto_data(data)`, mesmo padrão pt-PT do Assistente IA, sem `strftime('%A')`): «Hoje é segunda-feira, 12/10/2026.» Usa a `data` do resumo (respeita simulação/`--data`), não `datetime.now()`. O exemplo do cumprimento deixou de fixar «sexta-feira» (ancorava o modelo a repetir esse dia). **Sem alteração de BD.**
+- **Validação — dia da semana (`validar_resposta`)** — nova garantia: se o LLM mencionar um dia da semana que não é nenhum dos cobertos pelo resumo (hoje/amanhã/fim-de-semana via `_datas_cobertos`), cai no determinístico com motivo `dia da semana errado`. Evita que o modelo ignore a data injectada e cumprimente com o dia errado.
+- **Prompt — saudação variada (v1.8.3)** — a instrução passou a pedir aberturas variadas de dia para dia (por vezes com o dia da semana, por vezes sem: «Bom dia!», «Olá!», «Cá estamos noutra segunda!») em vez do fixo «Bom dia, [dia]» que soava robótico. A validação do dia mantém-se: um texto sem dia da semana passa; só um dia errado cai no determinístico. **Sem alteração de BD.**
+- **Testes** — `tests/test_resumo_diario_fase4.py` passou de 24 para **38 testes**: `test_prompt_inclui_data_do_resumo_e_dia_da_semana` e `test_data_do_resumo_usa_a_data_passada_nao_a_de_hoje` (a data injectada é a do resumo), `test_dia_da_semana_errado_cai_no_deterministico`, `test_dia_da_semana_correcto_passa` e `test_sem_dia_da_semana_no_texto_passa` (sem dia passa), `test_prompt_incentiva_saudacao_variada` (aberturas variadas), mais os de cobertura condicional, anti-metalinguagem e títulos por maioria de palavras-chave (`test_titulo_reescrito_em_prosa_passa`, `test_titulo_longo_condensado_passa`, `test_titulo_realmente_ausente_cai`, `test_tarefa_inteira_omitida_cai`, `test_metalinguagem_cai_no_deterministico`, `test_negacao_legitima_passa`, `test_titulo_com_palavra_da_denylist_e_isento`, `test_titulo_com_sec_ou_topico_e_isento`).
+- **Validação com LLM real** — os cenários do diagnóstico (`tests/temp_modelos/`, untracked) e os **casos reais reportados** (3 tarefas longas em atraso + meteorologia, dia da semana correcto e saudações variadas) passam com **origem LLM**: o resumo de segunda já abriu de formas distintas («Bom dia segunda-feira!», «Cá estamos noutra segunda!»), mantém tarefas/datas/PT-PT e nunca larga dia errado (cairia no determinístico). Suite integral do projecto: **330 passed** (+ 26 subtests), sem regressões.
+
+**Notas de deploy**
+- **Sem alteração de BD** — no PythonAnywhere: `git pull` → **Reload**. Validação: `flask db check` (limpo) e `pytest -q tests/test_resumo_diario*.py tests/test_pipe_tasks.py`.
+
+---
+
 ## [v1.8.2] — 2026-10-12
 Resumo Diário — validação de completude: o LLM não pode largar secções.
 

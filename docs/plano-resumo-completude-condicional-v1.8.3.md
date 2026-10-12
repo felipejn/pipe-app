@@ -1,7 +1,16 @@
 # Plano — Resumo Diário v1.8.3: cobertura condicional + anti-metalinguagem
 
-**Estado do plano:** aprovado, por implementar (guardado para continuar amanhã).
+**Estado do plano:** ✅ **IMPLEMENTADO** (commit a preparar). Ver `CHANGELOG.md` [v1.8.3].
 **Data:** 2026-10-12 | Projecto: PIPE v1.8.2 (commit `ba42d6f`, `main` limpa)
+
+> **Nota de fecho:** implementado com **âmbito completo** (passos 1+2+4+5) mais uma
+> frente adicional não prevista no plano — a **validação de títulos por
+> palavras-chave** (ver «Frente extra» abaixo). Passo 3 (retry Open-Meteo)
+> ficou opcional/fora. Diagnóstico com LLM real reproduziu ambos os bugs e
+> confirmou a correcção (os 3 cenários passam agora com origem LLM, sem
+> metalinguagem).
+
+---
 
 ## 0. Contexto: o teste que motivou este plano
 
@@ -48,3 +57,28 @@ CHANGELOG/Estado_Atual v1.8.3, `pytest -q tests/test_resumo_diario*.py`, commit 
 
 ## 3. Decisão em aberto
 Âmbito: **completo** (passos 1+2+3+4+5) ou **essencial** (1+4+5)? Decidir antes de implementar.
+
+## 4. Frente extra descoberta no diagnóstico (implementada)
+
+O diagnóstico com LLM real revelou um **segundo bug não previsto**: a
+validação de títulos exigia a frase literal (`titulo.casefold() in texto`),
+pelo que uma resposta **excelente** (cenário completo com todos os números e
+PT-PT correctos) era rejeitada por `título em falta` só porque o LLM reescreve
+«Comprar pão»/«Reunião - Filipa Quintas» em prosa natural («comprar pão»,
+«uma reunião com a Filipa Quintas»). Este era o problema mais grave em
+produção — o texto bom caía sempre no determinístico.
+
+**Correcção:** a verificação passa a exigir as **palavras-chave** do título
+(stopwords PT — de, com, o, ao… — não contam), com fallback para a ocorrência
+literal quando o título é só stopwords. Implementado em `validar_resposta()`
+com `_palavras_chave()`. Testes: `test_titulo_reescrito_em_prosa_passa`,
+`test_titulo_realmente_ausente_cai`.
+
+## 5. Resultado (validação com LLM real)
+
+`tests/temp_modelos/diagnostico_llm_resumo.py` (untracked). Os 3 cenários
+passam agora todos com **origem LLM** e sem metalinguagem:
+- **A** só-com-evento → passa (antes: metalinguagem + rejeição).
+- **B** completo → passa, todos os números e PT-PT preservados (antes: rejeitado por título em falta).
+- **C** só-meteorologia → passa, focado só no que existe (antes: metalinguagem).
+Suite integral do projecto: **322 passed** (+ 26 subtests), sem regressões.

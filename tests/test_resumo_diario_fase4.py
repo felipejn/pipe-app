@@ -94,7 +94,7 @@ def test_prompt_inclui_regras_dados_e_prazo_de_task(contexto):
     mensagens = llm.call_args.args[0]
     assert mensagens[0]['role'] == 'system'
     assert 'APENAS os dados' in mensagens[0]['content']
-    assert 'Não omitas nada' in mensagens[0]['content']
+    assert 'Todos os tópicos PRESENTES nos dados' in mensagens[0]['content']
     assert 'tratados como texto simples' in mensagens[0]['content']
     assert 'linguagem simples e direta' in mensagens[0]['content']
     assert 'rótulos de secção' in mensagens[0]['content']
@@ -105,6 +105,99 @@ def test_prompt_inclui_regras_dados_e_prazo_de_task(contexto):
     assert 'ferramentas' not in llm.call_args.kwargs  # sem tool use
     assert (llm.call_args.kwargs['prazo_total']
             == redacao.ORCAMENTO_TASK_POR_OMISSAO)
+
+
+def test_prompt_inclui_data_do_resumo_e_dia_da_semana(contexto):
+    """v1.8.3: o prompt ao LLM recebe o dia da semana/data correctos da `data`.
+
+    Sem esta referência o LLM inventa o dia («sexta-feira» num resumo de
+    segunda). A data é a do resumo (pode ser simulada), não `datetime.now()`.
+    HOJE = 09/10/2026 = sexta-feira.
+    """
+    app, user_id = contexto
+    dados = _texto_deterministico(app, user_id)
+    with app.app_context(), \
+            patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+            patch.object(redacao, 'chamar_llm',
+                         return_value=_resposta_llm(f'Bom dia! {dados}')) as llm:
+        gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
+    mensagens = llm.call_args.args[0]
+    conteudo = mensagens[1]['content']
+    assert 'sexta-feira' in conteudo
+    assert '09/10/2026' in conteudo
+
+
+def test_data_do_resumo_usa_a_data_passada_nao_a_de_hoje():
+    """A data injectada respeita a `data` do resumo (simulação/`--data`).
+
+    `redigir()` recebe `data` explícita; não deve usar `datetime.now()`, senão
+    um resumo simulado para outro dia receberia o dia errado.
+    """
+    with patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+            patch.object(redacao, 'chamar_llm',
+                         return_value={'model': 'm',
+                                       'choices': [{'message': {
+                                           'content': 'Bom dia!'}}]}) as llm:
+        # Segunda-feira, 12/10/2026.
+        redacao.redigir('Hoje: algo.', date(2026, 10, 12))
+    conteudo = llm.call_args.args[0][1]['content']
+    assert 'segunda-feira' in conteudo
+    assert '12/10/2026' in conteudo
+
+
+def test_prompt_incentiva_saudacao_variada(contexto):
+    """v1.8.3: o prompt pede aberturas variadas (não fixar «Bom dia, [dia]»)."""
+    app, user_id = contexto
+    dados = _texto_deterministico(app, user_id)
+    with app.app_context(), \
+            patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+            patch.object(redacao, 'chamar_llm',
+                         return_value=_resposta_llm(f'Bom dia! {dados}')) as llm:
+        gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
+    conteudo = llm.call_args.args[0][0]['content']
+    assert 'VARIA de dia para dia' in conteudo
+
+
+def test_sem_dia_da_semana_no_texto_passa():
+    """Uma redacção que não menciona nenhum dia da semana é aceite.
+
+    A validação só rejeita um dia ERRADO mencionado; não exigir o dia permite
+    aberturas variadas («Olá!», «Bom dia!») sem cair no determinístico.
+    """
+    data = date(2026, 10, 12)  # segunda-feira
+    dados = 'Hoje: Reunião - Filipa Quintas (14:00).'
+    redigido = 'Olá! Às 14:00 tens uma reunião com a Filipa Quintas.'
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Reunião - Filipa Quintas'], 900)
+    assert (valido, detalhe) == (True, None)
+
+
+def test_dia_da_semana_errado_cai_no_deterministico():
+    """Se o LLM disser um dia que não é o do resumo, cai no determinístico.
+
+    Garantia contra o modelo ignorar a data injectada (ex.: dizer «sexta-feira»
+    num resumo de segunda). O dia correcto e os dias cobertos pelo resumo
+    (hoje/amanhã/fim-de-semana) são admitidos.
+    """
+    data = date(2026, 10, 12)  # segunda-feira
+    dados = 'Hoje: Reunião - Filipa Quintas (14:00).'
+    # Diz «sexta-feira» — dia errado para segunda.
+    redigido = 'Bom dia, sexta-feira! Às 14:00 tens uma reunião.'
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Reunião - Filipa Quintas'], 900)
+    assert valido is False
+    assert detalhe == 'dia da semana errado'
+
+
+def test_dia_da_semana_correcto_passa():
+    """O dia correcto do resumo é admitido na redacção."""
+    data = date(2026, 10, 12)  # segunda-feira
+    dados = 'Hoje: Reunião - Filipa Quintas (14:00).'
+    redigido = ('Bom dia, segunda-feira! Às 14:00 tens uma reunião com a '
+                'Filipa Quintas.')
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Reunião - Filipa Quintas'], 900)
+    assert (valido, detalhe) == (True, None)
 
 
 def test_modo_web_usa_orcamento_curto(contexto):
@@ -220,6 +313,117 @@ def test_titulo_em_falta_na_saida_cai_no_deterministico(contexto):
         resultado = gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
     assert resultado['texto'] == dados
     assert resultado['motivo'] == 'validação (título em falta)'
+
+
+def test_titulo_reescrito_em_prosa_passa():
+    """v1.8.3: o LLM pode reescrever o título; as palavras-chave bastam.
+
+    Antes exigia-se a frase exacta («Reunião - Filipa Quintas»), pelo que uma
+    redacção natural («uma reunião com a Filipa Quintas») caía no
+    determinístico mesmo sendo boa. Agora sobreviver às palavras-chave chega.
+    """
+    data = date(2026, 10, 12)
+    dados = 'Hoje: Reunião - Filipa Quintas (14:00).'
+    redigido = 'Bom dia! Às 14:00 tens uma reunião com a Filipa Quintas.'
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Reunião - Filipa Quintas'], 900)
+    assert (valido, detalhe) == (True, None)
+
+
+def test_titulo_realmente_ausente_cai():
+    """Se nenhuma palavra-chave do título aparece, é título em falta."""
+    data = date(2026, 10, 12)
+    dados = 'Hoje: Reunião - Filipa Quintas (14:00).'
+    redigido = 'Bom dia! Hoje não tens nada marcado.'
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Reunião - Filipa Quintas'], 900)
+    assert valido is False
+    assert detalhe == 'título em falta'
+
+
+def test_titulo_longo_condensado_passa():
+    """v1.8.3: nome longo condensado pelo LLM passa (maioria das palavras-chave).
+
+    Caso real: «Revisar o relatório financeiro do trimestre e enviar ao
+    supervisor» onde o LLM reescreve verbos («rever», «enviá-lo»). Sobrevivem
+    relatório/financeiro/trimestre/supervisor — 4 de 6, acima do limiar.
+    """
+    data = date(2026, 10, 12)
+    dados = ('Tarefas\nEm atraso (09/10): Revisar o relatório financeiro '
+             'do trimestre e enviar ao supervisor')
+    redigido = ('Bom dia! Em atraso desde 09/10, rever o relatório '
+                'financeiro do trimestre e enviá-lo ao supervisor.')
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data,
+        ['Revisar o relatório financeiro do trimestre e enviar ao supervisor'],
+        900)
+    assert (valido, detalhe) == (True, None)
+
+
+def test_tarefa_inteira_omitida_cai():
+    """Uma tarefa de que não sobrevive nenhuma palavra-chave é omissão real."""
+    data = date(2026, 10, 12)
+    dados = ('Tarefas\nVencem hoje: Revisar o relatório financeiro\n'
+             'Vencem hoje: Organizar a garagem')
+    # Só fala de uma delas; a garagem desapareceu por completo.
+    redigido = ('Bom dia! Revisa o relatório financeiro hoje, não te '
+                'esqueças.')
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data,
+        ['Revisar o relatório financeiro', 'Organizar a garagem'], 900)
+    assert valido is False
+    assert detalhe == 'título em falta'
+
+
+
+def test_metalinguagem_cai_no_deterministico():
+    """v1.8.3: frases de ausência/metalinguagem rejeitam a resposta.
+
+    Versão estreita: só metalinguagem (falar dos dados/secções). Negações
+    legítimas («não há chuva») continuam a passar — ver o teste seguinte.
+    """
+    data = date(2026, 10, 12)
+    dados = 'Hoje: Reunião - Filipa Quintas (14:00).'
+    frases = [
+        'Bom dia! Meteorologia: sem dados disponíveis.',
+        'Bom dia! A meteorologia não foi fornecida.',
+        'Bom dia! Como vês na secção seguinte, nada de novo.',
+        'Bom dia! Este tópico ficou de fora.',
+    ]
+    for redigido in frases:
+        valido, detalhe = redacao.validar_resposta(
+            redigido, dados, data, ['Reunião - Filipa Quintas'], 900)
+        assert valido is False, redigido
+        assert detalhe == 'metalinguagem', redigido
+
+
+def test_negacao_legitima_passa():
+    """«não há chuva» não é metalinguagem — tem de passar."""
+    data = date(2026, 10, 12)
+    dados = 'Meteorologia: 13 a 23 °C, sem chuva.'
+    redigido = 'Bom dia! Entre 13 e 23 °C e não há chuva.'
+    valido, detalhe = redacao.validar_resposta(redigido, dados, data, [], 900)
+    assert (valido, detalhe) == (True, None)
+
+
+def test_titulo_com_palavra_da_denylist_e_isento():
+    """Um título legítimo «Limpar base de dados» não dispara metalinguagem."""
+    data = date(2026, 10, 12)
+    dados = 'Tarefas\nVencem hoje: Limpar base de dados.'
+    redigido = 'Bom dia! Hoje tens de limpar a base de dados.'
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Limpar base de dados'], 900)
+    assert (valido, detalhe) == (True, None)
+
+
+def test_titulo_com_sec_ou_topico_e_isento():
+    """Título com «secção»/«tópico» é dado do utilizador — não é metalinguagem."""
+    data = date(2026, 10, 12)
+    dados = 'Tarefas\nVencem hoje: Rever secção de código.'
+    redigido = 'Bom dia! Tens de rever a secção de código hoje.'
+    valido, detalhe = redacao.validar_resposta(
+        redigido, dados, data, ['Rever secção de código'], 900)
+    assert (valido, detalhe) == (True, None)
 
 
 def test_titulo_como_instrucao_e_dado_nao_instrucao(contexto):
