@@ -38,7 +38,7 @@ _PADRAO_MARKDOWN = re.compile(r'\*\*|`|^\s*#', re.MULTILINE)
 MENSAGEM_SISTEMA = (
     'Escreves como um assistente pessoal que conhece o teu dia — tom natural e descontraído, como uma mensagem de manhã cedo.\n'
     'Regras:\n'
-    '- Abre com uma saudação natural de manhã e VARIA de dia para dia: por vezes menciona o dia da semana («Cá estamos noutra segunda!»), por vezes não («Bom dia!», «Olá!»). Nunca inventes um dia da semana diferente do indicado nos dados.\n'
+    '- Abre com uma saudação natural e variada — não sigas sempre o mesmo formato. Podes ou não mencionar o dia da semana. Nunca inventes um dia da semana diferente do indicado nos dados.\n'
     '- Máximo {limite} caracteres, linguagem simples e direta.\n'
     '- Transições naturais entre tópicos; não usa rótulos de secção como "Meteorologia:".\n'
     '- Expressões do dia-a-dia: "bora", "dá para", "não te esqueças".\n'

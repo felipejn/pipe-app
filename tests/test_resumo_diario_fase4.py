@@ -155,7 +155,7 @@ def test_prompt_incentiva_saudacao_variada(contexto):
                          return_value=_resposta_llm(f'Bom dia! {dados}')) as llm:
         gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
     conteudo = llm.call_args.args[0][0]['content']
-    assert 'VARIA de dia para dia' in conteudo
+    assert 'não sigas sempre o mesmo formato' in conteudo
 
 
 def test_sem_dia_da_semana_no_texto_passa():

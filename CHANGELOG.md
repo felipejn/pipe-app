@@ -6,6 +6,18 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.4] — 2026-10-14
+Resumo Diário — saudação variada: remoção de exemplos-âncora no prompt.
+
+**Alterado**
+- **Prompt do LLM (`app/resumo_diario/redacao.py`)** — a instrução de saudação deixou de incluir exemplos concretos («Cá estamos noutra segunda!», «Bom dia!», «Olá!») que o modelo copiava. A nova instrução é aberta: «não sigas sempre o mesmo formato». Mantém a restrição de não inventar dia errado. **Sem alteração de BD.**
+- **Testes** — `tests/test_resumo_diario_fase4.py::test_prompt_incentiva_saudacao_variada` actualizado para a nova string.
+
+**Notas de deploy**
+- **Sem alteração de BD** — no PythonAnywhere: `git pull` → **Reload**. Validação: `pytest -q tests/test_resumo_diario*.py tests/test_pipe_tasks.py`.
+
+---
+
 ## [v1.8.3] — 2026-10-12
 Resumo Diário — cobertura condicional no prompt + anti-metalinguagem + validação de títulos por palavras-chave.
 
