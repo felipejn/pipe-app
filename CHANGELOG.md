@@ -6,6 +6,34 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.6] — 2026-10-14
+Definições — o conselho do «Testar Telegram» passa a depender do tipo de erro.
+
+**Contexto**
+- Depois de revogar o token do bot no BotFather e de criar um novo, o teste em `/settings/notificacoes` devolveu `HTTP 401 — Unauthorized` **acompanhado de «Confirma que o chat_id está correcto»**. O conselho era fixo e apontava para o que estava bem: num 401 o problema é o `TELEGRAM_BOT_TOKEN` no `.env`, nunca o `chat_id`. Mandar verificar o `chat_id` é um beco sem saída e foi o que atrasou o diagnóstico.
+- **Causa real do 401:** `config.py` faz `load_dotenv()` **no import do módulo**, uma única vez — o valor que a app web usa é o que estava no `.env` quando o worker arrancou. Substituir o token no `.env` sem fazer **Reload** no PythonAnywhere deixa a app a usar o token antigo (já revogado), que a API rejeita com 401. Com Reload, resolveu.
+
+**Alterado** (`app/settings/routes.py`, **sem alteração de BD**)
+- Novo `_conselho_telegram(motivo)` — traduz o motivo da falha na acção concreta, em vez do conselho único:
+
+| Motivo | Conselho |
+|---|---|
+| `401` / `Unauthorized` | Corrige `TELEGRAM_BOT_TOKEN` no `.env` e faz **Reload** |
+| `ProxyError` / erro de rede | Falha de rede do servidor (proxy) — não é o `chat_id` |
+| `403` / `blocked` | Envia primeiro uma mensagem ao bot para ele poder responder |
+| `chat not found` / `400` | Confirma o `chat_id` |
+| resto | Confirma a configuração do Telegram no servidor |
+
+- O flash continua a mostrar o motivo exacto (`HTTP <código> — <description>`) e passa a acrescentar o conselho correspondente.
+
+**Testes** — 2 novos em `tests/test_notifications_telegram.py`: `test_flash_do_teste_aconselha_conforme_o_tipo_de_erro` (401 → token/Reload; proxy → explicitamente *não* o chat_id; 403 → retomar conversa; 400 → chat_id) e `test_flash_de_erro_inclui_o_motivo_real`. Suite do ficheiro: **26 testes**.
+
+**Notas de deploy**
+- **Sem alteração de BD** — no PythonAnywhere: `git pull` → **Reload**.
+- **Armadilha registada:** alterar `TELEGRAM_BOT_TOKEN` (ou qualquer variável do `.env`) **exige Reload** — o `load_dotenv()` do `config.py` corre no arranque do processo. Sem Reload, a app continua com o valor antigo e a API devolve `401`.
+
+---
+
 ## [v1.8.5] — 2026-10-14
 Notificações — motivo da falha do Telegram no log + retry em falhas transitórias.
 

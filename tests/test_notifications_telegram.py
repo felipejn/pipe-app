@@ -95,6 +95,45 @@ def test_falha_permanente_regista_codigo_e_descricao(status, codigo, descricao, 
     assert pedido.call_count == 1
 
 
+def test_flash_do_teste_aconselha_conforme_o_tipo_de_erro():
+    """Um 401 é token, não chat_id — o conselho errado manda o utilizador
+    verificar o que está bem (foi o que aconteceu em 14/10/2026).
+    """
+    from app.settings.routes import _conselho_telegram
+
+    assert 'TELEGRAM_BOT_TOKEN' in _conselho_telegram('HTTP 401 — Unauthorized')
+    assert 'Reload' in _conselho_telegram('HTTP 401 — Unauthorized')
+
+    # Proxy: é o servidor, não a configuração do utilizador. A mensagem pode
+    # nomear o chat_id — desde que para o excluir, não para o mandar verificar.
+    conselho_proxy = _conselho_telegram('Erro de rede: ProxyError(...)')
+    assert 'proxy' in conselho_proxy.lower()
+    assert 'não é o chat_id' in conselho_proxy
+
+    # Bot bloqueado: o utilizador tem de retomar a conversa.
+    conselho_403 = _conselho_telegram(
+        'HTTP 403 — Forbidden: bot was blocked by the user')
+    assert 'mensagem' in conselho_403.lower()
+
+    # Chat inexistente: aqui sim, o chat_id.
+    conselho_400 = _conselho_telegram('HTTP 400 — Bad Request: chat not found')
+    assert 'chat_id' in conselho_400
+
+
+def test_flash_de_erro_inclui_o_motivo_real():
+    """O erro exacto aparece na mensagem — sem isto volta o «Erro ao enviar.» opaco."""
+    canal = TelegramChannel('token')
+    with patch('app.notifications.channels.telegram.requests.post',
+               return_value=_insucesso(401, 401, 'Unauthorized')):
+        canal.enviar(Utilizador(), 'Teste', 'Corpo')
+
+    from app.settings.routes import _conselho_telegram
+    motivo = canal.ultimo_resultado['erro']
+    assert 'Unauthorized' in motivo
+    assert 'Token' in _conselho_telegram(motivo)
+
+
+
 def test_description_no_topo_do_corpo_formato_da_bot_api():
     """A Bot API do Telegram devolve `description` no TOPO do corpo:
 

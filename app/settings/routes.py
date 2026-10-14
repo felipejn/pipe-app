@@ -69,14 +69,37 @@ def testar_telegram():
     if sucesso:
         flash('Mensagem de teste enviada com sucesso!', 'sucesso')
     else:
-        # O canal guarda o motivo exacto (HTTP + description da Bot API);
-        # mostrá-lo evita o ciclo «erro genérico → tentar às cegas».
+        # O canal guarda o motivo exacto (HTTP + description da Bot API).
+        # Mostrá-lo evita o ciclo «erro genérico → tentar às cegas» — e o
+        # conselho tem de depender do tipo de erro: mandar verificar o chat_id
+        # num 401 (token) ou num erro de proxy é um beco sem saída.
         detalhe = (canal.ultimo_resultado or {}).get('erro') or 'motivo desconhecido'
-        flash(f'Erro ao enviar: {detalhe} '
-              'Confirma que o chat_id está correcto e que enviaste uma mensagem ao bot primeiro.',
-              'erro')
+        flash(f'Erro ao enviar: {detalhe} {_conselho_telegram(detalhe)}', 'erro')
 
     return redirect(url_for('settings.index'))
+
+
+def _conselho_telegram(motivo):
+    """Traduz o motivo da falha na acção concreta a tentar.
+
+    Cada família de erro tem uma correcção diferente e nenhuma serve para as
+    outras: token inválido → `.env` + Reload; bot bloqueado → o utilizador
+    retomar a conversa; chat inexistente → corrigir o chat_id; proxy → é o
+    servidor, não a configuração do utilizador.
+    """
+    texto = (motivo or '').lower()
+    if '401' in texto or 'unauthorized' in texto:
+        return ('Token inválido ou revogado — corrige TELEGRAM_BOT_TOKEN no .env '
+                'do servidor e faz Reload.')
+    if 'proxyerror' in texto or 'proxy' in texto or 'erro de rede' in texto:
+        return ('Falha de rede do servidor (proxy) a contactar a API do Telegram '
+                '— não é o chat_id.')
+    if '403' in texto or 'blocked' in texto or 'bot was' in texto:
+        return ('O bot não consegue iniciar a conversa — envia-lhe primeiro uma '
+                'mensagem no Telegram e volta a testar.')
+    if 'chat not found' in texto or 'chat_id' in texto or '400' in texto:
+        return ('Confirma que o chat_id está correcto.')
+    return 'Confirma a configuração do Telegram no servidor.'
 
 
 @settings.route('/testar-email', methods=['POST'])

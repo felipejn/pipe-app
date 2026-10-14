@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.5
+# PIPE — Estado Actual do Projecto — v1.8.6
 
 ## O que é o PIPE
 
@@ -294,7 +294,9 @@ pipe-app/
 - **Canal Telegram** — valida o `ok` do corpo da resposta (a Bot API devolve `{"ok": false, "error_code", "description"}`; `description` vive no **topo** do corpo, ao contrário da OpenRouter, que a aninha em `error`). O motivo fica em `ultimo_resultado['erro']` como `HTTP <error_code> — <description>` (ex.: `HTTP 403 — Forbidden: bot was blocked by the user`), `Erro de rede: …` ou `Destinatário sem chat_id de Telegram.`; o sucesso guarda o `message_id`. **Retry só em falhas transitórias:** rede, 408/425/429/500/502/503/504 repetem uma vez (2 s); 4xx permanentes (400/401/403/404/409) falham de imediato.
 - **Log da scheduled task** — `_descrever(resultado, canal)` traduz cada canal para `ok` / `não activo` / `FALHOU (<motivo>)` nas linhas de Euromilhões, Tarefas e Calendário; o Resumo Diário distingue os dois casos de ausência.
 - **Script `scripts/verificar_telegram.py`** — diagnóstico de ponta a ponta: `getMe` (token válido + identidade do bot), `getChat` por `chat_id` de cada utilizador da BD (detecta «bot was blocked» e «chat not found») e `--enviar-teste` (sendMessage real); aceita `--chat <id>`. Corre na consola do PA sem depender do log da task.
-- **Testes:** `tests/test_notifications_telegram.py` (24: motivo por status/descrição, 200 com `ok: false`, corpo não-JSON, retry selectivo, escape HTML preservado) mais 2 em `test_resumo_diario_fase3.py` e 2 em `test_pipe_tasks.py`.
+- **Testes:** `tests/test_notifications_telegram.py` (26: motivo por status/descrição, 200 com `ok: false`, corpo não-JSON, retry selectivo, escape HTML preservado, conselho por tipo de erro) mais 2 em `test_resumo_diario_fase3.py` e 2 em `test_pipe_tasks.py`.
+- **Conselho por tipo de erro (`/settings/notificacoes`)** — o botão «Testar Telegram» mostra o motivo exacto e o conselho correspondente (`_conselho_telegram()`): `401`/`Unauthorized` → corrige `TELEGRAM_BOT_TOKEN` no `.env` e faz **Reload**; `ProxyError`/rede → falha do servidor, não do `chat_id`; `403`/`blocked` → envia primeiro uma mensagem ao bot; `chat not found`/`400` → confirma o `chat_id`.
+- **Armadilha do `.env` (v1.8.6):** `config.py` faz `load_dotenv()` no import do módulo — corre **uma vez**, no arranque do processo. Alterar `TELEGRAM_BOT_TOKEN` (ou outra variável) **exige Reload** no PythonAnywhere; sem Reload a app usa o valor antigo e a API devolve `401`.
 
 ### Scheduled task (`scripts/pipe_tasks.py`)
 
@@ -470,6 +472,7 @@ Com a **app parada**, copiar o ficheiro mais recente de `instance/backups/` para
 
 ## Armadilhas conhecidas
 
+- **Variáveis do `.env` exigem Reload (v1.8.6)** — `config.py` faz `load_dotenv()` **no import do módulo**, ou seja uma única vez, no arranque do processo. Alterar `TELEGRAM_BOT_TOKEN` (ou qualquer variável) no ficheiro **não tem efeito** na app já a correr: o worker continua com o valor antigo. No PythonAnywhere é obrigatório **Reload** depois de escrever o `.env`. Sem isso, um token revogado e substituído continua a dar `HTTP 401 — Unauthorized` — que foi o que aconteceu em 14/10/2026. Nas *scheduled tasks* o efeito é imediato (cada execução é um processo novo), o que torna a armadilha ainda mais enganadora: a task vê o valor novo e a app web não.
 - **`create_all()` só corre em testes (v1.6.0)** — nunca altera uma BD existente (não faz `ALTER TABLE`); o esquema evolui com Flask-Migrate: alterar o modelo → `flask db migrate -m "..."` → rever o diff → `python scripts/backup_bd.py` → `flask db upgrade`. BD local perdida ou para recriar de zero: `del instance\pipe.db` → `flask db upgrade` → `python scripts/criar_admin.py`
 - **Scripts de migração manuais são históricos** — `scripts/migrar_convites_mailjet.py` (e outros `migrar_*.py`) e `scripts/reset_postos_combustiveis.py` estão **OBSOLETOS** desde a v1.6.0 (o baseline do Flask-Migrate cobre o schema); ficam só como documentação — **NÃO alterar os scripts**
 - **Engine fixado em `db.init_app()`** — atribuir `app.config['SQLALCHEMY_DATABASE_URI']` **depois** de `create_app()` não tem efeito sobre o engine já construído; por isso os testes têm de usar `create_app('testing')` antes de qualquer reatribuição (o conftest bloqueia `db.drop_all()` com BD de ficheiro)
