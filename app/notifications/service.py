@@ -1,3 +1,4 @@
+import logging
 import os
 from app.notifications.channels.telegram import TelegramChannel
 from app.notifications.channels.email import EmailChannel
@@ -85,6 +86,7 @@ class NotificationService:
                         user, subject, body, data)
             else:
                 resultados['telegram'] = None
+            self._registar_falhas(user, resultados)
             # Um canal forçado é exclusivo; não despacha por email.
             resultados['email'] = None
             return resultados
@@ -105,7 +107,36 @@ class NotificationService:
         else:
             resultados['email'] = None  # não activo
 
+        self._registar_falhas(user, resultados)
         return resultados
+
+    def _registar_falhas(self, user, resultados):
+        """Regista no log o motivo dos canais que falharam de facto.
+
+        `False` e `None` não são a mesma coisa: `None` é canal não activo ou
+        destinatário sem contacto (cenário esperado, silencioso), `False` é o
+        canal a correr e a falhar — é esse que precisa de motivo no log.
+        """
+        for canal, valor in resultados.items():
+            if valor is not False:
+                continue
+            motivo = self.ultimo_erro(canal) or 'motivo não detalhado'
+            logging.error(
+                '[Notificações] %s falhou para %s: %s',
+                canal, getattr(user, 'username', user), motivo)
+
+    def ultimo_erro(self, canal='telegram'):
+        """Devolve o motivo legível da última falha de um canal.
+
+        O canal guarda-o em `ultimo_resultado` (mesmo contrato do email, que
+        já expunha `message_id`/`erro` para o /admin). Devolve None quando o
+        canal não está inicializado ou não registou falha.
+        """
+        instancia = self._canais.get(canal)
+        resultado = getattr(instancia, 'ultimo_resultado', None)
+        if not resultado:
+            return None
+        return resultado.get('erro')
 
 
 # Instância global — importar directamente nos módulos

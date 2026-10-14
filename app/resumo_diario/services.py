@@ -89,9 +89,17 @@ def enviar_resumos_diarios(data=None, simular=False):
                 recebidos.add(user.id)
             else:
                 db.session.rollback()
-                print(f'[Resumo Diário] {user.username}: envio Telegram falhou ({resultado.get("telegram")}).')
-                logging.error('[Resumo Diário] Falha de envio para %s: telegram=%r',
-                              user.username, resultado.get('telegram'))
+                estado = resultado.get('telegram')
+                if estado is None:
+                    # Canal não inicializado ou utilizador sem chat_id — o
+                    # serviço não chegou a chamar a API do Telegram.
+                    motivo = 'Telegram não configurado (canal ou chat_id em falta)'
+                else:
+                    motivo = (notification_service.ultimo_erro('telegram')
+                              or 'motivo não detalhado')
+                print(f'[Resumo Diário] {user.username}: envio Telegram falhou ({estado}) — {motivo}')
+                logging.error('[Resumo Diário] Falha de envio para %s: telegram=%r (%s)',
+                              user.username, estado, motivo)
         except Exception as erro:
             db.session.rollback()
             print(f'[Resumo Diário] Erro para utilizador {getattr(user, "username", user.id)}: {erro}')

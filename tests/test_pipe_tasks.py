@@ -103,6 +103,40 @@ def test_tarefas_avisa_no_dia_do_prazo(app, enviar):
     assert t.notificada_em == hoje
 
 
+def test_tarefas_log_mostra_o_motivo_da_falha_do_telegram(app, enviar, capsys):
+    """A linha da task dizia `telegram=False` — indistinguível de «não activo».
+
+    Agora traz o motivo (ex.: timeout), que é o que permite diagnosticar a
+    scheduled task sem adivinhar.
+    """
+    from app.notifications import notification_service
+
+    hoje = date.today()
+    user, lista = _criar_user('util-falha-tg')
+    _criar_tarefa(lista, user, 'Tarefa vencida', hoje)
+    enviar.return_value = {'telegram': False, 'email': True}
+
+    with mock.patch.object(notification_service, 'ultimo_erro',
+                           return_value='Erro de rede: timed out'):
+        pipe_tasks.tarefa_tarefas(hoje)
+
+    saida = capsys.readouterr().out
+    assert 'FALHOU' in saida
+    assert 'timed out' in saida
+
+
+def test_descrever_distingue_nao_activo_de_falha():
+    """`None` (canal não activo) e `False` (falhou) não são a mesma coisa."""
+    from app.notifications import notification_service
+
+    assert pipe_tasks._descrever(None) == 'não activo'
+    assert pipe_tasks._descrever(True) == 'ok'
+    with mock.patch.object(notification_service, 'ultimo_erro',
+                           return_value='HTTP 403 — bot bloqueado'):
+        assert 'FALHOU' in pipe_tasks._descrever(False)
+        assert 'bot bloqueado' in pipe_tasks._descrever(False)
+
+
 def test_tarefas_nao_repete_no_mesmo_dia(app, enviar):
     hoje = date.today()
     user, lista = _criar_user('util-dedupe')

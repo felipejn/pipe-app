@@ -69,7 +69,12 @@ def testar_telegram():
     if sucesso:
         flash('Mensagem de teste enviada com sucesso!', 'sucesso')
     else:
-        flash('Erro ao enviar. Confirma que o chat_id está correcto e que enviaste uma mensagem ao bot primeiro.', 'erro')
+        # O canal guarda o motivo exacto (HTTP + description da Bot API);
+        # mostrá-lo evita o ciclo «erro genérico → tentar às cegas».
+        detalhe = (canal.ultimo_resultado or {}).get('erro') or 'motivo desconhecido'
+        flash(f'Erro ao enviar: {detalhe} '
+              'Confirma que o chat_id está correcto e que enviaste uma mensagem ao bot primeiro.',
+              'erro')
 
     return redirect(url_for('settings.index'))
 

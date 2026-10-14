@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.4
+# PIPE — Estado Actual do Projecto — v1.8.5
 
 ## O que é o PIPE
 
@@ -115,8 +115,8 @@ pipe-app/
 │   ├── notifications/       # Sistema de notificações
 │   │   ├── __init__.py
 │   │   ├── models.py        # UserNotificationPreferences
-│   │   ├── service.py       # orquestração de canais (Telegram + Email)
-│   │   └── channels/        # TelegramChannel, EmailChannel
+│   │   ├── service.py       # orquestração de canais (Telegram + Email) + `ultimo_erro()`
+│   │   └── channels/        # TelegramChannel (motivo + retry transitório), EmailChannel
 │   └── admin/               # Blueprint de administração
 │       ├── __init__.py
 │       ├── decorators.py    # @admin_required
@@ -144,6 +144,7 @@ pipe-app/
 │   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
 │   ├── gerar_icones_extensao.py # gera icon48/icon128 da extensão Chrome (Pillow, sem Flask)
 │   ├── verificar_mailjet.py     # estado real dos emails no Mailjet + `--apenas-hoje`
+│   ├── verificar_telegram.py    # diagnóstico do canal Telegram: getMe + getChat + `--enviar-teste`
 │   └── smoke_combustiveis.py    # smoke test da ferramenta get_combustiveis (Assistente IA)
 ├── tests/
 │   ├── conftest.py              # guarda-civil: bloqueia `db.drop_all()` com BD de ficheiro (obrigatório create_app('testing'))
@@ -289,6 +290,11 @@ pipe-app/
 
 - Modelo `UserNotificationPreferences` (`notificacao_preferencias`) — preferências por canal (Telegram, Email, Tarefas, Calendário)
 - `service.py` orquestra o envio; canais: `TelegramChannel` (python-telegram-bot) e `EmailChannel` (Mailjet)
+- **Diagnóstico de falhas (v1.8.4):** ambos os canais guardam o motivo do último envio em `ultimo_resultado` (`{'sucesso', 'message_id', 'erro'}`), no mesmo contrato — o retorno continua `bool` para não partir os chamadores antigos (2FA, definições, resumo diário). `notification_service.ultimo_erro(canal)` expõe o motivo e `_registar_falhas()` escreve-o no log sempre que um canal devolve `False`. **`False` e `None` não são o mesmo:** `None` é canal não activo ou destinatário sem contacto (silencioso, esperado); `False` é o canal a correr e a falhar — e traz motivo.
+- **Canal Telegram** — valida o `ok` do corpo da resposta (a Bot API devolve `{"ok": false, "error_code", "description"}`; `description` vive no **topo** do corpo, ao contrário da OpenRouter, que a aninha em `error`). O motivo fica em `ultimo_resultado['erro']` como `HTTP <error_code> — <description>` (ex.: `HTTP 403 — Forbidden: bot was blocked by the user`), `Erro de rede: …` ou `Destinatário sem chat_id de Telegram.`; o sucesso guarda o `message_id`. **Retry só em falhas transitórias:** rede, 408/425/429/500/502/503/504 repetem uma vez (2 s); 4xx permanentes (400/401/403/404/409) falham de imediato.
+- **Log da scheduled task** — `_descrever(resultado, canal)` traduz cada canal para `ok` / `não activo` / `FALHOU (<motivo>)` nas linhas de Euromilhões, Tarefas e Calendário; o Resumo Diário distingue os dois casos de ausência.
+- **Script `scripts/verificar_telegram.py`** — diagnóstico de ponta a ponta: `getMe` (token válido + identidade do bot), `getChat` por `chat_id` de cada utilizador da BD (detecta «bot was blocked» e «chat not found») e `--enviar-teste` (sendMessage real); aceita `--chat <id>`. Corre na consola do PA sem depender do log da task.
+- **Testes:** `tests/test_notifications_telegram.py` (24: motivo por status/descrição, 200 com `ok: false`, corpo não-JSON, retry selectivo, escape HTML preservado) mais 2 em `test_resumo_diario_fase3.py` e 2 em `test_pipe_tasks.py`.
 
 ### Scheduled task (`scripts/pipe_tasks.py`)
 

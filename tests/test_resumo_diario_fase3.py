@@ -116,6 +116,28 @@ def test_simulacao_nao_envia_nem_grava(contexto):
         assert ConfiguracaoResumoDiario.query.filter_by(user_id=user_id).first() is None
 
 
+
+def test_falha_de_envio_regista_o_motivo_no_log(contexto, caplog):
+    """`telegram=False` sem motivo deixou 14/10 sem diagnóstico — o log tem de
+    trazer a razão (HTTP/descrição) para se perceber timeout vs token vs bloqueio.
+    """
+    app, (user_id, _) = contexto
+    hoje = date(2026, 10, 9)
+    with app.app_context(), patch.object(services, 'gerar_resumo_diario', side_effect=_resumo), \
+            patch.object(services.notification_service, 'send',
+                         return_value={'telegram': False}) as enviar, \
+            patch.object(services.notification_service, 'ultimo_erro',
+                         return_value='Erro de rede: timed out'):
+        assert services.enviar_resumos_diarios(hoje) == set()
+
+    assert enviar.call_count == 2
+    assert 'timed out' in caplog.text
+    # Sem envio, não marca o dia: amanhã volta a tentar.
+    with app.app_context():
+        assert (ConfiguracaoResumoDiario.query
+                .filter_by(user_id=user_id).first() is None)
+
+
 def test_data_local_perto_da_meia_noite_utc():
     instante = datetime(2026, 10, 8, 23, 30, tzinfo=timezone.utc)
     class Relogio:

@@ -36,6 +36,24 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from app import create_app, db
 
 
+def _descrever(resultado, canal='telegram'):
+    """Traduz o resultado de um canal numa linha legível para o log da task.
+
+    `None` e `False` não dizem o mesmo: None é canal não activo ou sem
+    contacto; False é o canal a correr e a falhar — e nesse caso o motivo
+    está no canal (ex.: «HTTP 502 — …», «Erro de rede: …timed out»). Sem
+    isto, o log da scheduled task mostrava apenas `telegram=False` e não
+    havia forma de distinguir um timeout de um token revogado.
+    """
+    if resultado is None:
+        return 'não activo'
+    if resultado is True:
+        return 'ok'
+    from app.notifications import notification_service
+    motivo = notification_service.ultimo_erro(canal) or 'motivo não detalhado'
+    return f'FALHOU ({motivo})'
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # MÓDULO 1 — Euromilhões
 # ══════════════════════════════════════════════════════════════════════════════
@@ -110,7 +128,9 @@ def tarefa_euromilhoes(hoje):
         res   = notification_service.send(
             user=user, type='resultado_euromilhoes',
             subject=f'Resultados Euromilhões — {hoje_str}', body=corpo)
-        print(f'  [Euromilhões] {user.username}: telegram={res.get("telegram")}  email={res.get("email")}')
+        print(f'  [Euromilhões] {user.username}: '
+              f'telegram={_descrever(res.get("telegram"), "telegram")}  '
+              f'email={_descrever(res.get("email"), "email")}')
         notificados += 1
 
     print(f'  [Euromilhões] {notificados} utilizador(es) notificado(s).')
@@ -153,7 +173,8 @@ def tarefa_tarefas(hoje, resumo_recebido=None):
     for user_id, lista in por_user.items():
         if resumo_recebido and user_id in resumo_recebido:
             continue
-        user = User.query.get(user_id)
+        # Query.get() é legado (aviso do SQLAlchemy 1.4+/2.0): Session.get().
+        user = db.session.get(User, user_id)
         if not user or not user.activo:
             continue
 
@@ -201,7 +222,8 @@ def tarefa_tarefas(hoje, resumo_recebido=None):
             logging.exception('[Tarefas] Falha ao notificar %s', user.username)
             continue
         print(f'  [Tarefas] {user.username}: hoje={n_hoje} atraso={n_atraso} '
-              f'— telegram={res.get("telegram")}  email={res.get("email")}')
+              f'— telegram={_descrever(res.get("telegram"), "telegram")}  '
+              f'email={_descrever(res.get("email"), "email")}')
 
         # Marcar com a data de hoje — amanhã, se ainda faltar, volta a notificar
         try:
@@ -295,7 +317,8 @@ def tarefa_calendario(hoje, resumo_recebido=None):
     for user_id, lista in por_user.items():
         if resumo_recebido and user_id in resumo_recebido:
             continue
-        user = User.query.get(user_id)
+        # Query.get() é legado (aviso do SQLAlchemy 1.4+/2.0): Session.get().
+        user = db.session.get(User, user_id)
         if not user or not user.activo:
             continue
 
@@ -334,7 +357,8 @@ def tarefa_calendario(hoje, resumo_recebido=None):
             logging.exception('[Calendário] Falha ao notificar %s', user.username)
             continue
         print(f'  [Calendário] {user.username}: amanhã={n_a} hoje={n_h} '
-              f'— telegram={res.get("telegram")}  email={res.get("email")}')
+              f'— telegram={_descrever(res.get("telegram"), "telegram")}  '
+              f'email={_descrever(res.get("email"), "email")}')
 
         # Um único campo cobre os dois avisos — amanhã passa a «hoje» e notifica
         try:

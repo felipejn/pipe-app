@@ -6,6 +6,34 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.5] — 2026-10-14
+Notificações — motivo da falha do Telegram no log + retry em falhas transitórias.
+
+**Contexto**
+- Em 14/10/2026 a scheduled task não entregou o Resumo Diário. O log dizia apenas `[Resumo Diário] Falha de envio para felipejn: telegram=False` e, nos avisos de tarefas, `telegram=False email=True` — o mesmo dia, o mesmo utilizador, enquanto os **envios manuais** (Definições → Testar canais, e o envio manual do Resumo Diário) funcionavam minutos depois.
+- **Diagnóstico:** o valor era `False`, não `None`. `None` significa canal não inicializado ou utilizador sem `chat_id` (o serviço nem chama a API); `False` significa que **a API foi chamada e falhou**. Como os testes manuais provavam que token, `chat_id` e escape HTML estavam bons, a causa residual era **falha transitória de rede/API na janela das 07:00** — timeout ou 5xx — que atingiu as duas notificações do mesmo processo.
+- **A verdadeira falha era de diagnóstico:** `TelegramChannel.enviar()` fazia `return resposta.status_code == 200` e `except requests.RequestException: return False`, deitando fora o HTTP **e** a `description` da Bot API. Sem motivo no log não havia como distinguir um timeout de um token revogado. O `EmailChannel` já guardava o motivo em `ultimo_resultado` (usado no `/admin/convites`); o Telegram nunca teve equivalente.
+
+**Alterado** (`app/notifications/channels/telegram.py`, `app/notifications/service.py`, `scripts/pipe_tasks.py`, `app/settings/routes.py`, **sem alteração de BD**)
+- **Canal Telegram — motivo da falha (`ultimo_resultado`)** — novo atributo no mesmo contrato do `EmailChannel`: `{'sucesso', 'message_id', 'erro'}`. Falhas passam a trazer `HTTP <error_code> — <description>` (ex.: `HTTP 403 — Forbidden: bot was blocked by the user`), erros de rede trazem `Erro de rede: …`, destinatário sem `chat_id` traz `Destinatário sem chat_id de Telegram.`; sucesso guarda o `message_id`. O valor de retorno continua `bool`, compatível com todos os chamadores (2FA, definições, resumo diário, testes). Cada falha é registada com `logger.error`.
+- **HTTP 200 com corpo de erro também é falha** — a Bot API responde `{"ok": false, "error_code": …, "description": …}`; o canal valida o `ok` do corpo em vez de confiar só no status (mesma lição do incidente v1.4.4 da OpenRouter). **`description` vive no TOPO do corpo**, ao contrário da OpenRouter, que a aninha em `error` — as duas formas são aceites; isto foi apanhado pelos testes novos.
+- **Retry só em falhas transitórias** — erros de rede, 408/425/429/500/502/503/504 repetem uma vez (2 s de espera); 4xx permanentes (400/401/403/404/409) falham de imediato, sem insistir nem disfarçar a causa. É o cenário da task das 07:00: um timeout já não perde o dia.
+- **Serviço de notificações** — novo `ultimo_erro(canal='telegram')` e `_registar_falhas()`, que registam no log os canais que devolveram `False` (com motivo). `False` e `None` deixam de ser o mesmo silêncio: `None` é cenário esperado (canal não activo), `False` é falha a reportar.
+- **Log da scheduled task** — novo `_descrever(resultado, canal)` traduz o resultado de cada canal: `ok` / `não activo` / `FALHOU (<motivo>)`. Aplicado às linhas de Euromilhões, Tarefas e Calendário. O Resumo Diário distingue `None` («Telegram não configurado») de `False` (com motivo).
+- **`scripts/pipe_tasks.py`** — `User.query.get(user_id)` → `db.session.get(User, user_id)` nos dois laços (Tarefas e Calendário): eliminado o `LegacyAPIWarning` do SQLAlchemy que aparecia em todas as corridas.
+- **Definições (`/settings/notificacoes`)** — o botão «Testar Telegram» passa a mostrar o motivo real da falha em vez de «Erro ao enviar.» genérico.
+
+**Adicionado** (`scripts/verificar_telegram.py`, novo)
+- Diagnóstico de ponta a ponta do canal, nas convenções de `verificar_mailjet.py`: `getMe` (o token é válido e identifica o bot), `getChat` por `chat_id` de cada utilizador da BD (apanha «bot was blocked» e «chat not found» — os dois casos permanentes que também davam `False` sem explicação) e `--enviar-teste` (sendMessage real, com o `message_id` ou o motivo). Aceita `--chat <id>` para isolar um utilizador. Lê `TELEGRAM_BOT_TOKEN` do `.env`.
+- **Testes** — novo `tests/test_notifications_telegram.py` (**24 testes**): sucesso guarda `message_id`; falhas permanentes registam código + descrição; 200 com `ok: false` é falha; corpo não-JSON assume o status HTTP; duplos que devolvem só o status continuam a passar; erro de rede regista o motivo e repete; sem `chat_id` não chama a API; retry até passar em 503; todos os status transitórios repetem e os permanentes não repetem; `description` no topo do corpo (formato real da Bot API); escape HTML preservado. Mais 2 em `tests/test_resumo_diario_fase3.py` (`test_falha_de_envio_regista_o_motivo_no_log`) e 2 em `tests/test_pipe_tasks.py` (`test_tarefas_log_mostra_o_motivo_da_falha_do_telegram`, `test_descrever_distingue_nao_activo_de_falha`).
+
+**Notas de deploy**
+- **Sem alteração de BD** — no PythonAnywhere: `git pull` → **Reload**. Validação: `flask db check` (limpo) e `pytest -q tests/test_notifications_telegram.py tests/test_resumo_diario*.py tests/test_pipe_tasks.py`.
+- **Diagnóstico pós-deploy:** `python scripts/verificar_telegram.py` (e `--enviar-teste` para confirmar a entrega). Responde token/chats sem depender do log da task.
+- **Ressalva:** o retry cobre falhas transitórias, não permanentes. Um token revogado ou um bot bloqueado continuam a exigir `verificar_telegram.py` e correcção manual (novo token no BotFather, ou o utilizador retomar a conversa com o bot).
+
+---
+
 ## [v1.8.4] — 2026-10-14
 Resumo Diário — saudação variada: remoção de exemplos-âncora no prompt.
 
