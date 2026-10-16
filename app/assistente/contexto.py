@@ -8,6 +8,7 @@ import json
 import time
 import traceback
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from flask import session
 
@@ -35,6 +36,11 @@ _DIAS_SEMANA = (
     'sexta-feira', 'sábado', 'domingo',
 )
 
+# Fuso horário do utilizador (Portugal continental). Em produção o servidor
+# pode estar em UTC (ex.: PythonAnywhere) — sem este fuso, datetime.now()
+# devolveria o dia errado e o modelo resolveria "amanhã" incorrectamente.
+_FUSO_HORARIO = ZoneInfo('Europe/Lisbon')
+
 
 def _contexto_temporal():
     """Devolve a data e a hora actuais em pt-PT, para anexar ao system prompt.
@@ -45,7 +51,7 @@ def _contexto_temporal():
     ("hoje", "amanhã", "na próxima sexta") e acabaria por inventar datas,
     uma vez que as ferramentas de escrita exigem ISO 8601 absoluto.
     """
-    agora = datetime.now()
+    agora = datetime.now(_FUSO_HORARIO)
     dia_semana = _DIAS_SEMANA[agora.weekday()]
     return (
         '\n\nDATA E HORA ACTUAIS\n'

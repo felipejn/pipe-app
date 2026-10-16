@@ -6,6 +6,20 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.7] — 2026-10-16
+Assistente IA — correcção do fuso horário no contexto temporal enviado ao modelo.
+
+**Problema**
+- `_contexto_temporal()` em `contexto.py` usava `datetime.now()` sem timezone. No PythonAnywhere (servidor UTC), isto devolvia a hora UTC — não a de Portugal. Quando o utilizador pedia uma tarefa para "amanhã" em certos horários, o modelo recebia o dia errado e resolvia a data incorrectamente (para o dia actual ou anterior).
+
+**Correcção** (`app/assistente/contexto.py`, **sem alteração de BD**)
+- Importado `zoneinfo.ZoneInfo` e definido `_FUSO_HORARIO = ZoneInfo('Europe/Lisbon')` (consistente com `resumo_diario/services.py`).
+- `_contexto_temporal()` passa a usar `datetime.now(_FUSO_HORARIO)` em vez de `datetime.now()`.
+
+**Testes** — 359 passam, 0 falhas.
+
+---
+
 ## [v1.8.6] — 2026-10-14
 Definições — o conselho do «Testar Telegram» passa a depender do tipo de erro.
 
