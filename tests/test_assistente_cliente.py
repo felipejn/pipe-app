@@ -153,8 +153,34 @@ class ChamarLlmTests(TestCase):
         self.assertEqual(modelos[0], MODELO_DEFAULT)
 
     @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
+    def test_max_tokens_personalizado_chega_ao_payload(self, post):
+        post.return_value = _resposta_valida()
+
+        chamar_llm([{"role": "user", "content": "cria evento"}], max_tokens=2000)
+
+        self.assertEqual(post.call_args.kwargs["json"]["max_tokens"], 2000)
+
+    @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT, "OPENROUTER_MAX_TOKENS": "3000"})
+    def test_max_tokens_por_env_chega_ao_payload(self, post):
+        post.return_value = _resposta_valida()
+
+        chamar_llm([{"role": "user", "content": "cria evento"}])
+
+        self.assertEqual(post.call_args.kwargs["json"]["max_tokens"], 3000)
+
+    @mock.patch("app.assistente.cliente.requests.post")
+    @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})
+    def test_max_tokens_omissao_usa_default_1000(self, post):
+        post.return_value = _resposta_valida()
+
+        chamar_llm([{"role": "user", "content": "cria evento"}])
+
+        self.assertEqual(post.call_args.kwargs["json"]["max_tokens"], 1000)
+
     @mock.patch.dict(os.environ, {"OPENROUTER_MODEL": MODELO_DEFAULT}, clear=True)
-    def test_chave_api_em_branco_levanta_value_error(self, _):
+    def test_chave_api_em_branco_levanta_value_error(self):
         with self.assertRaises(ValueError):
             chamar_llm([{"role": "user", "content": "cria evento"}])
 

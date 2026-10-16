@@ -128,7 +128,19 @@ def _registar_falha(modelo, motivo):
     print(f'[Assistente] Modelo {modelo} indisponivel: {motivo}')
 
 
-def chamar_llm(mensagens, ferramentas=None, prazo_total=None):
+_MAX_TOKENS_POR_OMISSAO = 1000
+
+
+def _max_tokens():
+    """Limite de tokens de saida, configuravel por env ou omissao."""
+    try:
+        valor = int(os.environ.get('OPENROUTER_MAX_TOKENS', _MAX_TOKENS_POR_OMISSAO))
+    except (TypeError, ValueError):
+        return _MAX_TOKENS_POR_OMISSAO
+    return valor if valor > 0 else _MAX_TOKENS_POR_OMISSAO
+
+
+def chamar_llm(mensagens, ferramentas=None, prazo_total=None, max_tokens=None):
     """Chama a API OpenRouter com retry e fallback automatico.
 
     Para cada modelo disponivel, sao feitas até ``_MAX_TENTATIVAS`` em caso de
@@ -143,6 +155,11 @@ def chamar_llm(mensagens, ferramentas=None, prazo_total=None):
             valor: as esperas de backoff sao cortadas e o timeout de cada
             pedido e limitado ao tempo restante. None (omissao) mantem o
             comportamento historical do Assistente, sem prazo.
+        max_tokens: limite de tokens de saida (opcional). Quando omitido, usa
+            a variavel de ambiente ``OPENROUTER_MAX_TOKENS`` ou o default de
+            1000. Modelos de raciocínio consomem parte do orçamento em
+            ``reasoning`` antes do ``content``, pelo que um valor muito baixo
+            pode deixar a resposta vazia.
 
     Returns:
         dict com a resposta da API.
@@ -164,9 +181,11 @@ def chamar_llm(mensagens, ferramentas=None, prazo_total=None):
             return None
         return prazo_fim - time.monotonic()
 
+    limite_tokens = max_tokens if max_tokens is not None else _max_tokens()
+
     payload_base = {
         'messages': mensagens,
-        'max_tokens': 1000,
+        'max_tokens': limite_tokens,
     }
     if ferramentas:
         payload_base['tools'] = ferramentas

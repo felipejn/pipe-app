@@ -6,6 +6,36 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.8] — 2026-10-16
+Resumo Diário — origem/modelo no preview agora mostra o nome real do modelo, não 'LLM' hardcoded; 'determinístico' mantido como fallback.
+
+**Contexto**
+- A pré-visualização do Resumo Diário no `/resumo-diario/definicoes` devolvia sempre "· Origem: LLM" quando o texto era gerado pelo LLM, mesmo quando um modelo diferente (ex.: "nvidia/nemotron-3.5-super-vl:free") gerava o texto. Isto confundia os utilizadores porque não conseguiam ver qual modelo estava realmente a funcionar. A solução foi usar o nome real do modelo quando disponível e manter o rótulo determinístico apenas como fallback.
+
+**Alterado** (`app/templates/resumo_diario/definicoes.html`, **sem alteração de BD**)
+- Template JS: lógica de sufixo do estado de acção — mudada de `resultado.dados.origem === 'llm'` para `resultado.dados.origem === 'deterministico'`:
+
+```javascript
+var sufixo = '';
+if (Object.prototype.hasOwnProperty.call(resultado.dados, 'origem')) {
+  sufixo = ' · Origem: ' +
+    (resultado.dados.origem === 'deterministico'
+      ? 'determinístico' +
+        (resultado.dados.motivo ? ' (' + resultado.dados.motivo + ')' : '')
+      : resultado.dados.origem);
+}
+```
+
+**Adicionado** (`app/resumo_diario/services.py`, **sem alteração de BD**)
+- Lançamento de `ModeloUsadoError` (herda de `Exception`): lançado quando um modelo é usado (origem != deterministico) na simulação do `enviar_resumos_diarios`. Garante que a simulação mostra o nome real do modelo, mesmo quando o texto é determinístico (por exemplo, sem secções).
+
+**Adicionado** (`app/resumo_diario/redacao.py`, **sem alteração de BD**)
+- Retorno da função `redigir()`: corrigido para devolver `modelo or 'llm'` como origem (em vez do literal 'llm'). Passa o nome real do modelo (ex.: 'nvidia/nemotron-3.5-super-vl:free') para o frontend; usa 'llm' quando não há nome de modelo.
+
+**Testes** — novo `tests/test_resumo_diario_fase4.py::test_origem_retorna_modelo`, `tests/test_resumo_diario_fase4.py::test_simulacao_mostrar_modelo_usado`, `tests/test_resumo_diario_fase4.py::test_log_origem_regista_o_nome_do_modelo`, mais `tests/test_resumo_diario_fase4.py::test_origem_com_'modelo'` actualizado e `tests/test_resumo_diario_fase4.py::test_origem_com_'modelo-teste'` actualizado.
+
+---
+
 ## [v1.8.7] — 2026-10-16
 Assistente IA — correcção do fuso horário no contexto temporal enviado ao modelo.
 

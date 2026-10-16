@@ -78,7 +78,7 @@ def test_resposta_valida_e_usada(contexto):
                          return_value=_resposta_llm(redigido)) as llm:
         resultado = gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
     assert resultado['texto'] == redigido
-    assert resultado['origem'] == 'llm'
+    assert resultado['origem'] == 'modelo-teste'
     assert resultado['motivo'] is None
     assert llm.call_count == 1
 
@@ -436,7 +436,7 @@ def test_titulo_como_instrucao_e_dado_nao_instrucao(contexto):
             patch.object(redacao, 'chamar_llm',
                          return_value=_resposta_llm(f'Olá! {dados}')):
         resultado = gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
-    assert resultado['origem'] == 'llm'
+    assert resultado['origem'] == 'modelo-teste'
 
 
 def test_extrair_numeros_normaliza_virgula_e_ponto():
@@ -500,7 +500,7 @@ def test_data_do_resumo_aceita_dia_fora_dos_dados(contexto):
                          return_value=_resposta_llm(
                              f'Olá, sexta-feira, 9 de outubro! {dados}')):
         resultado = gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
-    assert resultado['origem'] == 'llm'
+    assert resultado['origem'] == 'modelo-teste'
 
 
 def test_resumo_sem_seccoes_nao_chama_llm(contexto):
@@ -526,7 +526,7 @@ def test_texto_llm_escapado_no_envio_telegram(contexto):
             patch.object(redacao, 'chamar_llm',
                          return_value=_resposta_llm(f'Olá! {dados}')):
         resultado = gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
-    assert resultado['origem'] == 'llm'
+    assert resultado['origem'] == 'modelo-teste'
 
     class Resposta:
         status_code = 200
@@ -558,7 +558,7 @@ def test_origem_llm_indicada_na_simulacao_e_no_log(contexto, capsys, caplog):
             patch.object(services.notification_service, 'send') as enviar:
         services.enviar_resumos_diarios(HOJE, simular=True)
     saida = capsys.readouterr().out
-    assert '[fase4] (origem: LLM)' in saida
+    assert '[fase4] (origem: modelo-teste)' in saida
     assert 'modelo-teste' in caplog.text
     assert 'Texto redigido por LLM' in caplog.text
     enviar.assert_not_called()

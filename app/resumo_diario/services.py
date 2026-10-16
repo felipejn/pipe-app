@@ -73,8 +73,7 @@ def enviar_resumos_diarios(data=None, simular=False):
                 continue
             resumo = gerar_resumo_diario(user.id, data)
             if simular:
-                origem = ('LLM' if resumo.get('origem') == 'llm'
-                          else f"determinístico — {resumo.get('motivo')}")
+                origem = resumo.get('origem') if resumo.get('origem') != 'deterministico' else f"determinístico — {resumo.get('motivo')}"
                 print(f'[{user.username}] (origem: {origem})\n'
                       f'{resumo["texto"] or "Não há novidades para hoje."}')
                 continue

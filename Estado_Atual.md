@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.7
+# PIPE — Estado Actual do Projecto — v1.8.8
 
 ## O que é o PIPE
 

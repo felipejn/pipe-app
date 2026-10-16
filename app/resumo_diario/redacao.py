@@ -332,4 +332,4 @@ def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900):
         return dados, 'deterministico', motivo
 
     _registar_origem('llm', modelo=modelo)
-    return conteudo.strip(), 'llm', None
+    return conteudo.strip(), modelo or 'llm', None
