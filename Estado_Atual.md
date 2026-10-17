@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.10
+# PIPE — Estado Actual do Projecto — v1.8.11
 
 ## O que é o PIPE
 
@@ -186,11 +186,13 @@ pipe-app/
 ### Módulo Auth (`app/auth/`)
 
 - Registo por convite apenas — `Convite` com token único, validade de 7 dias e contador de usos (`convites_usados`)
-- Login com `@login_required` (Flask-Login)
+- Login por email com `@login_required` (Flask-Login); `username` mantém-se como identificador interno de compatibilidade
+- Perfil guarda nome próprio e apelido (`utilizadores.nome`, `utilizadores.apelido`); campos opcionais para contas antigas e pedidos no registo por convite
+- Saudações do dashboard, Assistente e comunicações usam o nome próprio, com fallback para contas antigas
 - 2FA: **Telegram, Email e TOTP** — métodos configuráveis e simultâneos (`UserNotificationPreferences`, `pyotp` + `qrcode`)
 - Reset de password por email
 - Rotas: `/auth/login`, `/auth/register`, `/auth/2fa/*`, `/auth/reset/*`
-- Rotas críticas protegidas por rate limiting (`Flask-Limiter`); falhas de login registadas com `app.logger.warning` (username + IP)
+- Rotas críticas protegidas por rate limiting (`Flask-Limiter`); falhas de login registadas com `app.logger.warning` (email + IP)
 
 ### Módulo Euromilhões (`app/euromilhoes/`)
 
@@ -369,7 +371,7 @@ pipe-app/
 - Execução:
   - `pytest --collect-only -q` — recolhe os testes
   - `pytest -q` — executa a suite completa
-- **Validação desta revisão (2026-10-17, já com `origin/main` integrado):** suite integral — **377 passaram, 1 ignorado**, 26 subtests passaram (53,93 s); `pip-audit` sobre `requirements.txt` — **sem vulnerabilidades conhecidas**; `git diff --check` limpo. O ambiente `.venv` local aponta para um Python removido; a suite foi executada com Python 3.14 disponível.
+- **Validação desta revisão (2026-10-17, já com `origin/main` integrado):** suite integral — **379 passaram, 1 ignorado**, 26 subtests passaram (60,79 s); `git diff --check` limpo. O ambiente `.venv` local aponta para um Python removido; a suite foi executada com Python 3.14 disponível.
 - **Aviso do `conftest.py`:** nenhum teste pode tocar na BD real do PIPE. O `drop_all_seguro` intercepta `flask_sqlalchemy.SQLAlchemy.drop_all` e levanta `RuntimeError` sempre que a URI da BD não for `:memory:` — criar a app com `create_app('testing')` (SQLite em memória + sessões temporárias). A reatribuição de `SQLALCHEMY_DATABASE_URI` depois de `create_app()` não altera o engine já inicializado.
 
 ---
@@ -469,6 +471,8 @@ O `stamp` foi usado apenas uma vez, para registar que a BD de produção já cor
 6. No PythonAnywhere: `git pull` → `pip install -r requirements.txt` → `flask db upgrade`
 7. Confirmar com `flask db current` (revisão esperada) e `flask db check` (limpo)
 8. Reload da aplicação
+
+**Migração v1.8.11:** `flask db upgrade` aplica `d7a4c91e2f60` (colunas `nome` e `apelido` em `utilizadores`); confirmar `flask db current` em `d7a4c91e2f60` e executar Reload. A base SQLite configurada localmente foi migrada durante a validação desta alteração.
 
 ### Restauro de backup
 

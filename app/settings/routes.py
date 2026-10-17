@@ -124,7 +124,7 @@ def testar_email():
 
     canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
     sucesso = canal.enviar_template(current_user, 'teste', {
-        'nome': current_user.username,
+        'nome': current_user.nome_apresentacao,
     })
 
     if sucesso:

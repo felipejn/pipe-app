@@ -6,6 +6,18 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.11] — 2026-10-17
+Login por email e perfil com nome próprio e apelido.
+
+**Alterado** (`app/auth/`, templates de autenticação e apresentação, notificações; migration `d7a4c91e2f60`)
+- O login e a recuperação de password normalizam o email; o registo por convite recolhe nome próprio e apelido. O `username` existente mantém-se como identificador interno e é gerado a partir do email para novas contas.
+- Perfil permite editar os dados pessoais. Dashboard, assistente e emails usam o nome próprio; contas antigas sem nome continuam suportadas com fallback para `username`.
+- Migration aditiva acrescenta `nome` e `apelido` opcionais à tabela `utilizadores`, preservando os dados existentes.
+
+**Validação**
+- Suite completa: **379 passaram, 1 ignorado**, 26 subtests; `git diff --check` limpo.
+- A migration `d7a4c91e2f60` foi aplicada à BD SQLite configurada localmente. No PythonAnywhere: fazer pull, executar `flask db upgrade`, confirmar `flask db current` em `d7a4c91e2f60` e fazer Reload.
+
 ## [v1.8.10] — 2026-10-17
 Refactor dos emails enviados pelo PIPE — conteúdo próprio por fluxo, layout HTML comum e alternativa em texto simples.
 

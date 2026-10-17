@@ -129,7 +129,7 @@ def tarefa_euromilhoes(hoje):
             user=user, type='resultado_euromilhoes',
             subject=f'Resultados Euromilhões — {hoje_str}', body=corpo,
             email_template='resultados_euromilhoes',
-            email_context={'nome': user.username, 'data': hoje_str,
+            email_context={'nome': user.nome_apresentacao, 'data': hoje_str,
                            'resultados': resultados})
         print(f'  [Euromilhões] {user.username}: '
               f'telegram={_descrever(res.get("telegram"), "telegram")}  '
@@ -210,7 +210,7 @@ def tarefa_tarefas(hoje, resumo_recebido=None):
             subject = f'⚠ {n_atraso} tarefa{"s" if n_atraso > 1 else ""} em atraso no PIPE'
 
         body = (
-            f'Olá {user.username},\n\n'
+            f'Olá {user.nome_apresentacao},\n\n'
             + '\n\n'.join(partes)
             + '\n\nAcede ao PIPE para concluir ou actualizar os prazos.'
         )
@@ -222,7 +222,7 @@ def tarefa_tarefas(hoje, resumo_recebido=None):
                 data={'total_hoje': n_hoje, 'total_atraso': n_atraso},
                 email_template='tarefas',
                 email_context={
-                    'nome': user.username,
+                    'nome': user.nome_apresentacao,
                     'tarefas_hoje': [
                         {'texto': t.texto, 'data': t.data_limite.strftime('%d/%m/%Y')}
                         for t in hoje_lista],
@@ -364,7 +364,7 @@ def tarefa_calendario(hoje, resumo_recebido=None):
             subject = f'📅 {n_h} evento{"s" if n_h > 1 else ""} hoje no PIPE'
 
         body = (
-            f'Olá {user.username},\n\n'
+            f'Olá {user.nome_apresentacao},\n\n'
             + '\n\n'.join(partes)
             + '\n\nAcede ao PIPE ao Calendário para ver os detalhes.'
         )
@@ -376,7 +376,7 @@ def tarefa_calendario(hoje, resumo_recebido=None):
                 data={'total_amanha': n_a, 'total_hoje': n_h},
                 email_template='eventos',
                 email_context={
-                    'nome': user.username,
+                    'nome': user.nome_apresentacao,
                     'eventos_amanha': [_dados_email(e) for e in amanha_lista],
                     'eventos_hoje': [_dados_email(e) for e in hoje_lista],
                     'total_amanha': n_a, 'total_hoje': n_h,

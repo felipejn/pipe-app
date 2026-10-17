@@ -344,7 +344,7 @@
     function boasVindas() {
         mostrarVazio(false);
         var modoEscrita = {{ 'true' if modo == 'escrita' else 'false' }};
-        var boas = 'Olá, {{ current_user.username }}! Sou o teu assistente PIPE.\n' +
+        var boas = 'Olá, {{ current_user.nome_apresentacao }}! Sou o teu assistente PIPE.\n' +
             (modoEscrita
                 ? 'Estou em modo de execução — posso consultar e alterar dados.\n'
                 : 'Estou em modo de consulta — só leitura.\n') +

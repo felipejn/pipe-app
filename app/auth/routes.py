@@ -12,7 +12,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app import db
 from app.auth import auth
 from app.auth.forms import (
-    LoginForm, RegistoForm, AlterarPasswordForm,
+    LoginForm, RegistoForm, DadosPessoaisForm, AlterarPasswordForm,
     VerificarCodigoForm, ConfigurarDoisFAForm, ConfirmarTOTPForm,
     PedirResetForm, ResetPasswordForm
 )
@@ -61,7 +61,7 @@ def _enviar_codigo_email(user):
     canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
 
     return canal.enviar_template(user, 'codigo_2fa', {
-        'nome': user.username, 'codigo': codigo,
+        'nome': user.nome_apresentacao, 'codigo': codigo,
     })
 
 
@@ -87,7 +87,8 @@ def login():
 
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        email = form.email.data.strip().lower()
+        user = User.query.filter(db.func.lower(User.email) == email).first()
         if user and user.activo and user.check_password(form.password.data):
 
             metodos = user.metodos_2fa_activos()
@@ -118,7 +119,7 @@ def login():
             return redirect(url_for('auth.escolher_2fa'))
 
         current_app.logger.warning('Login falhado para utilizador: %s (IP: %s)',
-                            form.username.data, request.remote_addr)
+                            email, request.remote_addr)
         flash('Utilizador ou palavra-passe incorrectos.', 'erro')
 
     return render_template('auth/login.html', form=form)
@@ -285,7 +286,15 @@ def registo_com_convite(token):
             flash('O email deve corresponder ao do convite.', 'erro')
             return render_template('auth/registo_token.html', form=form, convite=convite)
 
-        user = User(username=form.username.data, email=form.email.data.lower().strip())
+        email = form.email.data.lower().strip()
+        username = email.split('@', 1)[0][:64]
+        base_username = username or 'utilizador'
+        sufixo = 1
+        while User.query.filter_by(username=username).first():
+            sufixo += 1
+            username = f'{base_username[:64 - len(str(sufixo))]}{sufixo}'
+        user = User(username=username, email=email,
+                    nome=form.nome.data.strip(), apelido=form.apelido.data.strip())
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.flush()  # obtém user.id para semear as listas predefinidas
@@ -306,8 +315,20 @@ def registo_com_convite(token):
 @auth.route('/perfil', methods=['GET', 'POST'])
 @login_required
 def perfil():
+    form_dados = DadosPessoaisForm(prefix='dados')
     form_password = AlterarPasswordForm(prefix='pwd')
     form_2fa = ConfigurarDoisFAForm(prefix='2fa')
+
+    if request.method == 'GET':
+        form_dados.nome.data = current_user.nome or ''
+        form_dados.apelido.data = current_user.apelido or ''
+
+    if form_dados.submeter.data and form_dados.validate_on_submit():
+        current_user.nome = form_dados.nome.data.strip()
+        current_user.apelido = form_dados.apelido.data.strip()
+        db.session.commit()
+        flash('Dados pessoais actualizados.', 'sucesso')
+        return redirect(url_for('auth.perfil'))
 
     # Formulário de password
     if form_password.submeter.data and form_password.validate_on_submit():
@@ -347,7 +368,8 @@ def perfil():
         form_2fa.dois_fa_chat_id.data = current_user.dois_fa_chat_id or ''
         form_2fa.dois_fa_email_activo.data = current_user.dois_fa_email_activo
 
-    return render_template('auth/perfil.html', form_password=form_password, form_2fa=form_2fa)
+    return render_template('auth/perfil.html', form_dados=form_dados,
+                           form_password=form_password, form_2fa=form_2fa)
 
 
 # ── TOTP — configurar ─────────────────────────────────────────────────────
@@ -432,7 +454,7 @@ def recuperar_password():
             remetente = current_app.config.get('MAILJET_FROM_EMAIL')
             canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
             canal.enviar_template(utilizador, 'recuperacao_password', {
-                'nome': utilizador.username, 'link': link,
+                'nome': utilizador.nome_apresentacao, 'link': link,
             })
 
         # Resposta sempre igual — evita enumeração de emails

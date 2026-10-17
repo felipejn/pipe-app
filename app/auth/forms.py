@@ -1,21 +1,22 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError, Optional
+from app import db
 from app.auth.models import User
 
 
 class LoginForm(FlaskForm):
-    username = StringField('Utilizador', validators=[DataRequired()])
+    email = StringField('Email', filters=[lambda valor: valor.strip().lower() if valor else valor],
+                        validators=[DataRequired(), Email(), Length(max=120)])
     password = PasswordField('Palavra-passe', validators=[DataRequired()])
     lembrar = BooleanField('Lembrar sessão')
     submeter = SubmitField('Entrar')
 
 
 class RegistoForm(FlaskForm):
-    username = StringField('Utilizador', validators=[
-        DataRequired(), Length(min=3, max=64)
-    ])
-    email = StringField('Email', validators=[
+    nome = StringField('Nome próprio', validators=[DataRequired(), Length(max=80)])
+    apelido = StringField('Apelido', validators=[DataRequired(), Length(max=80)])
+    email = StringField('Email', filters=[lambda valor: valor.strip().lower() if valor else valor], validators=[
         DataRequired(), Email(), Length(max=120)
     ])
     password = PasswordField('Palavra-passe', validators=[
@@ -26,13 +27,15 @@ class RegistoForm(FlaskForm):
     ])
     submeter = SubmitField('Criar conta')
 
-    def validate_username(self, field):
-        if User.query.filter_by(username=field.data).first():
-            raise ValidationError('Este nome de utilizador já existe.')
-
     def validate_email(self, field):
-        if User.query.filter_by(email=field.data).first():
+        if User.query.filter(db.func.lower(User.email) == field.data.strip().lower()).first():
             raise ValidationError('Este email já está registado.')
+
+
+class DadosPessoaisForm(FlaskForm):
+    nome = StringField('Nome próprio', validators=[DataRequired(), Length(max=80)])
+    apelido = StringField('Apelido', validators=[DataRequired(), Length(max=80)])
+    submeter = SubmitField('Guardar dados')
 
 
 class AlterarPasswordForm(FlaskForm):
@@ -68,7 +71,8 @@ class ConfigurarDoisFAForm(FlaskForm):
 
 class PedirResetForm(FlaskForm):
     """Formulário para pedir recuperação de password por email."""
-    email = StringField('Email', validators=[DataRequired(), Email()])
+    email = StringField('Email', filters=[lambda valor: valor.strip().lower() if valor else valor],
+                        validators=[DataRequired(), Email()])
     submeter = SubmitField('Enviar link de recuperação')
 
 

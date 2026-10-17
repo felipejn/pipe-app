@@ -12,6 +12,8 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    nome = db.Column(db.String(80), nullable=True)
+    apelido = db.Column(db.String(80), nullable=True)
     password_hash = db.Column(db.String(256), nullable=False)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     ultimo_login = db.Column(db.DateTime)
@@ -39,6 +41,16 @@ class User(UserMixin, db.Model):
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+
+    @property
+    def nome_completo(self):
+        """Nome para apresentação, com compatibilidade para contas antigas."""
+        nome = ' '.join(parte for parte in (self.nome, self.apelido) if parte)
+        return nome or self.username
+
+    @property
+    def nome_apresentacao(self):
+        return self.nome or self.username
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)

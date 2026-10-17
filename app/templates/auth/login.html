@@ -16,9 +16,9 @@
         <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
             {{ form.hidden_tag() }}
             <div class="campo">
-                {{ form.username.label }}
-                {{ form.username(class="input", placeholder="O teu nome de utilizador") }}
-                {% for erro in form.username.errors %}
+                {{ form.email.label }}
+                {{ form.email(class="input", placeholder="o-teu@email.com", autocomplete="email") }}
+                {% for erro in form.email.errors %}
                 <span class="erro-campo">{{ erro }}</span>
                 {% endfor %}
             </div>

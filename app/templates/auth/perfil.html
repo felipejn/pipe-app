@@ -15,8 +15,8 @@
                 <h3>Dados da conta</h3>
             </div>
             <div class="campo-info">
-                <span class="campo-info-label">Utilizador</span>
-                <span class="campo-info-valor">{{ current_user.username }}</span>
+                <span class="campo-info-label">Nome</span>
+                <span class="campo-info-valor">{{ current_user.nome_completo }}</span>
             </div>
             <div class="campo-info">
                 <span class="campo-info-label">Email</span>
@@ -36,6 +36,24 @@
                     {% endif %}
                 </span>
             </div>
+        </div>
+
+        <div class="cartao">
+            <div class="cartao-cabecalho"><h3>Dados pessoais</h3></div>
+            <form method="POST" action="{{ url_for('auth.perfil') }}">
+                {{ form_dados.hidden_tag() }}
+                <div class="campo">
+                    {{ form_dados.nome.label }}
+                    {{ form_dados.nome(class="input", autocomplete="given-name") }}
+                    {% for erro in form_dados.nome.errors %}<span class="erro-campo">{{ erro }}</span>{% endfor %}
+                </div>
+                <div class="campo">
+                    {{ form_dados.apelido.label }}
+                    {{ form_dados.apelido(class="input", autocomplete="family-name") }}
+                    {% for erro in form_dados.apelido.errors %}<span class="erro-campo">{{ erro }}</span>{% endfor %}
+                </div>
+                {{ form_dados.submeter(class="btn btn-primario") }}
+            </form>
         </div>
 
         <!-- Alterar palavra-passe -->

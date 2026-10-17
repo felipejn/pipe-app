@@ -16,7 +16,7 @@ def client(monkeypatch):
     with app.app_context():
         db.create_all()
         user = User(
-            username='security-test', email='security@example.test',
+            username='security-test', email='security@example.com',
             password_hash=generate_password_hash('correct-horse-battery'),
             activo=True,
         )
@@ -70,7 +70,7 @@ def test_external_next_is_ignored_and_remember_checkbox_is_respected(client):
     test_client, _, _ = client
     resposta = test_client.post(
         '/auth/login?next=https://attacker.example/phishing',
-        data={'username': 'security-test', 'password': 'correct-horse-battery'},
+        data={'email': 'security@example.com', 'password': 'correct-horse-battery'},
     )
     assert resposta.status_code == 302
     assert resposta.headers['Location'].endswith('/')
@@ -83,10 +83,37 @@ def test_internal_next_survives_login_form_submission(client):
     test_client, _, _ = client
     resposta = test_client.post(
         '/auth/login?next=/passwords/',
-        data={'username': 'security-test', 'password': 'correct-horse-battery'},
+        data={'email': 'security@example.com', 'password': 'correct-horse-battery'},
     )
     assert resposta.status_code == 302
     assert resposta.headers['Location'].endswith('/passwords/')
+
+
+def test_login_usa_email_e_ignora_maiusculas(client):
+    test_client, _, _ = client
+    resposta = test_client.post('/auth/login', data={
+        'email': ' SECURITY@EXAMPLE.COM ',
+        'password': 'correct-horse-battery',
+    })
+    assert resposta.status_code == 302
+    assert resposta.headers['Location'].endswith('/')
+
+
+def test_perfil_guarda_nome_e_apelido(client):
+    test_client, app, user_id = client
+    with test_client.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+
+    resposta = test_client.post('/auth/perfil', data={
+        'dados-nome': 'Ana',
+        'dados-apelido': 'Silva',
+        'dados-submeter': 'Guardar dados',
+    })
+    assert resposta.status_code == 302
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.nome_completo == 'Ana Silva'
 
 
 def test_remember_checkbox_sets_thirty_day_session(client):
@@ -94,7 +121,7 @@ def test_remember_checkbox_sets_thirty_day_session(client):
     resposta = test_client.post(
         '/auth/login',
         data={
-            'username': 'security-test', 'password': 'correct-horse-battery',
+            'email': 'security@example.com', 'password': 'correct-horse-battery',
             'lembrar': 'y',
         },
     )
@@ -118,7 +145,7 @@ def test_totp_login_completes_and_honours_remember_choice(client):
     inicio = test_client.post(
         '/auth/login',
         data={
-            'username': 'security-test', 'password': 'correct-horse-battery',
+            'email': 'security@example.com', 'password': 'correct-horse-battery',
             'lembrar': 'y',
         },
     )

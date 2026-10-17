@@ -33,7 +33,7 @@
     <div class="navbar-utilizador">
         <a href="{{ url_for('auth.perfil') }}"
            class="utilizador-nome utilizador-link {% if request.endpoint == 'auth.perfil' %}activo{% endif %}">
-            {{ current_user.username }}
+            {{ current_user.nome_apresentacao }}
         </a>
         {% if current_user.is_admin %}
         <a href="{{ url_for('admin.dashboard') }}"

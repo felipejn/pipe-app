@@ -77,15 +77,17 @@ def test_registo_cria_listas_predefinidas(app, client):
     """POST /auth/registo/<token> cria o utilizador com as 4 listas na ordem certa."""
     token = _criar_convite(app, 'novo@exemplo.pt')
     client.post(f'/auth/registo/{token}', data={
-        'username': 'novo-utilizador',
+        'nome': 'Novo', 'apelido': 'Utilizador',
         'email': 'novo@exemplo.pt',
         'password': 'password-de-teste-123',
         'password2': 'password-de-teste-123',
     }, follow_redirects=True)
 
     with client.application.app_context():
-        user = User.query.filter_by(username='novo-utilizador').first()
+        user = User.query.filter_by(email='novo@exemplo.pt').first()
         assert user is not None, 'registo não criou o utilizador'
+        assert user.nome == 'Novo'
+        assert user.apelido == 'Utilizador'
         listas = Lista.query.filter_by(user_id=user.id).order_by(Lista.ordem).all()
         assert [(l.nome, l.icone, l.ordem) for l in listas] == ESPERADAS
 

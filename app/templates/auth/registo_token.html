@@ -17,9 +17,16 @@
         <form method="POST" action="{{ url_for('auth.registo_com_convite', token=convite.token) }}">
             {{ form.hidden_tag() }}
             <div class="campo">
-                {{ form.username.label }}
-                {{ form.username(class="input") }}
-                {% for erro in form.username.errors %}
+                {{ form.nome.label }}
+                {{ form.nome(class="input", autocomplete="given-name") }}
+                {% for erro in form.nome.errors %}
+                <span class="erro-campo">{{ erro }}</span>
+                {% endfor %}
+            </div>
+            <div class="campo">
+                {{ form.apelido.label }}
+                {{ form.apelido(class="input", autocomplete="family-name") }}
+                {% for erro in form.apelido.errors %}
                 <span class="erro-campo">{{ erro }}</span>
                 {% endfor %}
             </div>
