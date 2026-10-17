@@ -127,7 +127,10 @@ def tarefa_euromilhoes(hoje):
         corpo = construir_mensagem(sorteio, resultados)
         res   = notification_service.send(
             user=user, type='resultado_euromilhoes',
-            subject=f'Resultados Euromilhões — {hoje_str}', body=corpo)
+            subject=f'Resultados Euromilhões — {hoje_str}', body=corpo,
+            email_template='resultados_euromilhoes',
+            email_context={'nome': user.username, 'data': hoje_str,
+                           'resultados': resultados})
         print(f'  [Euromilhões] {user.username}: '
               f'telegram={_descrever(res.get("telegram"), "telegram")}  '
               f'email={_descrever(res.get("email"), "email")}')
@@ -216,7 +219,19 @@ def tarefa_tarefas(hoje, resumo_recebido=None):
             res = notification_service.send(
                 user=user, type='tarefa_lembrete',
                 subject=subject, body=body,
-                data={'total_hoje': n_hoje, 'total_atraso': n_atraso})
+                data={'total_hoje': n_hoje, 'total_atraso': n_atraso},
+                email_template='tarefas',
+                email_context={
+                    'nome': user.username,
+                    'tarefas_hoje': [
+                        {'texto': t.texto, 'data': t.data_limite.strftime('%d/%m/%Y')}
+                        for t in hoje_lista],
+                    'tarefas_atraso': [
+                        {'texto': t.texto, 'data': t.data_limite.strftime('%d/%m/%Y'),
+                         'dias': (hoje - t.data_limite).days}
+                        for t in atraso_lista],
+                    'total_hoje': n_hoje, 'total_atraso': n_atraso,
+                })
         except Exception:
             db.session.rollback()
             logging.exception('[Tarefas] Falha ao notificar %s', user.username)
@@ -313,6 +328,13 @@ def tarefa_calendario(hoje, resumo_recebido=None):
         local = f' — {e.localizacao}' if e.localizacao else ''
         return f'• {e.titulo} ({quando}){local}'
 
+    def _dados_email(e):
+        return {
+            'titulo': e.titulo,
+            'quando': 'dia inteiro' if e.dia_inteiro else f'às {e.data_inicio.strftime("%H:%M")}',
+            'local': e.localizacao or '',
+        }
+
     notificados = 0
     for user_id, lista in por_user.items():
         if resumo_recebido and user_id in resumo_recebido:
@@ -351,7 +373,14 @@ def tarefa_calendario(hoje, resumo_recebido=None):
             res = notification_service.send(
                 user=user, type='evento_lembrete',
                 subject=subject, body=body,
-                data={'total_amanha': n_a, 'total_hoje': n_h})
+                data={'total_amanha': n_a, 'total_hoje': n_h},
+                email_template='eventos',
+                email_context={
+                    'nome': user.username,
+                    'eventos_amanha': [_dados_email(e) for e in amanha_lista],
+                    'eventos_hoje': [_dados_email(e) for e in hoje_lista],
+                    'total_amanha': n_a, 'total_hoje': n_h,
+                })
         except Exception:
             db.session.rollback()
             logging.exception('[Calendário] Falha ao notificar %s', user.username)

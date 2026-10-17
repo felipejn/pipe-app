@@ -1,0 +1,61 @@
+PIPE
+====
+
+{% if tipo == 'codigo_2fa' %}Confirma o teu acesso
+
+Olá {{ nome|default('') }}, utiliza este código para concluir o início de sessão:
+
+{{ codigo }}
+
+O código é válido durante 10 minutos e só pode ser utilizado uma vez. Se não foste tu, ignora este email.
+{% elif tipo == 'convite' %}Tens um convite para o PIPE
+
+Olá, foste convidado a juntar-te ao PIPE, uma plataforma pessoal para organizar tarefas, notas e outras ferramentas.
+
+O convite é válido durante 7 dias. Cria a tua conta neste endereço:
+{{ link }}
+
+Se não estavas à espera deste convite, ignora esta mensagem.
+{% elif tipo == 'recuperacao_password' %}Recuperar palavra-passe
+
+Olá {{ nome }}, recebemos um pedido para definir uma nova palavra-passe para a tua conta PIPE.
+O link é válido durante 1 hora:
+{{ link }}
+
+Se não fizeste este pedido, ignora este email. A tua palavra-passe não será alterada.
+{% elif tipo == 'teste' %}Email configurado
+
+Olá {{ nome }}, este email confirma que o endereço está pronto para receber notificações do PIPE.
+Gere as notificações nas definições da tua conta: {{ app_url }}
+{% elif tipo == 'resultados_euromilhoes' %}Resultados do Euromilhões — {{ data }}
+
+Olá {{ nome }}, aqui está a verificação dos teus jogos:
+{% for jogo in resultados %}
+- Números: {{ jogo.numeros|join(', ') }}; estrelas: {{ jogo.estrelas|join(', ') }}; acertos: {{ jogo.n_ac }} números e {{ jogo.e_ac }} estrelas{% if jogo.premio %}; prémio: {{ jogo.premio }}{% endif %}
+{% endfor %}
+Ver resultados: {{ euromilhoes_url }}
+{% elif tipo == 'tarefas' %}Lembrete de tarefas
+
+Olá {{ nome }}, este é o resumo das tuas tarefas:
+{% if tarefas_hoje %}
+Com prazo hoje ({{ total_hoje }}):
+{% for t in tarefas_hoje %}- {{ t.texto }} — {{ t.data }}
+{% endfor %}{% endif %}{% if tarefas_atraso %}
+Em atraso ({{ total_atraso }}):
+{% for t in tarefas_atraso %}- {{ t.texto }} — prazo {{ t.data }}, {{ t.dias }} dia(s) de atraso
+{% endfor %}{% endif %}
+Ver tarefas: {{ tarefas_url }}
+{% elif tipo == 'eventos' %}Lembrete do Calendário
+
+Olá {{ nome }}, estes são os teus próximos eventos:
+{% if eventos_amanha %}
+Amanhã ({{ total_amanha }}):
+{% for e in eventos_amanha %}- {{ e.titulo }} — {{ e.quando }}{% if e.local %}, {{ e.local }}{% endif %}
+{% endfor %}{% endif %}{% if eventos_hoje %}
+Hoje ({{ total_hoje }}):
+{% for e in eventos_hoje %}- {{ e.titulo }} — {{ e.quando }}{% if e.local %}, {{ e.local }}{% endif %}
+{% endfor %}{% endif %}
+Ver Calendário: {{ calendario_url }}
+{% endif %}
+
+Mensagem automática do PIPE. Podes gerir as notificações nas definições da tua conta.

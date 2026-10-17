@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.9
+# PIPE — Estado Actual do Projecto — v1.8.10
 
 ## O que é o PIPE
 
@@ -25,6 +25,7 @@ pipe-app/
 │   ├── templates/
 │   │   ├── base.html        # navbar + alternador de tema 🌙/☀️ + anti-FOUC + barra secundária «Voltar/Home» (oculta no dashboard) + meta `csrf-token` (cofre/extensão)
 │   │   ├── dashboard.html   # dashboard — grelha híbrida de cards com resumos por provider (Tarefas + Calendário); fallback clássico automático se não houver provider
+│   │   ├── emails/          # layout responsivo e templates HTML + texto simples dos emails PIPE
 │   │   ├── assistente/
 │   │   │   └── index.html   # interface de chat do Assistente IA
 │   │   ├── auth/            # login, registo (por convite), 2FA, reset password
@@ -290,6 +291,7 @@ pipe-app/
 
 - Modelo `UserNotificationPreferences` (`notificacao_preferencias`) — preferências por canal (Telegram, Email, Tarefas, Calendário)
 - `service.py` orquestra o envio; canais: `TelegramChannel` (python-telegram-bot) e `EmailChannel` (Mailjet)
+- **Emails PIPE (v1.8.10):** `email_templates.py` compõe assunto, HTML e texto simples para convite, recuperação de palavra-passe, 2FA, teste, Euromilhões, tarefas e Calendário; `EmailChannel` envia `HTMLPart` + `TextPart` ao Mailjet com remetente `PIPE`. O serviço separa o conteúdo do email das mensagens Telegram. `PIPE_PUBLIC_URL` define a origem dos links em tarefas agendadas (por omissão `https://felipejn.pythonanywhere.com`).
 - **Diagnóstico de falhas (v1.8.4):** ambos os canais guardam o motivo do último envio em `ultimo_resultado` (`{'sucesso', 'message_id', 'erro'}`), no mesmo contrato — o retorno continua `bool` para não partir os chamadores antigos (2FA, definições, resumo diário). `notification_service.ultimo_erro(canal)` expõe o motivo e `_registar_falhas()` escreve-o no log sempre que um canal devolve `False`. **`False` e `None` não são o mesmo:** `None` é canal não activo ou destinatário sem contacto (silencioso, esperado); `False` é o canal a correr e a falhar — e traz motivo.
 - **Canal Telegram** — valida o `ok` do corpo da resposta (a Bot API devolve `{"ok": false, "error_code", "description"}`; `description` vive no **topo** do corpo, ao contrário da OpenRouter, que a aninha em `error`). O motivo fica em `ultimo_resultado['erro']` como `HTTP <error_code> — <description>` (ex.: `HTTP 403 — Forbidden: bot was blocked by the user`), `Erro de rede: …` ou `Destinatário sem chat_id de Telegram.`; o sucesso guarda o `message_id`. **Retry só em falhas transitórias:** rede, 408/425/429/500/502/503/504 repetem uma vez (2 s); 4xx permanentes (400/401/403/404/409) falham de imediato.
 - **Log da scheduled task** — `_descrever(resultado, canal)` traduz cada canal para `ok` / `não activo` / `FALHOU (<motivo>)` nas linhas de Euromilhões, Tarefas e Calendário; o Resumo Diário distingue os dois casos de ausência.

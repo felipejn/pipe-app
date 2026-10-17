@@ -35,7 +35,7 @@ class EmailChannel(BaseChannel):
             'Content-Type': 'application/json',
         }
 
-    def enviar(self, utilizador, assunto, corpo, dados=None):
+    def enviar(self, utilizador, assunto, corpo, dados=None, html=None):
         """Envia email ao utilizador via Mailjet.
 
         Requer que utilizador.email esteja preenchido.
@@ -57,10 +57,11 @@ class EmailChannel(BaseChannel):
                 json={
                     'Messages': [
                         {
-                            'From': {'Email': self.remetente},
+                            'From': {'Email': self.remetente, 'Name': 'PIPE'},
                             'To': [{'Email': utilizador.email}],
                             'Subject': assunto,
                             'TextPart': corpo,
+                            **({'HTMLPart': html} if html else {}),
                         }
                     ]
                 },
@@ -107,6 +108,13 @@ class EmailChannel(BaseChannel):
                 'erro': f'Erro de rede: {e}',
             }
             return False
+
+    def enviar_template(self, utilizador, tipo, contexto):
+        """Compõe e envia uma mensagem PIPE com versões HTML e texto simples."""
+        from app.notifications.email_templates import compor_email
+
+        assunto, texto, html = compor_email(tipo, contexto)
+        return self.enviar(utilizador, assunto, texto, html=html)
 
     def consultar_estado(self, message_id):
         """Consulta a actividade Mailjet de uma mensagem já enviada.

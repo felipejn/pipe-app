@@ -60,11 +60,9 @@ def _enviar_codigo_email(user):
     remetente = current_app.config.get('MAILJET_FROM_EMAIL')
     canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
 
-    return canal.enviar(
-        user,
-        assunto='Código de acesso PIPE',
-        corpo=f'O teu código de verificação é: {codigo}\n\nExpira em 10 minutos.',
-    )
+    return canal.enviar_template(user, 'codigo_2fa', {
+        'nome': user.username, 'codigo': codigo,
+    })
 
 
 def _destino_seguro(proximo):
@@ -433,17 +431,9 @@ def recuperar_password():
             api_secret = current_app.config.get('MAILJET_API_SECRET')
             remetente = current_app.config.get('MAILJET_FROM_EMAIL')
             canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
-            canal.enviar(
-                utilizador,
-                assunto='PIPE — Recuperação de palavra-passe',
-                corpo=(
-                    f'Olá {utilizador.username},\n\n'
-                    f'Recebemos um pedido de recuperação de palavra-passe para a tua conta PIPE.\n\n'
-                    f'Clica no link abaixo para definir uma nova palavra-passe (válido durante 1 hora):\n\n'
-                    f'{link}\n\n'
-                    f'Se não fizeste este pedido, ignora este email — a tua conta está segura.'
-                ),
-            )
+            canal.enviar_template(utilizador, 'recuperacao_password', {
+                'nome': utilizador.username, 'link': link,
+            })
 
         # Resposta sempre igual — evita enumeração de emails
         mensagem = 'Se o email existir na plataforma, receberás um link em breve.'

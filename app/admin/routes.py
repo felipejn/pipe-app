@@ -151,17 +151,8 @@ def gerar_convite():
                 username = 'convidado'
 
             current_app.logger.info(f'Enviando convite por email para {convite.email}')
-            enviado = canal.enviar(
-                _Destinatario(),
-                assunto='Convite para a plataforma PIPE',
-                corpo=(
-                    f'Olá,\n\n'
-                    f'Foste convidado a juntar-te à plataforma PIPE.\n\n'
-                    f'Clica no link abaixo para criar a tua conta (válido durante 7 dias):\n\n'
-                    f'{link}\n\n'
-                    f'Se não esperavas este convite, podes ignorar esta mensagem.'
-                ),
-            )
+            enviado = canal.enviar_template(
+                _Destinatario(), 'convite', {'link': link})
             current_app.logger.info(f'Resultado do envio: {enviado}')
             res = getattr(canal, 'ultimo_resultado', None) or {}
             current_app.logger.info(

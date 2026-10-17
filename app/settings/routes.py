@@ -123,11 +123,9 @@ def testar_email():
         return redirect(url_for('settings.index'))
 
     canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
-    sucesso = canal.enviar(
-        current_user,
-        'Teste PIPE',
-        'Notificações email configuradas com sucesso!\n\nVais receber aqui as notificações do PIPE.',
-    )
+    sucesso = canal.enviar_template(current_user, 'teste', {
+        'nome': current_user.username,
+    })
 
     if sucesso:
         flash(f'Email de teste enviado para {current_user.email}.', 'sucesso')

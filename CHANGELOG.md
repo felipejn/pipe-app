@@ -6,6 +6,19 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.10] — 2026-10-17
+Refactor dos emails enviados pelo PIPE — conteúdo próprio por fluxo, layout HTML comum e alternativa em texto simples.
+
+**Alterado** (`app/notifications/`, templates de email, autenticação, notificações e tarefas agendadas; **sem alteração de BD**)
+- `EmailChannel` envia `HTMLPart` e `TextPart` pelo Mailjet e identifica o remetente como PIPE; o envio legado de texto simples continua suportado.
+- Novo compositor e layout responsivo reutilizável para convite, recuperação de palavra-passe, código 2FA, teste de email e notificações de Euromilhões, tarefas e Calendário. Os assuntos e chamadas à acção são próprios de cada fluxo; dados dinâmicos passam pelo escaping do Jinja.
+- O serviço de notificações aceita um template/contexto específico de email, mantendo o assunto e o corpo Telegram existentes.
+- `PIPE_PUBLIC_URL` define a origem dos links dos emails disparados por tarefas agendadas sem pedido HTTP; por omissão usa `https://felipejn.pythonanywhere.com`.
+
+**Validação**
+- 76 testes relevantes passaram (`test_convites_email.py`, `test_pipe_tasks.py`, `test_security_hardening.py`, `test_notifications_telegram.py`); os sete tipos de email foram renderizados fora de um pedido web; `compileall` e `git diff --check` sem erros.
+- Sem alteração de BD. No PythonAnywhere: garantir `PIPE_PUBLIC_URL` se o domínio diferir do valor predefinido, fazer push e Reload.
+
 ## [v1.8.9] — 2026-10-17
 Endurecimento de segurança, limites de recursos e privacidade da extensão Chrome.
 

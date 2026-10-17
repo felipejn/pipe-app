@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ assunto }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;color:#202124;font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">{{ preheader }}</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:28px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+        <tr><td style="padding:22px 30px;background:#202124;color:#fff;font-size:21px;font-weight:bold;letter-spacing:.4px;">PIPE</td></tr>
+        <tr><td style="padding:30px;font-size:16px;line-height:1.6;">
+          {% if tipo == 'codigo_2fa' %}
+            <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;">Confirma o teu acesso</h1>
+            <p>Olá {{ nome|default('') }}, utiliza este código para concluir o início de sessão:</p>
+            <p style="margin:24px 0;padding:16px;text-align:center;background:#fff8e1;border-radius:8px;color:#8a5a00;font-size:30px;font-weight:bold;letter-spacing:8px;">{{ codigo }}</p>
+            <p>O código é válido durante <strong>10 minutos</strong> e só pode ser utilizado uma vez. Se não foste tu, podes ignorar este email.</p>
+          {% elif tipo == 'convite' %}
+            <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;">Tens um convite para o PIPE</h1>
+            <p>Olá, foste convidado a juntar-te ao PIPE, uma plataforma pessoal para organizar tarefas, notas e outras ferramentas.</p>
+            <p>O convite é válido durante <strong>7 dias</strong>. Cria a tua conta através do botão abaixo.</p>
+            <p style="margin:26px 0;"><a href="{{ link }}" style="display:inline-block;padding:13px 22px;background:#f4b400;border-radius:7px;color:#202124;text-decoration:none;font-weight:bold;">Criar conta</a></p>
+            <p style="font-size:13px;color:#5f6368;">Se o botão não funcionar, copia este endereço para o navegador:<br><a href="{{ link }}" style="color:#785600;word-break:break-all;">{{ link }}</a></p>
+            <p>Se não estavas à espera deste convite, ignora esta mensagem.</p>
+          {% elif tipo == 'recuperacao_password' %}
+            <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;">Recuperar palavra-passe</h1>
+            <p>Olá {{ nome }}, recebemos um pedido para definir uma nova palavra-passe para a tua conta PIPE.</p>
+            <p>O link é válido durante <strong>1 hora</strong>.</p>
+            <p style="margin:26px 0;"><a href="{{ link }}" style="display:inline-block;padding:13px 22px;background:#f4b400;border-radius:7px;color:#202124;text-decoration:none;font-weight:bold;">Definir nova palavra-passe</a></p>
+            <p style="font-size:13px;color:#5f6368;">Se o botão não funcionar, copia este endereço para o navegador:<br><a href="{{ link }}" style="color:#785600;word-break:break-all;">{{ link }}</a></p>
+            <p>Se não fizeste este pedido, ignora este email. A tua palavra-passe não será alterada.</p>
+          {% elif tipo == 'teste' %}
+            <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;">Email configurado</h1>
+            <p>Olá {{ nome }}, este email confirma que o endereço está pronto para receber notificações do PIPE.</p>
+            <p>Podes gerir as notificações nas definições da tua conta.</p>
+            <p style="margin:26px 0;"><a href="{{ euromilhoes_url }}" style="display:inline-block;padding:13px 22px;background:#f4b400;border-radius:7px;color:#202124;text-decoration:none;font-weight:bold;">Ver resultados</a></p>
+          {% elif tipo == 'resultados_euromilhoes' %}
+            <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;">Resultados do Euromilhões</h1>
+            <p>Olá {{ nome }}, aqui está a verificação dos teus jogos para {{ data }}:</p>
+            {% for jogo in resultados %}<div style="margin:12px 0;padding:14px;background:#f7f7f7;border-radius:8px;"><strong>Números:</strong> {{ jogo.numeros|join(', ') }} &nbsp; <strong>Estrelas:</strong> {{ jogo.estrelas|join(', ') }}<br><strong>Acertos:</strong> {{ jogo.n_ac }} números e {{ jogo.e_ac }} estrelas{% if jogo.premio %}<br><strong>Prémio:</strong> {{ jogo.premio }}{% endif %}</div>{% endfor %}
+            <p style="margin:26px 0;"><a href="{{ app_url }}" style="display:inline-block;padding:13px 22px;background:#f4b400;border-radius:7px;color:#202124;text-decoration:none;font-weight:bold;">Abrir o PIPE</a></p>
+          {% elif tipo == 'tarefas' %}
+            <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;">Lembrete de tarefas</h1>
+            <p>Olá {{ nome }}, este é o resumo das tuas tarefas:</p>
+            {% if tarefas_hoje %}<h2 style="font-size:17px;">Com prazo hoje ({{ total_hoje }})</h2><ul>{% for t in tarefas_hoje %}<li>{{ t.texto }} — {{ t.data }}</li>{% endfor %}</ul>{% endif %}
+            {% if tarefas_atraso %}<h2 style="font-size:17px;">Em atraso ({{ total_atraso }})</h2><ul>{% for t in tarefas_atraso %}<li>{{ t.texto }} — prazo {{ t.data }}, {{ t.dias }} dia(s) de atraso</li>{% endfor %}</ul>{% endif %}
+            <p style="margin:26px 0;"><a href="{{ tarefas_url }}" style="display:inline-block;padding:13px 22px;background:#f4b400;border-radius:7px;color:#202124;text-decoration:none;font-weight:bold;">Ver tarefas</a></p>
+          {% elif tipo == 'eventos' %}
+            <h1 style="margin:0 0 16px;font-size:23px;line-height:1.3;">Lembrete do Calendário</h1>
+            <p>Olá {{ nome }}, estes são os teus próximos eventos:</p>
+            {% if eventos_amanha %}<h2 style="font-size:17px;">Amanhã ({{ total_amanha }})</h2><ul>{% for e in eventos_amanha %}<li>{{ e.titulo }} — {{ e.quando }}{% if e.local %}, {{ e.local }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+            {% if eventos_hoje %}<h2 style="font-size:17px;">Hoje ({{ total_hoje }})</h2><ul>{% for e in eventos_hoje %}<li>{{ e.titulo }} — {{ e.quando }}{% if e.local %}, {{ e.local }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+            <p style="margin:26px 0;"><a href="{{ calendario_url }}" style="display:inline-block;padding:13px 22px;background:#f4b400;border-radius:7px;color:#202124;text-decoration:none;font-weight:bold;">Ver Calendário</a></p>
+          {% endif %}
+        </td></tr>
+        <tr><td style="padding:18px 30px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.5;">Mensagem automática do PIPE. Podes gerir as notificações nas definições da tua conta.</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

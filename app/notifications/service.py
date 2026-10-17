@@ -49,7 +49,7 @@ class NotificationService:
         self._inicializado = True
 
     def send(self, user, type, subject, body, data=None, force_channel=None,
-             telegram_parse_mode=None):
+             telegram_parse_mode=None, email_template=None, email_context=None):
         """Envia notificação ao utilizador pelos canais activos.
 
         Args:
@@ -103,7 +103,11 @@ class NotificationService:
         # Email
         canal_email = self._canais.get('email')
         if canal_email and prefs and prefs.email_activo:
-            resultados['email'] = canal_email.enviar(user, subject, body, data)
+            if email_template:
+                resultados['email'] = canal_email.enviar_template(
+                    user, email_template, email_context or data or {})
+            else:
+                resultados['email'] = canal_email.enviar(user, subject, body, data)
         else:
             resultados['email'] = None  # não activo
 
