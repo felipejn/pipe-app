@@ -38,7 +38,11 @@ def api_chat():
     if not mensagem:
         return jsonify({'erro': 'A mensagem não pode estar vazia.'}), 400
 
-    resposta_texto, modelo = processar_mensagem_assistente(mensagem, user_id=current_user.id)
+    resposta_texto, modelo = processar_mensagem_assistente(
+        mensagem,
+        user_id=current_user.id,
+        nome_completo=current_user.nome_completo,
+    )
     return jsonify({'resposta': resposta_texto, 'modelo': modelo})
 
 

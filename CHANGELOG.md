@@ -6,6 +6,17 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.13] — 2026-10-18
+O Assistente IA recebe o nome completo do utilizador e usa-o de forma adequada.
+
+**Alterado** (`app/assistente/`; **sem alteração de BD**)
+- Cada pedido ao modelo inclui o nome completo do perfil autenticado. A instrução concisa indica que deve usar o primeiro nome por padrão e o nome completo apenas quando relevante ou solicitado.
+
+**Validação**
+- Testes do assistente: **100 passaram**, 26 subtests; `git diff --check` limpo.
+- Suite completa: **379 passaram, 1 ignorado**, 26 subtests; 1 falha não relacionada em `tests/test_dashboard.py::TestCalendarioProvider::test_com_eventos_devolve_ok` (esperava pelo menos um evento "hoje", obteve zero).
+- Sem alteração de BD. No PythonAnywhere: push + Reload.
+
 ## [v1.8.12] — 2026-10-17
 Correcções ao processo de primeira instalação.
 

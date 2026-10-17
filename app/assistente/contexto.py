@@ -238,7 +238,9 @@ def _guardar_historico(historico):
     session.modified = True
 
 
-def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None, modo=None):
+def processar_mensagem_assistente(
+    mensagem_utilizador, user_id, historico=None, modo=None, nome_completo=None
+):
     """Processa uma mensagem do utilizador através do Assistente PIPE.
 
     Quando chamada em contexto de requisição (Flask session), passa None
@@ -270,6 +272,13 @@ def processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None, 
         modo = 'leitura'
 
     system_prompt = SYSTEM_PROMPT_ESCRITA if modo == 'escrita' else SYSTEM_PROMPT_LEITURA
+    if nome_completo:
+        system_prompt += (
+            '\n\n'
+            f'Utilizador: {json.dumps(nome_completo, ensure_ascii=False)}. '
+            'Usa o primeiro nome por padrão; nome completo apenas quando '
+            'relevante ou solicitado.\n'
+        )
     # Anexa a data/hora actuais a cada pedido, para o modelo resolver
     # expressões relativas ("amanhã", "na próxima sexta") sem inventar datas.
     system_prompt += _contexto_temporal()

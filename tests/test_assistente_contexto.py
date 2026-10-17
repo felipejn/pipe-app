@@ -27,6 +27,26 @@ class ProcessarMensagemTests(TestCase):
     @mock.patch("app.assistente.contexto.chamar_llm")
     @mock.patch("app.assistente.contexto.executar_ferramenta")
     @mock.patch("app.assistente.contexto.time.sleep")
+    def test_prompt_define_uso_do_nome_completo_do_utilizador(
+        self, sleep, executar, chamar_llm
+    ):
+        chamar_llm.return_value = _resposta(conteudo="Chamas-te Felipe.")
+
+        processar_mensagem_assistente(
+            "Qual o meu nome?", user_id=1, historico=[], modo="leitura",
+            nome_completo="Felipe Pipe",
+        )
+
+        mensagens = chamar_llm.call_args.args[0]
+        self.assertEqual(mensagens[0]["role"], "system")
+        prompt = mensagens[0]["content"].lower()
+        self.assertIn("felipe pipe", prompt)
+        self.assertIn("primeiro nome por padrão", prompt)
+        self.assertIn("nome completo apenas quando relevante ou solicitado", prompt)
+
+    @mock.patch("app.assistente.contexto.chamar_llm")
+    @mock.patch("app.assistente.contexto.executar_ferramenta")
+    @mock.patch("app.assistente.contexto.time.sleep")
     def test_resposta_vazia_sem_tool_calls_retorna_mensagem_amigavel(
         self, sleep, executar, chamar_llm
     ):
