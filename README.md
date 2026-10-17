@@ -141,8 +141,13 @@ cp .env.example .env
 # Editar .env e preencher SECRET_KEY (obrigatório)
 # As restantes variáveis são opcionais para uso local
 
-# Criar a base de dados e o primeiro utilizador admin
+# Aplicar as migrações e criar o primeiro utilizador admin
+flask --app run db upgrade
 python scripts/criar_admin.py
+
+# O script pede username (identificador interno), email, nome próprio,
+# apelido e palavra-passe. Se o username já existir, promove a conta a admin
+# e preenche apenas os nomes em falta; mantém o email e a palavra-passe existentes.
 
 # Arrancar a aplicação
 python run.py

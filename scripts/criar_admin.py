@@ -24,14 +24,20 @@ def criar_admin():
     app = create_app('development')
     with app.app_context():
         username = input('Username: ').strip()
-        email = input('Email: ').strip()
+        email = input('Email: ').strip().lower()
+        nome = input('Nome próprio: ').strip()
+        apelido = input('Apelido: ').strip()
         password = input('Palavra-passe: ').strip()
 
         user = User.query.filter_by(username=username).first()
         if user:
-            print(f'Utilizador "{username}" já existe. A aplicar seed...')
+            print(f'Utilizador "{username}" já existe. A promover a admin e aplicar seed...')
+            user.is_admin = True
+            user.nome = user.nome or nome or None
+            user.apelido = user.apelido or apelido or None
         else:
-            user = User(username=username, email=email)
+            user = User(username=username, email=email, nome=nome or None,
+                        apelido=apelido or None)
             user.set_password(password)
             user.is_admin = True
             db.session.add(user)

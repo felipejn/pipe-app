@@ -6,6 +6,20 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.12] — 2026-10-17
+Correcções ao processo de primeira instalação.
+
+**Alterado** (`scripts/criar_admin.py`, README; **sem alteração de BD**)
+- O README aplica agora as migrações (`flask --app run db upgrade`) antes da criação do primeiro administrador.
+- O script pede nome próprio e apelido e grava-os na conta nova; normaliza o email para minúsculas.
+- Se o username já existir, promove a conta a administradora e preenche apenas os nomes em falta, sem alterar email ou palavra-passe existentes.
+
+**Validação**
+- Suite completa: **379 passaram, 1 ignorado**, 26 subtests; `git diff --check` limpo.
+- Sem alteração de BD. Na primeira instalação, executar `flask --app run db upgrade` antes de `python scripts/criar_admin.py`.
+
+---
+
 ## [v1.8.11] — 2026-10-17
 Login por email e perfil com nome próprio e apelido.
 

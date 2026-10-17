@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.11
+# PIPE — Estado Actual do Projecto — v1.8.12
 
 ## O que é o PIPE
 
@@ -473,6 +473,8 @@ O `stamp` foi usado apenas uma vez, para registar que a BD de produção já cor
 8. Reload da aplicação
 
 **Migração v1.8.11:** `flask db upgrade` aplica `d7a4c91e2f60` (colunas `nome` e `apelido` em `utilizadores`); confirmar `flask db current` em `d7a4c91e2f60` e executar Reload. A base SQLite configurada localmente foi migrada durante a validação desta alteração.
+
+**Primeira instalação (v1.8.12):** executar `flask --app run db upgrade` antes de `python scripts/criar_admin.py`. O script pede username interno, email, nome próprio, apelido e palavra-passe. Se o username já existir, promove essa conta a administradora, preenche apenas os nomes em falta e mantém o email e a palavra-passe existentes.
 
 ### Restauro de backup
 

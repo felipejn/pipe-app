@@ -33,8 +33,9 @@ def client(app):
     return app.test_client()
 
 
-def _criar_admin(app, monkeypatch, username='admin-teste', email='admin@exemplo.pt', password='password'):
-    inputs = iter([username, email, password])
+def _criar_admin(app, monkeypatch, username='admin-teste', email='admin@exemplo.pt',
+                 password='password', nome='Admin', apelido='Teste'):
+    inputs = iter([username, email, nome, apelido, password])
     monkeypatch.setattr('builtins.input', lambda _: next(inputs))
     monkeypatch.setattr(criar_admin, 'create_app', lambda env: app)
     criar_admin.criar_admin()
@@ -48,6 +49,8 @@ def test_cria_admin_com_listas_e_concelhos(app, monkeypatch):
         user = User.query.filter_by(username='admin-teste').first()
         assert user is not None
         assert user.is_admin is True
+        assert user.nome == 'Admin'
+        assert user.apelido == 'Teste'
 
         listas = Lista.query.filter_by(user_id=user.id).order_by(Lista.ordem).all()
         assert [(l.nome, l.icone, l.ordem) for l in listas] == [
@@ -79,7 +82,8 @@ def test_segunda_criacao_nao_duplica(app, monkeypatch):
 def test_utilizador_existente_com_concelhos_proprios_nao_altera(app, monkeypatch):
     """Seed nao sobrescreve concelhos que o utilizador ja configurou."""
     with app.app_context():
-        user = User(username='admin-existing', email='admin-existing@exemplo.pt')
+        user = User(username='admin-existing', email='admin-existing@exemplo.pt',
+                    apelido='Apelido preservado')
         user.password_hash = generate_password_hash('password')
         db.session.add(user)
         db.session.commit()
@@ -87,7 +91,7 @@ def test_utilizador_existente_com_concelhos_proprios_nao_altera(app, monkeypatch
         db.session.add(UtilizadorConcelho(user_id=user.id, concelho='Porto'))
         db.session.commit()
 
-    inputs = iter(['admin-existing', 'admin-existing@exemplo.pt', 'password'])
+    inputs = iter(['admin-existing', 'outro@exemplo.pt', 'Novo nome', 'Novo apelido', 'outra-password'])
     monkeypatch.setattr('builtins.input', lambda _: next(inputs))
     monkeypatch.setattr(criar_admin, 'create_app', lambda env: app)
 
@@ -99,6 +103,11 @@ def test_utilizador_existente_com_concelhos_proprios_nao_altera(app, monkeypatch
 
     with app.app_context():
         user = User.query.filter_by(username='admin-existing').first()
+        assert user.is_admin is True
+        assert user.nome == 'Novo nome'
+        assert user.apelido == 'Apelido preservado'
+        assert user.email == 'admin-existing@exemplo.pt'
+        assert user.check_password('password')
         concelhos = {
             uc.concelho for uc in UtilizadorConcelho.query.filter_by(user_id=user.id).all()
         }
@@ -107,7 +116,7 @@ def test_utilizador_existente_com_concelhos_proprios_nao_altera(app, monkeypatch
 
 def test_recolha_chamada_quando_nao_ha_postos(app, monkeypatch):
     """Recolha e chamada quando a tabela de postos esta vazia e ha chave API."""
-    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'password'])
+    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'Admin', 'Teste', 'password'])
     monkeypatch.setattr('builtins.input', lambda _: next(inputs))
     monkeypatch.setattr(criar_admin, 'create_app', lambda env: app)
 
@@ -131,7 +140,7 @@ def test_recolha_nao_chamada_quando_ja_existem_postos(app, monkeypatch):
         db.session.add(Posto(id=1, nome='Posto Teste', concelho='Braga'))
         db.session.commit()
 
-    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'password'])
+    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'Admin', 'Teste', 'password'])
     monkeypatch.setattr('builtins.input', lambda _: next(inputs))
     monkeypatch.setattr(criar_admin, 'create_app', lambda env: app)
 
@@ -144,7 +153,7 @@ def test_recolha_nao_chamada_quando_ja_existem_postos(app, monkeypatch):
 
 def test_erro_na_recolha_nao_impede_criacao(app, monkeypatch):
     """Erro na recolha nao impede a criacao do admin, listas nem concelhos."""
-    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'password'])
+    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'Admin', 'Teste', 'password'])
     monkeypatch.setattr('builtins.input', lambda _: next(inputs))
     monkeypatch.setattr(criar_admin, 'create_app', lambda env: app)
 
@@ -161,7 +170,7 @@ def test_erro_na_recolha_nao_impede_criacao(app, monkeypatch):
 
 def test_sem_api_key_nao_recolhe(app, monkeypatch):
     """Sem APIABERTA_API_KEY definida, a recolha e saltada."""
-    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'password'])
+    inputs = iter(['admin-teste', 'admin@exemplo.pt', 'Admin', 'Teste', 'password'])
     monkeypatch.setattr('builtins.input', lambda _: next(inputs))
     monkeypatch.setattr(criar_admin, 'create_app', lambda env: app)
 
