@@ -409,14 +409,23 @@ def api_importar_csv():
     import csv
     import io
 
-    stream = io.StringIO(ficheiro.read().decode('utf-8'))
+    conteudo = ficheiro.read(current_app.config['MAX_CSV_BYTES'] + 1)
+    if len(conteudo) > current_app.config['MAX_CSV_BYTES']:
+        return jsonify({'erro': 'O CSV excede o limite de 5 MB.'}), 413
+    try:
+        stream = io.StringIO(conteudo.decode('utf-8-sig'))
+    except UnicodeDecodeError:
+        return jsonify({'erro': 'O CSV tem de estar codificado em UTF-8.'}), 400
     reader = csv.DictReader(stream)
 
     importadas = 0
     duplicadas = 0
     erros = []
 
-    for linha in reader:
+    for numero_linha, linha in enumerate(reader, start=1):
+        if numero_linha > current_app.config['MAX_CSV_ROWS']:
+            db.session.rollback()
+            return jsonify({'erro': 'O CSV excede o limite de 5000 linhas.'}), 413
         try:
             url = linha.get('url', '')
             username = linha.get('username', '')

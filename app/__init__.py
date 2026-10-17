@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import timedelta
 from flask import Flask, app
 from flask_sqlalchemy import SQLAlchemy
@@ -20,6 +21,10 @@ login_manager.login_message_category = 'info'
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    if config_name == 'production' and not app.config.get('SECRET_KEY'):
+        raise RuntimeError('SECRET_KEY tem de estar configurada em produção.')
+    if not app.config.get('SECRET_KEY'):
+        app.config['SECRET_KEY'] = secrets.token_hex(32)
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
     # Configurações de sessão para PWA.
@@ -28,6 +33,7 @@ def create_app(config_name='default'):
     # pedidos cross-site e só recebe o cookie com SameSite=None (exige HTTPS),
     # pelo que não podem ser fixados aqui.
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
 
     # Sessões server-side para o cofre (chave nunca no browser).
     # setdefault: a config carregada (ex.: TestingConfig) tem de poder fixar o
@@ -117,6 +123,14 @@ def create_app(config_name='default'):
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; object-src 'none'; base-uri 'self'; "
+            "frame-ancestors 'none'; form-action 'self'; "
+            "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; font-src 'self' data:; connect-src 'self'"
+        )
+        if app.config.get('SESSION_COOKIE_SECURE'):
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000'
         return response
 
     # Rota raiz — redireciona para dashboard

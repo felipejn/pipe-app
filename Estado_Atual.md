@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.8
+# PIPE — Estado Actual do Projecto — v1.8.9
 
 ## O que é o PIPE
 
@@ -349,6 +349,10 @@ pipe-app/
 | Rate limiting | Flask-Limiter nas rotas críticas | `app/auth/routes.py`, `app/combustiveis/routes.py`, `app/assistente/routes.py`, `app/extensions.py` |
 | Logging de login falhado | `app.logger.warning` com username e IP | `app/auth/routes.py` |
 | Security headers | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` | `app/__init__.py` |
+| CSP e HSTS | Content Security Policy; HSTS quando os cookies seguros estão activos | `app/__init__.py` |
+| Segredo da aplicação | produção falha no arranque sem `SECRET_KEY`; desenvolvimento/testes geram chave aleatória se faltar | `app/__init__.py`, `config.py` |
+| 2FA | código aleatório seguro, limitação de envio/reenvio e rejeição de contas inactivas | `app/auth/routes.py`, `app/auth/models.py` |
+| Limites de upload | limite global, conversões, dimensões de imagem, CSV e número de linhas | `config.py`, `app/conversoes/routes.py`, `app/passwords/routes.py` |
 | Password hashing | Werkzeug `generate_password_hash` / `check_password_hash` | `app/auth/models.py` |
 | Controlo de acesso | `@login_required` e `@admin_required` | rotas protegidas |
 | Configuração IP PA | `X-Forwarded-For` no Limiter | `app/extensions.py` |
@@ -361,10 +365,10 @@ pipe-app/
 ## Testes
 
 - Execução:
-  - `pytest --collect-only -q` — recolhe todos os testes (259 colectados)
+  - `pytest --collect-only -q` — recolhe os testes
   - `pytest -q` — executa a suite completa
-- A suite contém agora **22 ficheiros e 270 testes recolhidos**, mais 26 subtests: inclui `test_resumo_diario_fase3.py` (8) e mais três casos em `test_pipe_tasks.py`. Os 48 testes de resumo e tasks passaram. A cadeia de migrations foi aplicada numa SQLite `:memory:` vazia e `flask db check` não encontrou operações pendentes. Suite integral: 83 passaram, 65 falharam, 122 erros e 26 subtests passaram; Pillow no `.venv` foi compilado para Python 3.11 e não carrega no Python 3.14 disponível.
-- **Aviso do `conftest.py`:** nenhum teste pode tocar na BD real do PIPE. O `drop_all_seguro` intercepta `flask_sqlalchemy.SQLAlchemy.drop_all` e levanta `RuntimeError` sempre que a URI da BD não for `:memory:` — obrigatoriedade de criar a app com `create_app('testing')` (SQLite em memória + sessões em pasta temporária). O anti-padrão `db.drop_all()` com BD de ficheiro levanta erro porque o engine do SQLAlchemy fica fixado em `db.init_app()` e a reatribuição de `SQLALCHEMY_DATABASE_URI` depois de `create_app()` não tem efeito
+- **Validação desta revisão (2026-10-17, já com `origin/main` integrado):** suite integral — **377 passaram, 1 ignorado**, 26 subtests passaram (53,93 s); `pip-audit` sobre `requirements.txt` — **sem vulnerabilidades conhecidas**; `git diff --check` limpo. O ambiente `.venv` local aponta para um Python removido; a suite foi executada com Python 3.14 disponível.
+- **Aviso do `conftest.py`:** nenhum teste pode tocar na BD real do PIPE. O `drop_all_seguro` intercepta `flask_sqlalchemy.SQLAlchemy.drop_all` e levanta `RuntimeError` sempre que a URI da BD não for `:memory:` — criar a app com `create_app('testing')` (SQLite em memória + sessões temporárias). A reatribuição de `SQLALCHEMY_DATABASE_URI` depois de `create_app()` não altera o engine já inicializado.
 
 ---
 
@@ -496,13 +500,13 @@ Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`;
 
 ## Próximos passos
 
-1. **Confirmar em produção (PythonAnywhere)** — o error log à hora do teste original devia mostrar `[Resumo Diário] Meteorologia em falha` (causa confirmada da ausência pontual de meteorologia: falha transitória da Open-Meteo). A v1.8.3 já corrigiu prompt e validação; falta um `git pull` + Reload e re-testar a pré-visualização com o checkbox **Meteorologia** activo.
-2. **Deploy do módulo Meteorologia no PythonAnywhere:** `git pull` → `flask db upgrade` (aplica a migration `c420a200f2f2_adiciona_meteorologia_localizacao.py`) → check `flask db current`/`flask db check` → **Reload**; verificar a previsão com Open-Meteo real.
-3. **Testar notificações do Calendário em produção** — via `pipe_tasks.py` (tarefa `tarefa_calendario`).
-4. **Testar o dashboard com resumos em produção** — confirmar badges de estado e métricas de Tarefas/Calendário; depois expandir os providers (Combustíveis, Notas, Euromilhões, Passwords) conforme o plano `docs/plano_dash_global_v1.7.0.md`.
-5. **Extensão Chrome do Cofre** — teste de ponta a ponta em produção.
-6. **Futuras alterações de schema** — seguir o procedimento Flask-Migrate (nunca editar a baseline `3b14f5bd26a5`).
-7. Manter `CHANGELOG.md` atualizado com cada versão — o histórico do projecto vive apenas lá a partir de agora.
+1. **Preparar deploy de segurança no PythonAnywhere:** confirmar `SECRET_KEY` forte já definida no ambiente antes de actualizar; instalar as versões de `requirements.txt`, fazer `git pull` e Reload. Não há alterações de esquema/migrations.
+2. **Validar em produção:** login e 2FA (incluindo TOTP), cookies e cabeçalhos HTTPS, importação de CSV e conversão de imagens; confirmar nos logs que não há erros de arranque.
+3. **Confirmar o Resumo Diário e Meteorologia em produção** — re-testar a pré-visualização com Meteorologia activa e observar logs da Open-Meteo.
+4. **Testar notificações do Calendário e dashboard em produção.**
+5. **Extensão Chrome do Cofre** — teste de ponta a ponta; captura pendente expira localmente após 15 minutos.
+6. Futuras alterações de schema seguem Flask-Migrate; nunca editar a baseline `3b14f5bd26a5`.
+7. Manter `CHANGELOG.md` actualizado com cada versão.
 
 ---
 

@@ -9,13 +9,17 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class Config:
     # Segurança
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-alterar-em-producao'
+    SECRET_KEY = os.environ.get('SECRET_KEY')
     WTF_CSRF_ENABLED = True
 
     # Base de dados
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(BASE_DIR, 'instance', 'pipe.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    MAX_CONTENT_LENGTH = 55 * 1024 * 1024
+    MAX_UPLOAD_TOTAL_BYTES = 50 * 1024 * 1024
+    MAX_CSV_BYTES = 5 * 1024 * 1024
+    MAX_CSV_ROWS = 5000
 
     # Notificações — Telegram
     TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -55,6 +59,7 @@ class ProductionConfig(Config):
     # (HTTPS), garantido acima. O CSRF continua protegido pelo token assinado do
     # Flask-WTF em todos os POSTs, incluindo os da extensão.
     SESSION_COOKIE_SAMESITE = 'None'
+    PREFERRED_URL_SCHEME = 'https'
 
 class TestingConfig(Config):
     """Configuração dos testes unitários — isolada da BD real.

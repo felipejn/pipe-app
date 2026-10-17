@@ -195,7 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     return `
       <div class="status status-locked" style="margin-top:8px;">
-        📝 Login capturado em <strong>${esc(dominioDeUrl(capturaDoSite.url) || '')}</strong>.<br>
+        📝 Formulário de início de sessão detetado em <strong>${esc(dominioDeUrl(capturaDoSite.url) || '')}</strong>.<br>
+        A extensão deteta estes formulários em todos os sites. A captura fica local até expirar ou ser descartada; só é enviada ao PIPE se escolheres Guardar ou Atualizar.<br>
         Guardar para <strong>${esc(capturaDoSite.username || '')}</strong>?
       </div>
       <button id="capture-accept-btn" class="btn btn-primary btn-block" style="margin-top:6px;">Guardar</button>

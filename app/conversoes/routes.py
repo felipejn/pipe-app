@@ -3,7 +3,7 @@ import zipfile
 from datetime import datetime, timezone
 
 import pillow_heif
-from flask import render_template, request, jsonify, send_file
+from flask import render_template, request, jsonify, send_file, current_app
 from flask_login import login_required, current_user
 from PIL import Image
 
@@ -18,6 +18,7 @@ pillow_heif.register_heif_opener()
 MAX_FICHEIROS = 20
 MAX_TAMANHO_MB = 10
 MAX_TAMANHO_BYTES = MAX_TAMANHO_MB * 1024 * 1024
+MAX_PIXELS = 25_000_000
 EXTENSOES_HEIC = {'.heic'}
 MIMETYPES_HEIC = {'image/heic', 'image/heif'}
 EXTENSOES_IMG = {'.png', '.jpg', '.jpeg'}
@@ -54,6 +55,8 @@ def converter_heic_para_jpg(file):
     """Converte um ficheiro HEIC para JPG em memória. Retorna BytesIO."""
     conteudo = file.read()
     imagem = Image.open(io.BytesIO(conteudo))
+    if imagem.width * imagem.height > MAX_PIXELS:
+        raise ValueError('A imagem excede o limite de 25 milhões de píxeis.')
     imagem_rgb = imagem.convert('RGB')
     output = io.BytesIO()
     imagem_rgb.save(output, format='JPEG', quality=85)
@@ -65,8 +68,10 @@ def converter_img_para_ico(file, tamanho=64):
     """Converte PNG/JPG para ICO em memória. Retorna BytesIO."""
     conteudo = file.read()
     imagem = Image.open(io.BytesIO(conteudo))
+    if imagem.width * imagem.height > MAX_PIXELS:
+        raise ValueError('A imagem excede o limite de 25 milhões de píxeis.')
     imagem = imagem.convert('RGBA')
-    imagem_red = imagem.resize((tamanho, tamanho), Image.LANCZOS)
+    imagem_red = imagem.resize((tamanho, tamanho), Image.Resampling.LANCZOS)
     output = io.BytesIO()
     imagem_red.save(output, format='ICO', sizes=[(tamanho, tamanho)])
     output.seek(0)
@@ -114,6 +119,15 @@ def api_converter():
     # Verificar limite de ficheiros
     if len(ficheiros) > MAX_FICHEIROS:
         return jsonify({'erro': f'Máximo de {MAX_FICHEIROS} ficheiros por conversão'}), 400
+
+    tamanho_total_pedido = 0
+    for ficheiro in ficheiros:
+        posicao = ficheiro.tell()
+        ficheiro.seek(0, 2)
+        tamanho_total_pedido += ficheiro.tell()
+        ficheiro.seek(posicao)
+    if tamanho_total_pedido > current_app.config['MAX_UPLOAD_TOTAL_BYTES']:
+        return jsonify({'erro': 'O total dos ficheiros excede o limite de 50 MB.'}), 413
 
     # Validar cada ficheiro
     todos_erros = []

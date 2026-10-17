@@ -95,6 +95,17 @@ class TestDownloadExtensao:
             manifesto = json.loads(zf.read('chrome-extension/manifest.json'))
         assert manifesto['manifest_version'] == 3
         assert manifesto['version']
+        assert 'alarms' in manifesto['permissions']
+
+    def test_extensao_explica_captura_e_tem_expiracao_automatica(self, authenticated_client):
+        r = authenticated_client.get('/passwords/extensao/download')
+        with zipfile.ZipFile(io.BytesIO(r.data)) as zf:
+            popup = zf.read('chrome-extension/popup.html').decode('utf-8')
+            background = zf.read('chrome-extension/background.js').decode('utf-8')
+        assert 'em todos os sites' in popup
+        assert 'só são enviadas ao PIPE' in popup
+        assert 'chrome.alarms.onAlarm' in background
+        assert 'CAPTURA_TTL_MS' in background
 
     def test_download_requer_sessao(self, client):
         """Sem sessão → redirect para o login (nunca o ZIP)."""

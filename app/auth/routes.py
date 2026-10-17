@@ -1,9 +1,9 @@
-import random
 import os
 import io
 import base64
 import secrets
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit
 
 import qrcode
 from flask import render_template, redirect, url_for, flash, request, session
@@ -29,7 +29,7 @@ from flask_limiter.errors import RateLimitExceeded
 
 def _gerar_e_guardar_codigo(user):
     """Gera código de 6 dígitos e guarda na BD. Não envia."""
-    codigo = str(random.randint(100000, 999999))
+    codigo = f'{secrets.randbelow(900000) + 100000:06d}'
     user.dois_fa_codigo = codigo
     user.dois_fa_expira = datetime.utcnow() + timedelta(minutes=10)
     db.session.commit()
@@ -67,6 +67,18 @@ def _enviar_codigo_email(user):
     )
 
 
+def _destino_seguro(proximo):
+    """Aceita apenas caminhos locais ou URLs na mesma origem."""
+    if not proximo or '\\' in proximo:
+        return False
+    destino = urlsplit(proximo)
+    if destino.scheme or destino.netloc:
+        return (destino.scheme in ('http', 'https')
+                and destino.scheme == request.scheme
+                and destino.netloc.lower() == request.host.lower())
+    return destino.path.startswith('/') and not destino.path.startswith('//')
+
+
 # ── Login ──────────────────────────────────────────────────────────────────
 
 @auth.route('/login', methods=['GET', 'POST'])
@@ -84,16 +96,21 @@ def login():
 
             if len(metodos) == 0:
                 # Sem 2FA — login directo
-                login_user(user, remember=True)
-                session.permanent = True
+                lembrar = bool(form.lembrar.data)
+                login_user(user, remember=lembrar)
+                session.permanent = lembrar
                 user.ultimo_login = datetime.utcnow()
                 db.session.commit()
                 proximo = request.args.get('next')
-                return redirect(proximo or url_for('dashboard'))
+                session.pop('login_next', None)
+                return redirect(proximo if _destino_seguro(proximo) else url_for('dashboard'))
 
             # Guarda estado na sessão
             session['2fa_user_id'] = user.id
             session['2fa_lembrar'] = form.lembrar.data
+            proximo = request.args.get('next')
+            if _destino_seguro(proximo):
+                session['login_next'] = proximo
 
             if len(metodos) == 1:
                 # Só um método — envia imediatamente
@@ -129,13 +146,14 @@ def escolher_2fa():
 # ── Enviar código pelo método escolhido ───────────────────────────────────
 
 @auth.route('/2fa/enviar/<metodo>')
+@limiter.limit('5 per 10 minutes')
 def enviar_2fa(metodo):
     user_id = session.get('2fa_user_id')
     if not user_id:
         return redirect(url_for('auth.login'))
 
     user = User.query.get(user_id)
-    if not user or metodo not in user.metodos_2fa_activos():
+    if not user or not user.activo or metodo not in user.metodos_2fa_activos():
         return redirect(url_for('auth.login'))
 
     session['2fa_metodo'] = metodo
@@ -171,7 +189,7 @@ def verificar_2fa():
         return redirect(url_for('auth.login'))
 
     user = User.query.get(user_id)
-    if not user:
+    if not user or not user.activo:
         session.pop('2fa_user_id', None)
         return redirect(url_for('auth.login'))
 
@@ -186,14 +204,16 @@ def verificar_2fa():
             if valido:
                 user.limpar_codigo()
 
-            if valido:
-                user.ultimo_login = datetime.utcnow()
-                db.session.commit()
-                session.pop('2fa_user_id', None)
-                session.pop('2fa_metodo', None)
-                login_user(user, remember=True)
-                session.permanent = True
-                return redirect(url_for('dashboard'))
+        if valido:
+            user.ultimo_login = datetime.utcnow()
+            db.session.commit()
+            lembrar = bool(session.pop('2fa_lembrar', False))
+            proximo = session.pop('login_next', None)
+            session.pop('2fa_user_id', None)
+            session.pop('2fa_metodo', None)
+            login_user(user, remember=lembrar)
+            session.permanent = lembrar
+            return redirect(proximo if _destino_seguro(proximo) else url_for('dashboard'))
         flash('Código incorrecto ou expirado.', 'erro')
 
     return render_template('auth/verificar_2fa.html', form=form, metodo=metodo, user=user)
@@ -202,6 +222,7 @@ def verificar_2fa():
 # ── Reenviar código ────────────────────────────────────────────────────────
 
 @auth.route('/2fa/reenviar', methods=['POST'])
+@limiter.limit('5 per 10 minutes')
 def reenviar_codigo():
     user_id = session.get('2fa_user_id')
     if not user_id:
@@ -210,7 +231,7 @@ def reenviar_codigo():
     user = User.query.get(user_id)
     metodo = session.get('2fa_metodo', 'telegram')
 
-    if user:
+    if user and user.activo and metodo in ('telegram', 'email') and metodo in user.metodos_2fa_activos():
         if metodo == 'telegram':
             enviado = _enviar_codigo_telegram(user)
         else:

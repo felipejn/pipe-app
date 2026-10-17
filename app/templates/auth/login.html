@@ -13,7 +13,7 @@
         <div class="alerta alerta-erro">{{ erro_limite }}</div>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('auth.login') }}">
+        <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
             {{ form.hidden_tag() }}
             <div class="campo">
                 {{ form.username.label }}
@@ -29,7 +29,9 @@
                 <span class="erro-campo">{{ erro }}</span>
                 {% endfor %}
             </div>
-             <!-- Campo "Lembrar sessão" removido para sessões permanentes -->
+            <div class="campo">
+                {{ form.lembrar() }} {{ form.lembrar.label }}
+            </div>
             <div class="campo">
                 {{ form.submeter(class="btn btn-primario btn-bloco") }}
             </div>

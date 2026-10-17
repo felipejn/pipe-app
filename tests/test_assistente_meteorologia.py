@@ -149,8 +149,12 @@ class RegistoFerramentaTests(_BaseMeteo):
         self.assertIn('description', properties['detalhado'])
 
     def test_despachante_aceita_o_filtro(self):
-        resultado = executar_ferramenta('get_meteorologia', {'detalhado': True},
-                                        self.user_id, modo='leitura')
+        with unittest.mock.patch(
+                'app.meteorologia.services.requests.get',
+                return_value=_RespostaFalsa(_forecast_valido())):
+            resultado = executar_ferramenta(
+                'get_meteorologia', {'detalhado': True},
+                self.user_id, modo='leitura')
         self.assertNotIn('erro', resultado)
         self.assertIn('horaria', resultado)
 

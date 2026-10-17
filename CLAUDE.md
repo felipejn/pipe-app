@@ -5,8 +5,8 @@
 - **Owner:** Felipe (apelido "Pipe") — ortografia Portuguesa Europeia em TODO o código e mensagens
 - **Repo:** https://github.com/felipejn/pipe-app
 - **Deploy:** https://felipejn.pythonanywhere.com (PythonAnywhere, plano free)
-- **Versão actual:** v1.7.4 (Assistente IA — reposição de `criar_tarefa` no registo + teste de invariante; 228 testes) — detalhe em `Estado_Atual.md`
-- **Testes:** 228 (pytest — nunca tocam na BD real)
+- **Versão actual:** v1.8.9 (endurecimento de segurança, limites de recursos e privacidade da extensão; detalhe em `Estado_Atual.md`)
+- **Testes:** 345 passaram na última suite completa (+ 26 subtests; pytest — nunca toca na BD real)
 
 ## Referência principal
 **Ler `Estado_Atual.md`** (nome com maiúsculas nesta platforma — em Linux/PA o sistema de ficheiros é case-sensitive) para o panorama completo do projecto — estrutura, módulos, rotas, segurança, deploy. Este ficheiro é a fonte de verdade.

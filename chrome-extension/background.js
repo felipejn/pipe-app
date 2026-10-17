@@ -8,7 +8,29 @@
 //   chrome.storage.local.set({ pipeOrigin: 'http://127.0.0.1:5000' })
 
 const PIPE_ORIGIN_DEFAULT = 'https://felipejn.pythonanywhere.com';
+const CAPTURA_TTL_MS = 15 * 60 * 1000;
+const ALARME_CAPTURA = 'pipe-pending-capture-expire';
 let _apiBase = null;
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== ALARME_CAPTURA) return;
+  const { pendingCapture } = await chrome.storage.local.get('pendingCapture');
+  if (!pendingCapture) return;
+  const restante = CAPTURA_TTL_MS - (Date.now() - pendingCapture.ts);
+  if (restante <= 0) {
+    await chrome.storage.local.remove('pendingCapture');
+    chrome.action.setBadgeText({ text: '' });
+  } else {
+    chrome.alarms.create(ALARME_CAPTURA, { delayInMinutes: restante / 60000 });
+  }
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.pendingCapture
+      && changes.pendingCapture.newValue === undefined) {
+    chrome.alarms.clear(ALARME_CAPTURA);
+  }
+});
 
 async function getApiBase() {
   if (_apiBase) return _apiBase;
@@ -130,6 +152,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       chrome.storage.local.set({
         pendingCapture: Object.assign({}, msg.data, { ts: Date.now() })
       });
+      chrome.alarms.create(ALARME_CAPTURA, { delayInMinutes: CAPTURA_TTL_MS / 60000 });
       chrome.action.setBadgeText({ text: '📝' });
       setTimeout(() => {
         chrome.action.setBadgeText({ text: '' });

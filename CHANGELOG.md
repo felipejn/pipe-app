@@ -6,6 +6,23 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.9] — 2026-10-17
+Endurecimento de segurança, limites de recursos e privacidade da extensão Chrome.
+
+**Corrigido e reforçado**
+- **Autenticação e sessões** — removida a chave secreta predefinida; produção não arranca sem `SECRET_KEY`. Contas inactivas são rejeitadas, o fluxo TOTP autentica correctamente, o código 2FA usa aleatoriedade criptográfica e o envio/reenvio está limitado. A opção «manter sessão» e o destino após login são preservados com validação de redireccionamento.
+- **Cabeçalhos e configuração** — adicionados CSP e HSTS em contexto de cookies seguros; configurado HTTPS como esquema preferido em produção e duração explícita do cookie de sessão.
+- **Limites de recursos** — limites de tamanho para pedidos, ficheiros e CSV, número máximo de linhas importadas e limite de píxeis nas conversões de imagem.
+- **Extensão Chrome** — captura pendente expira após 15 minutos; a interface explica permissões, armazenamento local e quando os dados são enviados. Versão da extensão: 1.0.2.
+- **Dependências** — actualizadas versões directas em `requirements.txt`; `pip-audit` não encontrou vulnerabilidades conhecidas nas dependências declaradas.
+- **Regressões** — testes de segurança, autenticação, conversão/importação e extensão; teste meteorológico deixou de depender de serviço remoto.
+
+**Validação**
+- Suite completa, já com os commits entretanto recebidos de `origin/main`: **377 passaram, 1 ignorado**, mais **26 subtests**, em 53,93 s. `git diff --check` sem problemas.
+- Sem alterações de esquema/BD. Antes do deploy, confirmar que `SECRET_KEY` está definida no ambiente de produção; instalar dependências, actualizar e fazer Reload.
+
+---
+
 ## [v1.8.8] — 2026-10-16
 Resumo Diário — origem/modelo no preview agora mostra o nome real do modelo, não 'LLM' hardcoded; 'determinístico' mantido como fallback.
 
