@@ -6,6 +6,25 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.18] — 2026-10-18
+Agenda semanal fiável no Assistente IA e avaliação explícita do orçamento de contexto.
+
+**Alterado** (`app/assistente/`, `app/calendario/routes.py`; **sem alteração de BD**)
+- Consultas semanais reconhecidas são respondidas directamente pelos dados, com intervalo, dia da semana, compromissos e tarefas com prazo; as contagens distinguem a semana do total geral.
+- `get_tarefas` e `get_eventos` aceitam `esta_semana` e intervalos explícitos; filtros de eventos incluem sobreposições com os limites do intervalo.
+- Resultados de ferramentas indicam total e truncagem. O histórico e cada mensagem têm limites; mensagens acima de 3.000 caracteres são rejeitadas.
+- Eventos ISO com offset são convertidos para hora de Lisboa ao criar/editar pelo Assistente e pela API do Calendário.
+- O cliente regista o tamanho da entrada e os tokens de uso devolvidos pelo provider sem registar prompts; rejeições de contexto recebem erro específico. Como o limite varia por modelo e a contagem exacta depende do tokenizer/provider, não há preflight exacto local.
+
+**Validação**
+- Testes focados do Assistente: **61 passaram**, 6 subtests; selecção do Assistente: **95 passaram**, 33 subtests.
+- Suite completa: **387 passaram, 1 ignorado, 25 falharam**; as falhas estão em `tests/test_assistente_combustiveis.py`, por fixtures de preços com mais de 30 dias. `git diff --check` limpo.
+
+**Notas de deploy**
+- Sem alteração de BD. No PythonAnywhere: actualizar o código e fazer Reload.
+
+---
+
 ## [v1.8.17] — 2026-10-18
 O email de teste das notificações deixa de incluir o botão antigo para consultar resultados do Euromilhões.
 

@@ -6,6 +6,7 @@ from unittest import mock, TestCase
 import requests
 
 from app.assistente.cliente import (
+    ContextoExcedidoError,
     PrazoExcedidoError,
     RateLimitError,
     ServicoIndisponivelError,
@@ -58,6 +59,18 @@ MODELOS_FALLBACK = [m for m in _MODELOS_FALLBACK_BRUTOS if m != MODELO_DEFAULT]
 
 
 class ClassificacaoTests(TestCase):
+    def test_erro_de_contexto_e_classificado_separadamente(self):
+        resposta = _FakeResponse(200, {
+            'error': {
+                'code': 'context_length_exceeded',
+                'message': 'maximum context length exceeded',
+            },
+        })
+
+        categoria, _ = _classificar_resposta(resposta)
+
+        self.assertEqual(categoria, 'contexto')
+
     def test_200_com_corpo_de_erro_e_classificado_como_servico(self):
         cat, _ = _classificar_resposta(_resposta_erro_servico())
         self.assertEqual(cat, "servico")
@@ -90,6 +103,44 @@ class ClassificacaoTests(TestCase):
 
 
 class ChamarLlmTests(TestCase):
+    @mock.patch('app.assistente.cliente.requests.post')
+    @mock.patch.dict(os.environ, {
+        'OPENROUTER_API_KEY': 'test-key', 'OPENROUTER_MODEL': MODELO_DEFAULT,
+    })
+    def test_todos_os_modelos_excedem_contexto_elevanta_erro_especifico(self, post):
+        modelos = _listar_modelos()
+        post.side_effect = [
+            _FakeResponse(400, {'error': {
+                'code': 'context_length_exceeded',
+                'message': 'maximum context length exceeded',
+            }}) for _ in modelos
+        ]
+
+        with self.assertRaises(ContextoExcedidoError):
+            chamar_llm([{'role': 'user', 'content': 'muitas instruções'}])
+
+        self.assertEqual(post.call_count, len(modelos))
+
+    @mock.patch('app.assistente.cliente.requests.post')
+    @mock.patch.dict(os.environ, {
+        'OPENROUTER_API_KEY': 'test-key', 'OPENROUTER_MODEL': MODELO_DEFAULT,
+    })
+    def test_regista_uso_de_tokens_de_entrada_e_saida_sem_registar_prompt(self, post):
+        dados = _resposta_valida()._json_data
+        dados['usage'] = {'prompt_tokens': 640, 'completion_tokens': 120}
+        post.return_value = _FakeResponse(200, dados)
+
+        with mock.patch('builtins.print') as registar:
+            chamar_llm([{'role': 'user', 'content': 'texto privado'}],
+                       ferramentas=[{'name': 'tool'}])
+
+        linhas = ' '.join(str(chamada.args[0]) for chamada in registar.call_args_list)
+        self.assertIn('prompt_tokens=640', linhas)
+        self.assertIn('completion_tokens=120', linhas)
+        self.assertIn('bytes_entrada=', linhas)
+        self.assertIn('limite_saida=1000', linhas)
+        self.assertNotIn('texto privado', linhas)
+
     @mock.patch("app.assistente.cliente.requests.post")
     @mock.patch("app.assistente.cliente.time.sleep")
     @mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": MODELO_DEFAULT})

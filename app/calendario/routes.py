@@ -5,6 +5,16 @@ from app.calendario.models import Evento
 from app import db
 from app.extensions import limiter
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+_FUSO_HORARIO = ZoneInfo('Europe/Lisbon')
+
+
+def _data_calendario_local(valor):
+    data = datetime.fromisoformat(valor)
+    if data.tzinfo is not None:
+        data = data.astimezone(_FUSO_HORARIO).replace(tzinfo=None)
+    return data
 
 @calendario_bp.route('/')
 @login_required
@@ -20,8 +30,8 @@ def api_eventos():
     fim    = request.args.get('fim')
     eventos = Evento.query.filter(
         Evento.user_id     == current_user.id,
-        Evento.data_inicio <  datetime.fromisoformat(fim),
-        Evento.data_fim    >  datetime.fromisoformat(inicio)
+        Evento.data_inicio <  _data_calendario_local(fim),
+        Evento.data_fim    >  _data_calendario_local(inicio)
     ).all()
     return jsonify([{
         'id':          e.id,
@@ -40,8 +50,8 @@ def api_eventos():
 @limiter.limit("30/minute")
 def api_criar_evento():
     dados = request.get_json()
-    inicio = datetime.fromisoformat(dados['data_inicio'])
-    fim    = datetime.fromisoformat(dados['data_fim'])
+    inicio = _data_calendario_local(dados['data_inicio'])
+    fim    = _data_calendario_local(dados['data_fim'])
     if fim < inicio:
         return jsonify({'erro': 'A data de fim não pode ser anterior à data de início.'}), 400
     evento = Evento(
@@ -65,8 +75,8 @@ def api_criar_evento():
 def api_editar_evento(id):
     evento = Evento.query.filter_by(id=id, user_id=current_user.id).first_or_404()
     dados  = request.get_json()
-    inicio = datetime.fromisoformat(dados['data_inicio'])
-    fim    = datetime.fromisoformat(dados['data_fim'])
+    inicio = _data_calendario_local(dados['data_inicio'])
+    fim    = _data_calendario_local(dados['data_fim'])
     if fim < inicio:
         return jsonify({'erro': 'A data de fim não pode ser anterior à data de início.'}), 400
     evento.titulo        = dados.get('titulo', evento.titulo)

@@ -1,4 +1,14 @@
-# PIPE — Estado Actual do Projecto — v1.8.17
+# PIPE — Estado Actual do Projecto — v1.8.18
+
+## Versão v1.8.18 — 2026-10-18
+
+- O Assistente apresenta compromissos e tarefas da semana com datas, dias da semana, estados e totais calculados directamente dos dados; respostas de agenda reconhecidas são determinísticas e não dependem do modelo para calcular contagens ou dias.
+- As ferramentas de leitura de tarefas e eventos aceitam filtros semanais e intervalos explícitos; resultados truncados preservam metadados de total e incompletude.
+- Datas ISO com fuso são normalizadas para Europe/Lisbon ao criar/editar eventos pelo Assistente e pela API do Calendário.
+- Mensagens do Assistente acima de 3.000 caracteres são rejeitadas. O cliente regista bytes da entrada e tokens reportados pelo OpenRouter após respostas bem-sucedidas e apresenta erro específico quando os modelos rejeitam o contexto. A contagem exacta prévia varia por modelo e não é conhecida localmente.
+- **Sem alteração de BD.**
+- **Validação:** testes focados do Assistente: 61 passaram, 6 subtestes passaram; selecção do Assistente: 95 passaram, 33 subtestes passaram. Suite completa: 387 passaram, 1 ignorado, 25 falharam em `tests/test_assistente_combustiveis.py` devido a fixtures de preços fora da janela activa de 30 dias. `git diff --check` limpo.
+
 
 ## Versão v1.8.17 — 2026-10-18
 

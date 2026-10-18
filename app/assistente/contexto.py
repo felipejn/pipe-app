@@ -7,12 +7,13 @@ orquestra o fluxo de chamadas à API OpenRouter com tool use.
 import json
 import time
 import traceback
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from flask import session
 
 from app.assistente.cliente import (
+    ContextoExcedidoError,
     RateLimitError,
     ServicoIndisponivelError,
     chamar_llm,
@@ -20,7 +21,10 @@ from app.assistente.cliente import (
 from app.assistente.ferramentas import (
     DEFINICOES_FERRAMENTAS_LEITURA,
     DEFINICOES_FERRAMENTAS_ESCRITA,
+    calcular_intervalo_semana,
     executar_ferramenta,
+    get_eventos,
+    get_tarefas,
 )
 
 # Limite de mensagens no histórico — 10 trocas (utilizador + assistente)
@@ -63,6 +67,96 @@ def _contexto_temporal():
     )
 
 
+def _data_actual():
+    """Data civil actual em Lisboa, separada para permitir testes estáveis."""
+    return datetime.now(_FUSO_HORARIO).date()
+
+
+def _pedido_agenda_semanal(mensagem):
+    texto = mensagem.casefold()
+    tem_semana_actual = any(
+        termo in texto for termo in ('esta semana', 'desta semana', 'nesta semana')
+    )
+    tem_tarefas = 'tarefa' in texto
+    tem_compromissos = any(
+        termo in texto for termo in ('compromisso', 'evento', 'calendário', 'agenda')
+    )
+    return tem_semana_actual and tem_tarefas and tem_compromissos
+
+
+def _formatar_agenda_semanal(user_id, hoje):
+    """Monta a agenda semanal a partir dos dados; datas/dias não vêm do LLM."""
+    inicio, fim = calcular_intervalo_semana(hoje)
+    inicio_iso, fim_iso = inicio.isoformat(), fim.isoformat()
+    tarefas_semana = get_tarefas(
+        user_id, data_inicio=inicio_iso, data_fim=fim_iso
+    )
+    tarefas_todas = get_tarefas(user_id)
+    eventos = get_eventos(
+        user_id, data_inicio=inicio_iso, data_fim=fim_iso
+    )
+
+    linhas = [f'Agenda da semana ({inicio:%d/%m/%Y} a {fim:%d/%m/%Y})', '', 'Compromissos']
+    if eventos.get('erro'):
+        linhas.append(f'Não foi possível consultar os compromissos: {eventos["erro"]}')
+    elif eventos['eventos']:
+        for evento in eventos['eventos']:
+            inicio_evento = datetime.fromisoformat(evento['data_inicio'])
+            data = inicio_evento.strftime('%d/%m/%Y')
+            fim_evento = datetime.fromisoformat(evento['data_fim'])
+            if evento.get('dia_inteiro'):
+                periodo = f'{evento["dia_semana"].capitalize()}, {data} (dia inteiro)'
+                if fim_evento.date() != inicio_evento.date():
+                    periodo += (
+                        f' a {evento["dia_semana_fim"]}, '
+                        f'{fim_evento:%d/%m/%Y}'
+                    )
+            else:
+                hora = inicio_evento.strftime('%H:%M')
+                hora_fim = fim_evento.strftime('%H:%M')
+                if fim_evento.date() == inicio_evento.date():
+                    periodo = (
+                        f'{evento["dia_semana"].capitalize()}, {data}, '
+                        f'{hora}–{hora_fim}'
+                    )
+                else:
+                    periodo = (
+                        f'{evento["dia_semana"].capitalize()}, {data}, {hora} – '
+                        f'{evento["dia_semana_fim"]}, '
+                        f'{fim_evento:%d/%m/%Y}, {hora_fim}'
+                    )
+            linhas.append(
+                f'- {periodo}: {evento["titulo"]}'
+            )
+            if evento.get('localizacao'):
+                linhas.append(f'  Local: {evento["localizacao"]}')
+    else:
+        linhas.append('- Sem compromissos neste intervalo.')
+
+    linhas.extend(['', 'Tarefas com prazo nesta semana'])
+    if tarefas_semana.get('erro'):
+        linhas.append(f'Não foi possível consultar as tarefas: {tarefas_semana["erro"]}')
+    else:
+        linhas.append(
+            f'{tarefas_semana["total"]} no intervalo: '
+            f'{tarefas_semana["pendentes"]} pendente(s), '
+            f'{tarefas_semana["concluidas"]} concluída(s).'
+        )
+        if tarefas_semana['tarefas']:
+            for tarefa in tarefas_semana['tarefas']:
+                prazo = date.fromisoformat(tarefa['prazo']).strftime('%d/%m/%Y')
+                estado = 'concluída' if tarefa['concluida'] else 'pendente'
+                linhas.append(f'- {tarefa["titulo"]} — {prazo} ({estado})')
+        else:
+            linhas.append('- Sem tarefas com prazo neste intervalo.')
+        linhas.append(
+            f'Total geral: {tarefas_todas["total"]} tarefas; '
+            f'{tarefas_todas["pendentes"]} pendente(s).'
+        )
+
+    return '\n'.join(linhas)
+
+
 SYSTEM_PROMPT_LEITURA = (
     'És o assistente do PIPE — uma plataforma pessoal de produtividade.\n'
     'Respostas devem ser em português europeu (pt-PT).\n\n'
@@ -80,6 +174,8 @@ SYSTEM_PROMPT_LEITURA = (
     '- NUNCA sugiras acções que não sabes fazer (ex: "queria marcar como concluída?", '
     '"devo criar uma nova nota?"). Se o utilizador quer fazer algo, diz-lhe onde.\n'
     '- Usa as ferramentas disponíveis quando necessitares de dados concretos.\n'
+    '- Para pedidos sobre tarefas e compromissos desta semana, usa o filtro esta_semana=true nas ferramentas; o servidor define segunda-feira a domingo em Europe/Lisbon. Copia o campo dia_semana devolvido para cada evento e nunca deduz o dia a partir da data.\n'
+    '- Nunca calcules totais a partir de uma lista truncada: usa os totais explícitos e indica quando o resultado está incompleto.\n'
     '- Qualquer pergunta sobre tempo, temperatura, chuva, vento ou previsão obriga a '
     'chamar primeiro a ferramenta get_meteorologia; NUNCA apresentes temperaturas, '
     'condições ou tendências sem um resultado da ferramenta nesse turno, nem '
@@ -168,13 +264,16 @@ def _truncar_listas(valor, limite=LIMITE_ITENS_LISTA_TOOL):
     JSON inválido) — o corte é feito na estrutura, antes de serializar."""
     if isinstance(valor, dict):
         novo = {}
+        lista_truncada = False
         for chave, item in valor.items():
             if isinstance(item, list) and len(item) > limite:
                 novo[chave] = item[:limite]
-                novo['truncado'] = True
+                lista_truncada = True
                 novo.setdefault('nota', f'Mostrados {limite} de {len(item)} registos. Usa filtros mais específicos para ver menos de cada vez.')
             else:
                 novo[chave] = _truncar_listas(item, limite)
+        if lista_truncada:
+            novo['truncado'] = True
         return novo
     if isinstance(valor, list):
         return [_truncar_listas(v, limite) for v in valor]
@@ -192,6 +291,15 @@ def _serializar_resultado_tool(resultado):
     """
     if isinstance(resultado, str):
         return resultado[:LIMITE_CHARS_TOOL_RESULT]
+
+    # Listas na raiz não podem ser truncadas sem metadados: o modelo receberia
+    # apenas os primeiros itens e trataria o subconjunto como se fosse completo.
+    if isinstance(resultado, list):
+        resultado = {
+            'itens': resultado,
+            'total': len(resultado),
+            'truncado': False,
+        }
 
     for limite in LIMITES_ITENS_DEGRADACAO:
         texto = json.dumps(_truncar_listas(resultado, limite), ensure_ascii=False)
@@ -279,6 +387,18 @@ def processar_mensagem_assistente(
     elif modo is None:
         modo = 'leitura'
 
+    # Esta consulta é inteiramente determinística. Responder sem LLM impede
+    # que o modelo invente contagens ou associe um dia da semana à data errada.
+    if _pedido_agenda_semanal(mensagem_utilizador):
+        historico.append({'role': 'user', 'content': mensagem_utilizador})
+        resposta = _formatar_agenda_semanal(user_id, _data_actual())
+        historico.append({'role': 'assistant', 'content': resposta})
+        historico = _limpar_historico(historico)
+        if usar_sessao:
+            _guardar_historico(historico)
+            return resposta, 'determinístico'
+        return resposta, historico, 'determinístico'
+
     system_prompt = SYSTEM_PROMPT_ESCRITA if modo == 'escrita' else SYSTEM_PROMPT_LEITURA
     if nome_completo:
         system_prompt += (
@@ -331,6 +451,11 @@ def processar_mensagem_assistente(
             resposta = chamar_llm(mensagens, ferramentas=ferramentas)
         except RateLimitError:
             return _finalizar_erro('O assistente atingiu o limite de pedidos. Aguarda um momento e tenta novamente.')
+        except ContextoExcedidoError:
+            return _finalizar_erro(
+                'O pedido excede o limite de contexto dos modelos disponíveis. '
+                'Limpa o histórico da conversa ou reformula o pedido com menos instruções.'
+            )
         except ServicoIndisponivelError:
             return _finalizar_erro('O serviço de IA está temporariamente indisponível. Aguarda um momento e tenta novamente.')
         except Exception as e:

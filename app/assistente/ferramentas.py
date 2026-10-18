@@ -5,7 +5,7 @@ ao nível de Python/SQLAlchemy. Este filtro é inegociável.
 """
 
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as datetime_time, timedelta
 from zoneinfo import ZoneInfo
 
 from flask import session
@@ -35,6 +35,49 @@ CORES_EVENTO = (
     'tomate', 'flamingo', 'tangerina', 'banana', 'salvia',
     'basil', 'peacock', 'mirtilo', 'lavanda', 'uva', 'grafite',
 )
+
+_FUSO_HORARIO = ZoneInfo('Europe/Lisbon')
+_DIAS_SEMANA = (
+    'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira',
+    'sexta-feira', 'sábado', 'domingo',
+)
+
+
+def calcular_intervalo_semana(data_referencia=None):
+    """Devolve segunda-feira e domingo da semana de referência em Lisboa."""
+    referencia = data_referencia or datetime.now(_FUSO_HORARIO).date()
+    inicio = referencia - timedelta(days=referencia.weekday())
+    return inicio, inicio + timedelta(days=6)
+
+
+def _resolver_intervalo(data_inicio=None, data_fim=None, esta_semana=False):
+    if esta_semana:
+        if data_inicio or data_fim:
+            return {'erro': 'Escolhe esta_semana ou um intervalo explícito, não ambos.'}
+        inicio, fim = calcular_intervalo_semana()
+        return inicio, fim
+
+    if data_inicio is None and data_fim is None:
+        return None
+    if not data_inicio or not data_fim:
+        return {'erro': 'Indica data_inicio e data_fim para filtrar por intervalo.'}
+    try:
+        inicio = date.fromisoformat(data_inicio)
+        fim = date.fromisoformat(data_fim)
+    except (TypeError, ValueError):
+        return {'erro': 'Datas inválidas. Usa o formato AAAA-MM-DD.'}
+    if inicio.isoformat() != data_inicio or fim.isoformat() != data_fim:
+        return {'erro': 'Datas inválidas. Usa o formato AAAA-MM-DD.'}
+    if fim < inicio:
+        return {'erro': 'data_fim não pode ser anterior a data_inicio.'}
+    return inicio, fim
+
+
+def _dia_semana_evento(valor):
+    """Calcula o dia civil do evento, tratando horas com fuso como Lisboa."""
+    if valor.tzinfo is not None:
+        valor = valor.astimezone(_FUSO_HORARIO)
+    return _DIAS_SEMANA[valor.weekday()]
 
 # Ferramentas que alteram dados — sujeitas a limite de débito e só
 # disponíveis quando a sessão está em modo 'escrita'.
@@ -125,7 +168,7 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
         'type': 'function',
         'function': {
             'name': 'get_tarefas',
-            'description': 'Consulta as tarefas do utilizador. Permite filtrar por lista, estado e se estão em atraso.',
+            'description': 'Consulta tarefas do utilizador, com filtros por lista, estado, atraso ou prazo. Para pedidos sobre esta semana, usa esta_semana=true; o servidor calcula o intervalo de segunda a domingo em Lisboa.',
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -141,6 +184,18 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
                     'atrasadas': {
                         'type': 'boolean',
                         'description': 'Se True, devolve apenas tarefas em atraso (pendentes com prazo ultrapassado).',
+                    },
+                    'esta_semana': {
+                        'type': 'boolean',
+                        'description': 'Se True, filtra tarefas com prazo entre segunda-feira e domingo da semana actual em Europe/Lisbon.',
+                    },
+                    'data_inicio': {
+                        'type': 'string',
+                        'description': 'Início inclusivo do intervalo de prazos (AAAA-MM-DD); usar com data_fim.',
+                    },
+                    'data_fim': {
+                        'type': 'string',
+                        'description': 'Fim inclusivo do intervalo de prazos (AAAA-MM-DD); usar com data_inicio.',
                     },
                 },
             },
@@ -201,7 +256,7 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
         'type': 'function',
         'function': {
             'name': 'get_eventos',
-            'description': 'Consulta os eventos do calendário do utilizador.',
+            'description': 'Consulta eventos do calendário. Para pedidos sobre esta semana, usa esta_semana=true; o servidor calcula o intervalo de segunda a domingo em Lisboa e inclui eventos que se sobreponham a esse intervalo.',
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -212,6 +267,18 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
                     'futuros': {
                         'type': 'boolean',
                         'description': 'Se True, devolve apenas eventos futuros.',
+                    },
+                    'esta_semana': {
+                        'type': 'boolean',
+                        'description': 'Se True, filtra eventos que se sobreponham à semana actual (segunda-feira a domingo em Europe/Lisbon).',
+                    },
+                    'data_inicio': {
+                        'type': 'string',
+                        'description': 'Início inclusivo do intervalo (AAAA-MM-DD); usar com data_fim.',
+                    },
+                    'data_fim': {
+                        'type': 'string',
+                        'description': 'Fim inclusivo do intervalo (AAAA-MM-DD); usar com data_inicio.',
                     },
                 },
             },
@@ -539,7 +606,8 @@ REGISTO_FERRAMENTAS = {
 # ── Implementação com queries reais ─────────────────────────────────────────────
 
 
-def get_tarefas(user_id, lista=None, estado=None, atrasadas=False):
+def get_tarefas(user_id, lista=None, estado=None, atrasadas=False,
+                esta_semana=False, data_inicio=None, data_fim=None):
     """Consulta tarefas do utilizador, com filtros opcionais.
 
     Args:
@@ -547,11 +615,23 @@ def get_tarefas(user_id, lista=None, estado=None, atrasadas=False):
         lista: nome ou ID da lista para filtrar (opcional).
         estado: 'pendentes', 'concluidas' ou 'todas'.
         atrasadas: se True, só tarefas pendentes com prazo ultrapassado.
+        esta_semana: filtra prazos pela semana actual em Europe/Lisbon.
+        data_inicio/data_fim: intervalo inclusivo de prazos em AAAA-MM-DD.
 
     Returns:
-        Lista de dicts com id, titulo, prioridade, prazo, concluida, lista_nome.
+        Dict com tarefas, contagens por estado e intervalo aplicado.
     """
     q = Tarefa.query.filter_by(user_id=user_id)
+
+    intervalo = _resolver_intervalo(data_inicio, data_fim, esta_semana)
+    if isinstance(intervalo, dict):
+        return intervalo
+    if intervalo:
+        inicio, fim = intervalo
+        q = q.filter(
+            Tarefa.data_limite >= inicio,
+            Tarefa.data_limite <= fim,
+        )
 
     if estado == 'pendentes':
         q = q.filter_by(concluida=False)
@@ -579,24 +659,38 @@ def get_tarefas(user_id, lista=None, estado=None, atrasadas=False):
             if lista_ids:
                 q = q.filter(Tarefa.lista_id.in_(lista_ids))
             else:
-                return []
+                return {
+                    'tarefas': [], 'total': 0, 'pendentes': 0, 'concluidas': 0,
+                    'intervalo': ({'inicio': inicio.isoformat(), 'fim': fim.isoformat()}
+                                  if intervalo else None),
+                }
 
+    total = q.count()
+    pendentes = q.filter_by(concluida=False).count()
+    concluidas = q.filter_by(concluida=True).count()
     resultados = q.order_by(
         Tarefa.concluida.asc(),
         Tarefa.data_limite.asc().nullslast(),
     ).all()
 
-    return [
-        {
-            'id': t.id,
-            'titulo': t.texto,
-            'prioridade': t.prioridade,
-            'prazo': t.data_limite.isoformat() if t.data_limite else None,
-            'concluida': t.concluida,
-            'lista_nome': t.lista.nome if t.lista else 'Sem lista',
-        }
-        for t in resultados
-    ]
+    return {
+        'tarefas': [
+            {
+                'id': t.id,
+                'titulo': t.texto,
+                'prioridade': t.prioridade,
+                'prazo': t.data_limite.isoformat() if t.data_limite else None,
+                'concluida': t.concluida,
+                'lista_nome': t.lista.nome if t.lista else 'Sem lista',
+            }
+            for t in resultados
+        ],
+        'total': total,
+        'pendentes': pendentes,
+        'concluidas': concluidas,
+        'intervalo': ({'inicio': inicio.isoformat(), 'fim': fim.isoformat()}
+                      if intervalo else None),
+    }
 
 
 def get_notas(user_id, busca=None, etiqueta=None, arquivadas=False):
@@ -731,19 +825,34 @@ def get_resumo_geral(user_id):
     return resumo
 
 
-def get_eventos(user_id, data=None, futuros=False):
+def get_eventos(user_id, data=None, futuros=False, esta_semana=False,
+                data_inicio=None, data_fim=None):
     """Consulta eventos do calendário do utilizador, com filtros opcionais.
 
     Args:
         user_id: ID do utilizador (obrigatório).
         data: data no formato AAAA-MM-DD para filtrar eventos desse dia (opcional).
         futuros: se True, só devolve eventos futuros (data_inicio >= agora).
+        esta_semana: inclui eventos que se sobreponham à semana actual em Lisboa.
+        data_inicio/data_fim: intervalo inclusivo de datas em AAAA-MM-DD.
 
     Returns:
-        Lista de dicts com id, titulo, descricao, localizacao, data_inicio,
-        data_fim, dia_inteiro, cor, notificar, notificado_em, criado_em.
+        Dict com eventos, total e intervalo; cada evento inclui também os dias
+        da semana calculados no servidor.
     """
     q = Evento.query.filter_by(user_id=user_id)
+
+    intervalo = _resolver_intervalo(data_inicio, data_fim, esta_semana)
+    if isinstance(intervalo, dict):
+        return intervalo
+    if intervalo:
+        inicio, fim = intervalo
+        inicio_dt = datetime.combine(inicio, datetime_time.min)
+        fim_exclusivo = datetime.combine(fim + timedelta(days=1), datetime_time.min)
+        q = q.filter(
+            Evento.data_inicio < fim_exclusivo,
+            Evento.data_fim > inicio_dt,
+        )
 
     if data:
         try:
@@ -761,22 +870,29 @@ def get_eventos(user_id, data=None, futuros=False):
 
     resultados = q.order_by(Evento.data_inicio.asc()).all()
 
-    return [
-        {
-            'id': e.id,
-            'titulo': e.titulo,
-            'descricao': e.descricao,
-            'localizacao': e.localizacao,
-            'data_inicio': e.data_inicio.isoformat() if e.data_inicio else None,
-            'data_fim': e.data_fim.isoformat() if e.data_fim else None,
-            'dia_inteiro': e.dia_inteiro,
-            'cor': e.cor,
-            'notificar': e.notificar,
-            'notificado_em': e.notificado_em.isoformat() if e.notificado_em else None,
-            'criado_em': e.criado_em.isoformat() if e.criado_em else None,
-        }
-        for e in resultados
-    ]
+    return {
+        'eventos': [
+            {
+                'id': e.id,
+                'titulo': e.titulo,
+                'descricao': e.descricao,
+                'localizacao': e.localizacao,
+                'data_inicio': e.data_inicio.isoformat() if e.data_inicio else None,
+                'dia_semana': _dia_semana_evento(e.data_inicio) if e.data_inicio else None,
+                'dia_semana_fim': _dia_semana_evento(e.data_fim) if e.data_fim else None,
+                'data_fim': e.data_fim.isoformat() if e.data_fim else None,
+                'dia_inteiro': e.dia_inteiro,
+                'cor': e.cor,
+                'notificar': e.notificar,
+                'notificado_em': e.notificado_em.isoformat() if e.notificado_em else None,
+                'criado_em': e.criado_em.isoformat() if e.criado_em else None,
+            }
+            for e in resultados
+        ],
+        'total': len(resultados),
+        'intervalo': ({'inicio': inicio.isoformat(), 'fim': fim.isoformat()}
+                      if intervalo else None),
+    }
 
 
 def get_cambio(user_id, origem=None, destino=None, valor=None):
@@ -1279,6 +1395,11 @@ def criar_evento(user_id, titulo, data_inicio, data_fim, descricao=None, localiz
         fim = datetime.fromisoformat(data_fim)
     except (ValueError, TypeError):
         return {'erro': 'Datas inválidas. Usa o formato ISO (ex: 2026-09-20T14:00:00).'}
+
+    if inicio.tzinfo is not None:
+        inicio = inicio.astimezone(_FUSO_HORARIO).replace(tzinfo=None)
+    if fim.tzinfo is not None:
+        fim = fim.astimezone(_FUSO_HORARIO).replace(tzinfo=None)
 
     if fim < inicio:
         return {'erro': 'A data de fim não pode ser anterior à data de início.'}

@@ -10,7 +10,10 @@ from flask import jsonify, request, render_template, session
 from flask_login import login_required, current_user
 
 from app.assistente import assistente
-from app.assistente.contexto import processar_mensagem_assistente
+from app.assistente.contexto import (
+    MAX_CHARS_POR_MENSAGEM,
+    processar_mensagem_assistente,
+)
 from app.extensions import limiter
 
 
@@ -37,6 +40,10 @@ def api_chat():
     mensagem = dados['mensagem'].strip()
     if not mensagem:
         return jsonify({'erro': 'A mensagem não pode estar vazia.'}), 400
+    if len(mensagem) > MAX_CHARS_POR_MENSAGEM:
+        return jsonify({
+            'erro': f'A mensagem não pode exceder {MAX_CHARS_POR_MENSAGEM} caracteres.'
+        }), 413
 
     resposta_texto, modelo = processar_mensagem_assistente(
         mensagem,

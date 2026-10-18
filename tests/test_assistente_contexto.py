@@ -3,7 +3,11 @@
 import json
 from unittest import mock, TestCase
 
-from app.assistente.cliente import RateLimitError, ServicoIndisponivelError
+from app.assistente.cliente import (
+    ContextoExcedidoError,
+    RateLimitError,
+    ServicoIndisponivelError,
+)
 from app.assistente.contexto import processar_mensagem_assistente
 
 
@@ -24,6 +28,18 @@ def _tool_call(nome="criar_evento", arguments=None, call_id="call-1"):
 
 
 class ProcessarMensagemTests(TestCase):
+    @mock.patch("app.assistente.contexto.chamar_llm")
+    @mock.patch("app.assistente.contexto.time.sleep")
+    def test_contexto_excedido_pede_para_reduzir_o_pedido(self, sleep, chamar_llm):
+        chamar_llm.side_effect = ContextoExcedidoError("contexto excedido")
+
+        resultado, _, _ = processar_mensagem_assistente(
+            "pedido longo", user_id=1, historico=[], modo="leitura"
+        )
+
+        self.assertIn("excede o limite de contexto", resultado)
+        self.assertIn("limpa o histórico", resultado.casefold())
+
     @mock.patch("app.assistente.contexto.chamar_llm")
     @mock.patch("app.assistente.contexto.executar_ferramenta")
     @mock.patch("app.assistente.contexto.time.sleep")

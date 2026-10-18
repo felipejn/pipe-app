@@ -1,5 +1,6 @@
 """Cliente HTTP para a API OpenRouter com retry e fallback entre modelos gratuitos."""
 
+import json
 import os
 import time
 
@@ -27,6 +28,10 @@ class ServicoIndisponivelError(Exception):
 
 class PrazoExcedidoError(Exception):
     """Erro quando o prazo total indicado expira antes de haver resposta."""
+
+
+class ContextoExcedidoError(Exception):
+    """Todos os modelos disponíveis rejeitaram o tamanho do contexto."""
 
 
 def _listar_modelos():
@@ -68,6 +73,23 @@ def _codigo_erro(dados):
     return None
 
 
+def _erro_de_contexto(dados):
+    erro = dados.get('error') if isinstance(dados, dict) else None
+    if not erro:
+        return False
+    codigo = str(_codigo_erro(dados) or '').casefold()
+    mensagem = _detalhes_erro(dados).casefold()
+    marcadores = (
+        'context_length', 'context length', 'context window',
+        'maximum context', 'max context', 'prompt is too long',
+        'prompt_too_long', 'input token limit', 'too many tokens',
+    )
+    return (
+        any(marcador in codigo for marcador in marcadores)
+        or any(marcador in mensagem for marcador in marcadores)
+    )
+
+
 def _classificar_resposta(resposta):
     """Valida a resposta e classifica falhas para permitir o fallback.
 
@@ -84,6 +106,8 @@ def _classificar_resposta(resposta):
     codigo = _codigo_erro(dados)
 
     if isinstance(dados, dict) and dados.get('error'):
+        if _erro_de_contexto(dados):
+            return 'contexto', _detalhes_erro(dados)
         if status == 429 or str(codigo) == '429':
             return 'rate_limit', _detalhes_erro(dados)
         if status == 404 or str(codigo) == '404':
@@ -128,6 +152,22 @@ def _registar_falha(modelo, motivo):
     print(f'[Assistente] Modelo {modelo} indisponivel: {motivo}')
 
 
+def _registar_uso(modelo, dados, bytes_entrada, limite_saida):
+    """Regista tamanhos/uso sem guardar mensagens, ferramentas ou conteúdo."""
+    uso = dados.get('usage') if isinstance(dados, dict) else None
+    prompt_tokens = uso.get('prompt_tokens') if isinstance(uso, dict) else None
+    completion_tokens = uso.get('completion_tokens') if isinstance(uso, dict) else None
+    print(
+        '[Assistente TOKENS] '
+        f'modelo={modelo} bytes_entrada={bytes_entrada} '
+        f'prompt_tokens={prompt_tokens if prompt_tokens is not None else "n/d"} '
+        f'completion_tokens={completion_tokens if completion_tokens is not None else "n/d"} '
+        f'limite_saida={limite_saida}'
+    )
+
+
+# Este é o limite da saída solicitada ao modelo, não o limite de contexto da
+# entrada. O uso real de entrada é registado a partir do campo `usage` do provider.
 _MAX_TOKENS_POR_OMISSAO = 1000
 
 
@@ -183,6 +223,13 @@ def chamar_llm(mensagens, ferramentas=None, prazo_total=None, max_tokens=None):
 
     limite_tokens = max_tokens if max_tokens is not None else _max_tokens()
 
+    entrada_serializavel = {'messages': mensagens}
+    if ferramentas:
+        entrada_serializavel['tools'] = ferramentas
+    bytes_entrada = len(json.dumps(
+        entrada_serializavel, ensure_ascii=False, separators=(',', ':')
+    ).encode('utf-8'))
+
     payload_base = {
         'messages': mensagens,
         'max_tokens': limite_tokens,
@@ -192,8 +239,10 @@ def chamar_llm(mensagens, ferramentas=None, prazo_total=None, max_tokens=None):
 
     rate_limit_excedido = False
     servico_indisponivel = False
+    modelos_contexto_excedido = 0
 
-    for modelo in _listar_modelos():
+    modelos = _listar_modelos()
+    for modelo in modelos:
         payload = dict(payload_base, model=modelo)
 
         for i, espera in enumerate(_ESPERA_RETRY):
@@ -230,16 +279,24 @@ def chamar_llm(mensagens, ferramentas=None, prazo_total=None, max_tokens=None):
 
             categoria, motivo = _classificar_resposta(resposta)
             if categoria == 'ok':
+                _registar_uso(motivo.get('model', modelo), motivo,
+                              bytes_entrada, limite_tokens)
                 return motivo
 
             _registar_falha(modelo, motivo)
-            if categoria == 'rate_limit':
+            if categoria == 'contexto':
+                modelos_contexto_excedido += 1
+            elif categoria == 'rate_limit':
                 rate_limit_excedido = True
             else:
                 servico_indisponivel = True
             # Erros de provider/modelo nao beneficiam de retry no mesmo modelo;
             # o fallback deve chegar rapidamente a um provider alternativo.
             break
+
+    if modelos_contexto_excedido == len(modelos):
+        raise ContextoExcedidoError(
+            'Todos os modelos rejeitaram o tamanho do contexto do pedido.')
 
     if rate_limit_excedido and not servico_indisponivel:
         raise RateLimitError('Todos os modelos estao com rate limit excedido.')
