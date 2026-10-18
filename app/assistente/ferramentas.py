@@ -6,6 +6,7 @@ ao nível de Python/SQLAlchemy. Este filtro é inegociável.
 
 import time
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from flask import session
 
@@ -38,13 +39,14 @@ CORES_EVENTO = (
 # Ferramentas que alteram dados — sujeitas a limite de débito e só
 # disponíveis quando a sessão está em modo 'escrita'.
 FERRAMENTAS_ESCRITA = {
-    'criar_tarefa', 'alternar_tarefa', 'apagar_tarefa',
+    'criar_tarefa', 'atualizar_tarefa', 'alternar_tarefa', 'apagar_tarefa',
     'criar_nota', 'alternar_nota_acao', 'apagar_nota',
     'criar_evento', 'atualizar_evento', 'apagar_evento',
     'gerar_credencial',
 }
 
 LIMITE_ESCRITAS_POR_MINUTO = 10
+_NAO_FORNECIDO = object()
 
 
 def _limite_escrita_excedido():
@@ -334,6 +336,26 @@ DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA = [
     {
         'type': 'function',
         'function': {
+            'name': 'atualizar_tarefa',
+            'description': 'Actualiza uma tarefa existente. Consulta primeiro get_tarefas e usa o ID exacto. Envia apenas campos a alterar; data_limite null remove o prazo, tags vazias removem todas as etiquetas e notas null ou vazias limpa as notas. lista_nome tem de identificar uma lista existente do utilizador.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'tarefa_id': {'type': 'integer'},
+                    'texto': {'type': 'string', 'description': 'Texto da tarefa (máximo 512 caracteres).'},
+                    'prioridade': {'type': 'string', 'enum': ['baixa', 'media', 'alta']},
+                    'data_limite': {'type': ['string', 'null'], 'description': 'AAAA-MM-DD; null remove o prazo.'},
+                    'lista_nome': {'type': 'string', 'description': 'Nome de uma lista existente do utilizador.'},
+                    'notas': {'type': ['string', 'null'], 'description': 'Notas (máximo 1000 caracteres); null ou vazio limpa.'},
+                    'tags': {'type': 'string', 'description': 'Etiquetas separadas por vírgulas; vazio limpa todas.'},
+                },
+                'required': ['tarefa_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'alternar_tarefa',
             'description': 'Marca uma tarefa como concluída ou volta a marcá-la como pendente.',
             'parameters': {
@@ -432,17 +454,17 @@ DEFINICOES_FERRAMENTAS_ESCRITA_EXTRA = [
         'type': 'function',
         'function': {
             'name': 'atualizar_evento',
-            'description': 'Actualiza campos de um evento existente. Só envia os campos que mudam.',
+            'description': 'Actualiza campos de um evento existente. Consulta primeiro get_eventos e usa o ID exacto; envia apenas os campos pedidos. Para alterar data/hora, envia início e fim coerentes. Datas ISO 8601 com fuso são convertidas para a hora de Lisboa. descricao ou localizacao null/vazio limpa o campo.',
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'evento_id': {'type': 'integer'},
-                    'titulo': {'type': 'string'},
-                    'data_inicio': {'type': 'string'},
-                    'data_fim': {'type': 'string'},
-                    'descricao': {'type': 'string'},
-                    'localizacao': {'type': 'string'},
-                    'cor': {'type': 'string'},
+                    'titulo': {'type': 'string', 'description': 'Máximo 200 caracteres; não pode ficar vazio.'},
+                    'data_inicio': {'type': 'string', 'description': 'Data/hora ISO 8601; com fuso, é convertida para a hora de Lisboa.'},
+                    'data_fim': {'type': 'string', 'description': 'Data/hora ISO 8601 coerente com data_inicio; com fuso, é convertida para a hora de Lisboa.'},
+                    'descricao': {'type': ['string', 'null']},
+                    'localizacao': {'type': ['string', 'null']},
+                    'cor': {'type': 'string', 'enum': list(CORES_EVENTO)},
                     'dia_inteiro': {'type': 'boolean'},
                     'notificar': {'type': 'boolean'},
                 },
@@ -501,6 +523,7 @@ REGISTO_FERRAMENTAS = {
     'get_combustiveis': 'get_combustiveis',
     'get_meteorologia': 'get_meteorologia',
     'criar_tarefa': 'criar_tarefa',
+    'atualizar_tarefa': 'atualizar_tarefa',
     'alternar_tarefa': 'alternar_tarefa',
     'apagar_tarefa': 'apagar_tarefa',
     'criar_nota': 'criar_nota',
@@ -1039,6 +1062,84 @@ def get_combustiveis(user_id, tipo_combustivel=None, concelho=None,
 
 # ── Tarefas — escrita ────────────────────────────────────────────────────
 
+def atualizar_tarefa(user_id, tarefa_id, texto=_NAO_FORNECIDO,
+                     prioridade=_NAO_FORNECIDO, data_limite=_NAO_FORNECIDO,
+                     lista_nome=_NAO_FORNECIDO, notas=_NAO_FORNECIDO,
+                     tags=_NAO_FORNECIDO):
+    """Actualiza apenas os campos fornecidos de uma tarefa do utilizador."""
+    tarefa = Tarefa.query.filter_by(id=tarefa_id, user_id=user_id).first()
+    if not tarefa:
+        return {'erro': 'Tarefa não encontrada.'}
+
+    alteracoes = {}
+    if texto is not _NAO_FORNECIDO:
+        if not isinstance(texto, str) or not texto.strip() or len(texto.strip()) > 512:
+            return {'erro': 'O texto deve ter entre 1 e 512 caracteres.'}
+        alteracoes['texto'] = texto.strip()
+    if prioridade is not _NAO_FORNECIDO:
+        if prioridade not in Tarefa.PRIORIDADES:
+            return {'erro': 'Prioridade inválida. Usa baixa, media ou alta.'}
+        alteracoes['prioridade'] = prioridade
+    if data_limite is not _NAO_FORNECIDO:
+        if data_limite is None:
+            alteracoes['data_limite'] = None
+        elif not isinstance(data_limite, str):
+            return {'erro': 'Data limite inválida. Usa AAAA-MM-DD ou null.'}
+        else:
+            try:
+                prazo = date.fromisoformat(data_limite)
+            except ValueError:
+                return {'erro': f'Data limite inválida: "{data_limite}". Usa o formato AAAA-MM-DD.'}
+            if prazo.isoformat() != data_limite:
+                return {'erro': f'Data limite inválida: "{data_limite}". Usa o formato AAAA-MM-DD.'}
+            alteracoes['data_limite'] = prazo
+    if notas is not _NAO_FORNECIDO:
+        if notas is not None and not isinstance(notas, str):
+            return {'erro': 'As notas têm de ser texto ou null.'}
+        if isinstance(notas, str) and len(notas) > 1000:
+            return {'erro': 'As notas não podem exceder 1000 caracteres.'}
+        alteracoes['notas'] = (notas.strip() or None) if isinstance(notas, str) else None
+
+    lista = None
+    if lista_nome is not _NAO_FORNECIDO:
+        if not isinstance(lista_nome, str) or not lista_nome.strip() or len(lista_nome.strip()) > 64:
+            return {'erro': 'O nome da lista deve ter entre 1 e 64 caracteres.'}
+        lista = Lista.query.filter_by(user_id=user_id).filter(
+            Lista.nome.ilike(lista_nome.strip())
+        ).first()
+        if not lista:
+            return {'erro': f'Não existe uma lista chamada "{lista_nome.strip()}".'}
+
+    nomes_tags = None
+    if tags is not _NAO_FORNECIDO:
+        if not isinstance(tags, str):
+            return {'erro': 'As etiquetas têm de ser indicadas como texto separado por vírgulas.'}
+        if len(tags) > 256:
+            return {'erro': 'As etiquetas não podem exceder 256 caracteres.'}
+        nomes_tags = list(dict.fromkeys(
+            parte.strip().lower() for parte in tags.split(',') if parte.strip()
+        ))
+        if any(len(nome) > 32 for nome in nomes_tags):
+            return {'erro': 'Cada etiqueta não pode exceder 32 caracteres.'}
+
+    # Só depois de validar todos os campos são criadas etiquetas ou alterada a tarefa.
+    tags_novas = None
+    if nomes_tags is not None:
+        tags_novas = _obter_ou_criar_tags(user_id, ', '.join(nomes_tags))
+    prazo_anterior = tarefa.data_limite
+    for campo, valor in alteracoes.items():
+        setattr(tarefa, campo, valor)
+    if lista is not None:
+        tarefa.lista_id = lista.id
+    if tags_novas is not None:
+        tarefa.tags = tags_novas
+    if 'data_limite' in alteracoes and tarefa.data_limite != prazo_anterior:
+        tarefa.notificada_em = None
+
+    db.session.commit()
+    return {'ok': True, 'id': tarefa.id, 'texto': tarefa.texto}
+
+
 def criar_tarefa(user_id, texto, prioridade='media', data_limite=None, lista_nome=None, tags=None):
     """Cria uma nova tarefa. Se a lista não existir, é criada; se nenhuma for indicada, usa/cria 'Geral'."""
     if prioridade not in Tarefa.PRIORIDADES:
@@ -1193,38 +1294,69 @@ def criar_evento(user_id, titulo, data_inicio, data_fim, descricao=None, localiz
     return {'ok': True, 'id': evento.id, 'titulo': evento.titulo}
 
 
-def atualizar_evento(user_id, evento_id, titulo=None, data_inicio=None, data_fim=None,
-                      descricao=None, localizacao=None, cor=None, dia_inteiro=None, notificar=None):
+def atualizar_evento(user_id, evento_id, titulo=_NAO_FORNECIDO,
+                      data_inicio=_NAO_FORNECIDO, data_fim=_NAO_FORNECIDO,
+                      descricao=_NAO_FORNECIDO, localizacao=_NAO_FORNECIDO,
+                      cor=_NAO_FORNECIDO, dia_inteiro=_NAO_FORNECIDO,
+                      notificar=_NAO_FORNECIDO):
     evento = Evento.query.filter_by(id=evento_id, user_id=user_id).first()
     if not evento:
         return {'erro': 'Evento não encontrado.'}
 
     inicio = evento.data_inicio
     fim = evento.data_fim
-    if data_inicio:
+    fuso_lisboa = ZoneInfo('Europe/Lisbon')
+    if data_inicio is not _NAO_FORNECIDO:
         try:
             inicio = datetime.fromisoformat(data_inicio)
-        except ValueError:
+            if inicio.tzinfo is not None:
+                inicio = inicio.astimezone(fuso_lisboa).replace(tzinfo=None)
+        except (TypeError, ValueError):
             return {'erro': f'Data de início inválida: "{data_inicio}".'}
-    if data_fim:
+    if data_fim is not _NAO_FORNECIDO:
         try:
             fim = datetime.fromisoformat(data_fim)
-        except ValueError:
+            if fim.tzinfo is not None:
+                fim = fim.astimezone(fuso_lisboa).replace(tzinfo=None)
+        except (TypeError, ValueError):
             return {'erro': f'Data de fim inválida: "{data_fim}".'}
     if fim < inicio:
         return {'erro': 'A data de fim não pode ser anterior à data de início.'}
 
-    evento.titulo = titulo or evento.titulo
-    evento.descricao = descricao if descricao is not None else evento.descricao
-    evento.localizacao = localizacao if localizacao is not None else evento.localizacao
+    alteracoes = {}
+    if titulo is not _NAO_FORNECIDO:
+        if not isinstance(titulo, str) or not titulo.strip() or len(titulo.strip()) > 200:
+            return {'erro': 'O título deve ter entre 1 e 200 caracteres.'}
+        alteracoes['titulo'] = titulo.strip()
+    if descricao is not _NAO_FORNECIDO:
+        if descricao is not None and not isinstance(descricao, str):
+            return {'erro': 'A descrição tem de ser texto ou null.'}
+        if isinstance(descricao, str) and len(descricao) > 10000:
+            return {'erro': 'A descrição não pode exceder 10000 caracteres.'}
+        alteracoes['descricao'] = descricao.strip() or None if isinstance(descricao, str) else None
+    if localizacao is not _NAO_FORNECIDO:
+        if localizacao is not None and not isinstance(localizacao, str):
+            return {'erro': 'A localização tem de ser texto ou null.'}
+        if isinstance(localizacao, str) and len(localizacao) > 300:
+            return {'erro': 'A localização não pode exceder 300 caracteres.'}
+        alteracoes['localizacao'] = localizacao or None
+    if cor is not _NAO_FORNECIDO:
+        if cor not in CORES_EVENTO:
+            return {'erro': 'Cor inválida para o evento.'}
+        alteracoes['cor'] = cor
+    if dia_inteiro is not _NAO_FORNECIDO:
+        if not isinstance(dia_inteiro, bool):
+            return {'erro': 'dia_inteiro tem de ser booleano.'}
+        alteracoes['dia_inteiro'] = dia_inteiro
+    if notificar is not _NAO_FORNECIDO:
+        if not isinstance(notificar, bool):
+            return {'erro': 'notificar tem de ser booleano.'}
+        alteracoes['notificar'] = notificar
+
+    for campo, valor in alteracoes.items():
+        setattr(evento, campo, valor)
     evento.data_inicio = inicio
     evento.data_fim = fim
-    if cor and cor in CORES_EVENTO:
-        evento.cor = cor
-    if dia_inteiro is not None:
-        evento.dia_inteiro = dia_inteiro
-    if notificar is not None:
-        evento.notificar = notificar
     evento.notificado_em = None  # como na rota — reabre a janela de notificação
 
     db.session.commit()

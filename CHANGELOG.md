@@ -6,6 +6,23 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.16] — 2026-10-18
+O Assistente IA pode editar tarefas existentes e actualiza compromissos com validações mais claras.
+
+**Alterado** (`app/assistente/`; **sem alteração de BD**)
+- Nova ferramenta de escrita `atualizar_tarefa`: altera texto, prioridade, prazo, lista, notas e etiquetas; preserva campos omitidos, permite limpar prazo/notas/etiquetas explicitamente, valida todos os argumentos antes de gravar e só aceita listas do próprio utilizador.
+- Instruções do modo de escrita orientam o Assistente a consultar primeiro tarefas/eventos, identificar o registo pelo ID exacto, pedir clarificação perante ambiguidades e só confirmar após sucesso.
+- `atualizar_evento` passa a distinguir campos omitidos de valores explícitos, valida os campos alterados e converte datas ISO 8601 com fuso para hora de Lisboa.
+
+**Validação**
+- Testes focados (`test_assistente_edicao.py`, `test_assistente_registo.py`): **22 passaram, 25 subtests passaram**; `git diff --check` limpo.
+- Suite completa: **371 passaram, 1 ignorado, 25 falharam**, todas em `tests/test_assistente_combustiveis.py`; 33 subtests passaram. Os testes focados da edição passaram. Não foi possível actualizar `origin/main` devido a falta de permissão de escrita em `.git/FETCH_HEAD`; comparação local indicava `0 0`.
+
+**Notas de deploy**
+- Sem alteração de BD. No PythonAnywhere: actualizar o código e fazer Reload.
+
+---
+
 ## [v1.8.15] — 2026-10-18
 Substitui o Mailjet pelo Zoho Mail através da API REST com OAuth 2.0.
 

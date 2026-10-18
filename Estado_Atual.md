@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.15
+# PIPE — Estado Actual do Projecto — v1.8.16
 
 ## O que é o PIPE
 
@@ -278,16 +278,18 @@ pipe-app/
 
 ### Assistente IA (`app/assistente/`)
 
+- **Edição segura (v1.8.16):** nova ferramenta de escrita `atualizar_tarefa` para alterar texto, prioridade, prazo, lista, notas e etiquetas. Campos omitidos são preservados; `data_limite=null`, notas vazias/nulas e etiquetas vazias limpam os respectivos valores. Validação completa antes de gravar, listas limitadas ao utilizador e reinício de `notificada_em` quando o prazo muda. O modo de escrita orienta a consultar primeiro e usar o ID exacto. `atualizar_evento` valida campos, preserva os omitidos e normaliza datas ISO 8601 com fuso para Europe/Lisbon.
+
 - **Cliente** (`cliente.py`): `chamar_llm(mensagens, ferramentas=None, prazo_total=None)` — HTTP POST para `openrouter.ai/api/v1/chat/completions`. Modelo principal via `OPENROUTER_MODEL` (default: `cohere/north-mini-code:free`) — **5 modelos no total (1 principal + 4 fallbacks)**. Fila de fallback: `nvidia/nemotron-3-super-120b-a12b:free`, `liquid/lfm-2.5-2.6b:free`, `dots-studio/dots-3-note-preview:free`, `poolside/laguna-s-2.1:free`. Auth por `OPENROUTER_API_KEY`; retry com backoff (3 tentativas: 2s, 5s, 10s) + fallback imediato em qualquer falha de provider (incluindo respostas HTTP 200 com `{"error": ...}` no corpo — detetadas por `_classificar_resposta()`, com classes `RateLimitError`/`ServicoIndisponivelError`; v1.8.0 acrescenta `PrazoExcedidoError` e o parâmetro aditivo `prazo_total` (segundos, opcional): prazo total da chamada entre tentativas e entre modelos — corta os backoffs e limita o timeout de cada pedido ao tempo restante; `None` (omissão) mantém o comportamento do Assistente. Usado pelo Resumo Diário (fase 4) para não prender a task nem o pedido web.)
 - **Contexto** (`contexto.py`): `processar_mensagem_assistente(mensagem_utilizador, user_id, historico=None, modo=None, nome_completo=None)` — orquestra o fluxo: monta prompt + histórico, chama LLM, executa tool calls (máx. 4 iterações), guarda resposta. Inclui o nome completo do perfil autenticado no prompt, com instrução para usar o primeiro nome por padrão e o nome completo apenas quando relevante ou solicitado (v1.8.13). Histórico em Flask session (20 mensagens = 10 trocas, tecto de 3000 chars/mensagem e 8000 chars no total). `_contexto_temporal()` usa `datetime.now(ZoneInfo('Europe/Lisbon'))` para devolver a data/hora de Portugal — sem este fuso, o servidor (UTC no PythonAnywhere) devolveria o dia errado e o modelo resolveria "amanhã" incorrectamente (v1.8.7)
-- **Ferramentas** (`ferramentas.py`): tool use com **8 funções de leitura** (`get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis`, `get_meteorologia`) e **10 de escrita** (`criar_tarefa`, `alternar_tarefa`, `apagar_tarefa`, `criar_nota`, `alternar_nota_acao`, `apagar_nota`, `criar_evento`, `atualizar_evento`, `apagar_evento`, `gerar_credencial`). Todas filtram por `user_id` (obrigatório, injetado pelo caller); `get_combustiveis` aceita `tipo_combustivel`, `concelho`, `posto` (nome **ou** marca, insensível a acentos e maiúsculas), `apenas_mais_barato` e `limite`; `get_meteorologia` recebe `detalhado` (bool) e consulta a previsão da localização guardada em Meteorologia. **Invariante (v1.7.4):** `REGISTO_FERRAMENTAS` tem de conter exactamente as ferramentas anunciadas nas definições — garantido por `tests/test_assistente_registo.py` (em v1.7.2 a adição de `get_meteorologia` apagou por engano a entrada de `criar_tarefa`, e o despachante devolvia "Ferramenta desconhecida")
+- **Ferramentas** (`ferramentas.py`): tool use com **8 funções de leitura** (`get_tarefas`, `get_notas`, `get_euromilhoes`, `get_resumo_geral`, `get_eventos`, `get_cambio`, `get_combustiveis`, `get_meteorologia`) e **11 de escrita** (`criar_tarefa`, `atualizar_tarefa`, `alternar_tarefa`, `apagar_tarefa`, `criar_nota`, `alternar_nota_acao`, `apagar_nota`, `criar_evento`, `atualizar_evento`, `apagar_evento`, `gerar_credencial`). Todas filtram por `user_id` (obrigatório, injetado pelo caller); `get_combustiveis` aceita `tipo_combustivel`, `concelho`, `posto` (nome **ou** marca, insensível a acentos e maiúsculas), `apenas_mais_barato` e `limite`; `get_meteorologia` recebe `detalhado` (bool) e consulta a previsão da localização guardada em Meteorologia. **Invariante (v1.7.4):** `REGISTO_FERRAMENTAS` tem de conter exactamente as ferramentas anunciadas nas definições — garantido por `tests/test_assistente_registo.py` (em v1.7.2 a adição de `get_meteorologia` apagou por engano a entrada de `criar_tarefa`, e o despachante devolvia "Ferramenta desconhecida")
 - **Rotas** (`routes.py`):
   - `GET /assistente` — página de chat (tema claro/escuro)
   - `POST /assistente/api/chat` — AJAX `{mensagem: "..."}` → `{resposta: "..."}` (rate limit 30/min)
   - `POST /assistente/api/modo` — alterna modo leitura/escrita (rate limit 10/min)
   - `POST /assistente/api/limpar` — limpa histórico da sessão (rate limit 10/min)
 - **System prompt:** PT-PT; capacidades limitadas à leitura em modo leitura (não sugere acções que não pode executar — encaminha para o módulo respectivo); nunca inventar dados; tom formal e conciso. **Anti-alucinação de meteorologia (08/10/2026):** qualquer pergunta sobre tempo obriga a chamar primeiro `get_meteorologia`, proibido apresentar valores sem resultado da ferramenta no turno, obrigatório citar local + fonte (Open-Meteo) + `meta.atualizada_em`, horizonte de 7 dias rolantes; garantido por `tests/test_assistente_prompt_meteorologia.py`
-- Testes: `test_assistente_cliente.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_contexto.py` (9), `test_assistente_contexto_truncagem.py` (10), `test_assistente_meteorologia.py` (14), `test_assistente_registo.py` (8 — invariante registo↔definições + regressão `criar_tarefa`)
+- Testes: `test_assistente_cliente.py` (13), `test_assistente_combustiveis.py` (31), `test_assistente_contexto.py` (9), `test_assistente_contexto_truncagem.py` (10), `test_assistente_meteorologia.py` (14), `test_assistente_registo.py` (8 — invariante registo↔definições + regressão `criar_tarefa`), `test_assistente_edicao.py` (14)
 
 ### Sistema de notificações (`app/notifications/`)
 
@@ -368,6 +370,8 @@ pipe-app/
 ---
 
 ## Testes
+
+- **Validação da v1.8.16 (2026-10-18):** `test_assistente_edicao.py` + `test_assistente_registo.py`: **22 passaram, 25 subtests passaram**. Suite integral: **371 passaram, 1 ignorado, 25 falharam** (todas em `test_assistente_combustiveis.py`); 33 subtests passaram. `git diff --check` limpo. A referência remota não pôde ser actualizada por falta de permissão em `.git/FETCH_HEAD`.
 
 - Execução:
   - `pytest --collect-only -q` — recolhe os testes
