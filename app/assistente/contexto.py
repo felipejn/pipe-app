@@ -89,9 +89,9 @@ def _formatar_agenda_semanal(user_id, hoje):
     inicio, fim = calcular_intervalo_semana(hoje)
     inicio_iso, fim_iso = inicio.isoformat(), fim.isoformat()
     tarefas_semana = get_tarefas(
-        user_id, data_inicio=inicio_iso, data_fim=fim_iso
+        user_id, estado='pendentes', data_inicio=inicio_iso, data_fim=fim_iso
     )
-    tarefas_todas = get_tarefas(user_id)
+    tarefas_todas = get_tarefas(user_id, estado='pendentes')
     eventos = get_eventos(
         user_id, data_inicio=inicio_iso, data_fim=fim_iso
     )
@@ -138,20 +138,16 @@ def _formatar_agenda_semanal(user_id, hoje):
         linhas.append(f'Não foi possível consultar as tarefas: {tarefas_semana["erro"]}')
     else:
         linhas.append(
-            f'{tarefas_semana["total"]} no intervalo: '
-            f'{tarefas_semana["pendentes"]} pendente(s), '
-            f'{tarefas_semana["concluidas"]} concluída(s).'
+            f'{tarefas_semana["total"]} tarefa(s) em aberto no intervalo.'
         )
         if tarefas_semana['tarefas']:
             for tarefa in tarefas_semana['tarefas']:
                 prazo = date.fromisoformat(tarefa['prazo']).strftime('%d/%m/%Y')
-                estado = 'concluída' if tarefa['concluida'] else 'pendente'
-                linhas.append(f'- {tarefa["titulo"]} — {prazo} ({estado})')
+                linhas.append(f'- {tarefa["titulo"]} — {prazo}')
         else:
             linhas.append('- Sem tarefas com prazo neste intervalo.')
         linhas.append(
-            f'Total geral: {tarefas_todas["total"]} tarefas; '
-            f'{tarefas_todas["pendentes"]} pendente(s).'
+            f'Total geral: {tarefas_todas["total"]} tarefa(s) em aberto.'
         )
 
     return '\n'.join(linhas)

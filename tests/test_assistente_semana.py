@@ -107,21 +107,24 @@ class ConsultasSemanaTests(TestCase):
                          {e['titulo'] for e in semana_anterior['eventos']})
 
     def test_filtro_semanal_de_tarefas_preserva_total_e_estado_correctos(self):
-        todas = get_tarefas(self.user.id)
+        abertas = get_tarefas(self.user.id)
+        todas = get_tarefas(self.user.id, estado='todas')
         with mock.patch('app.assistente.ferramentas.calcular_intervalo_semana',
                         return_value=(date(2026, 10, 12), date(2026, 10, 18))):
             semana = get_tarefas(self.user.id, esta_semana=True)
 
+        self.assertEqual(abertas['total'], 1)
+        self.assertEqual({t['titulo'] for t in abertas['tarefas']}, {'Tarefa 1'})
         self.assertEqual(todas['total'], 19)
         self.assertEqual(todas['pendentes'], 1)
-        self.assertEqual(semana['total'], 2)
+        self.assertEqual(semana['total'], 1)
         self.assertEqual(semana['pendentes'], 1)
-        self.assertEqual(semana['concluidas'], 1)
+        self.assertEqual(semana['concluidas'], 0)
         self.assertEqual(semana['intervalo'], {
             'inicio': '2026-10-12', 'fim': '2026-10-18',
         })
         self.assertEqual({t['titulo'] for t in semana['tarefas']},
-                         {'Tarefa 1', 'Tarefa 2'})
+                         {'Tarefa 1'})
 
     def test_filtro_semanal_de_eventos_inclui_sobreposicoes_e_dia_calculado(self):
         with mock.patch('app.assistente.ferramentas.calcular_intervalo_semana',
@@ -211,10 +214,11 @@ class ConsultasSemanaTests(TestCase):
 
         chamar.assert_not_called()
         self.assertIn('12/10/2026 a 18/10/2026', resposta)
-        self.assertIn('Total geral: 19 tarefas; 1 pendente(s).', resposta)
-        self.assertIn('1 pendente', resposta)
+        self.assertIn('Total geral: 1 tarefa(s) em aberto.', resposta)
+        self.assertIn('1 tarefa(s) em aberto no intervalo.', resposta)
         self.assertIn('Cruza fim', resposta)
         self.assertIn('segunda-feira, 19/10/2026', resposta)
         self.assertNotIn('Semana seguinte', resposta)
+        self.assertNotIn('Tarefa 2', resposta)
         self.assertNotIn('22 de outubro (2ª-feira)', resposta)
         self.assertEqual(historico[-1]['content'], resposta)

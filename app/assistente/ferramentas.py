@@ -168,7 +168,7 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
         'type': 'function',
         'function': {
             'name': 'get_tarefas',
-            'description': 'Consulta tarefas do utilizador, com filtros por lista, estado, atraso ou prazo. Para pedidos sobre esta semana, usa esta_semana=true; o servidor calcula o intervalo de segunda a domingo em Lisboa.',
+            'description': 'Consulta tarefas do utilizador. Por omissão devolve apenas tarefas pendentes; define estado=concluidas ou estado=todas apenas quando o utilizador pedir explicitamente tarefas concluídas ou todas. Aceita filtros por lista, atraso ou prazo. Para pedidos sobre esta semana, usa esta_semana=true; o servidor calcula o intervalo de segunda a domingo em Lisboa.',
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -179,7 +179,7 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
                     'estado': {
                         'type': 'string',
                         'enum': ['pendentes', 'concluidas', 'todas'],
-                        'description': 'Estado das tarefas a devolver.',
+                        'description': 'Estado das tarefas a devolver. Por omissão são devolvidas apenas as pendentes; usa concluidas ou todas só se o utilizador o pedir.',
                     },
                     'atrasadas': {
                         'type': 'boolean',
@@ -613,7 +613,7 @@ def get_tarefas(user_id, lista=None, estado=None, atrasadas=False,
     Args:
         user_id: ID do utilizador (obrigatório).
         lista: nome ou ID da lista para filtrar (opcional).
-        estado: 'pendentes', 'concluidas' ou 'todas'.
+    estado: 'pendentes', 'concluidas' ou 'todas'; omisso significa 'pendentes'.
         atrasadas: se True, só tarefas pendentes com prazo ultrapassado.
         esta_semana: filtra prazos pela semana actual em Europe/Lisbon.
         data_inicio/data_fim: intervalo inclusivo de prazos em AAAA-MM-DD.
@@ -633,7 +633,7 @@ def get_tarefas(user_id, lista=None, estado=None, atrasadas=False,
             Tarefa.data_limite <= fim,
         )
 
-    if estado == 'pendentes':
+    if estado in (None, 'pendentes'):
         q = q.filter_by(concluida=False)
     elif estado == 'concluidas':
         q = q.filter_by(concluida=True)

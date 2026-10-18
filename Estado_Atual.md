@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.18
+# PIPE — Estado Actual do Projecto — v1.8.19
+
+## Versão v1.8.19 — 2026-10-18
+
+- O Assistente apresenta apenas tarefas em aberto por omissão, incluindo nas agendas semanais; pedidos explícitos por tarefas concluídas ou por todas as tarefas continuam disponíveis.
+- **Sem alteração de BD.**
+- **Validação:** 37 testes focados passaram, 6 subtestes passaram; `git diff --check` limpo.
+
 
 ## Versão v1.8.18 — 2026-10-18
 

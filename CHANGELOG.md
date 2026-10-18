@@ -6,6 +6,22 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.19] — 2026-10-18
+O Assistente passa a mostrar tarefas em aberto por omissão.
+
+**Alterado** (`app/assistente/`; sem alteração de BD)
+- A ferramenta `get_tarefas` filtra tarefas concluídas por omissão; o utilizador pode pedir explicitamente tarefas concluídas ou todas.
+- A agenda semanal passa a apresentar apenas tarefas em aberto e o respectivo total.
+- Testes de regressão cobrem o filtro predefinido e os pedidos explícitos por todas as tarefas.
+
+**Validação**
+- **37 testes passaram**, 6 subtests; `git diff --check` limpo.
+
+**Notas de deploy**
+- Sem alteração de BD. No PythonAnywhere: actualizar o código e fazer Reload.
+
+---
+
 ## [v1.8.18] — 2026-10-18
 Agenda semanal fiável no Assistente IA e avaliação explícita do orçamento de contexto.
 
