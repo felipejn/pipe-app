@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.19
+# PIPE — Estado Actual do Projecto — v1.8.20
+
+## Versão v1.8.20 — 2026-10-18
+
+- Validações de produção concluídas para segurança, autenticação, 2FA, notificações, Meteorologia, Resumo Diário, Calendário e restantes itens de deploy documentados.
+- Mantém-se pendente apenas o teste ponta a ponta da extensão Chrome do Cofre, incluindo CORS, preenchimento de credenciais, ausência da chave nos cookies e expiração da captura pendente.
+- **Sem alteração de BD.**
+- **Validação:** confirmação manual do utilizador em produção.
 
 ## Versão v1.8.19 — 2026-10-18
 
@@ -465,7 +472,7 @@ OPENROUTER_MODEL=cohere/north-mini-code:free
 ---
 
 ## Pendências de deploy
-- **Módulo Meteorologia (deploy em pendência):** aplicar a migration `c420a200f2f2_adiciona_meteorologia_localizacao.py` (`flask db upgrade`) antes de usar o módulo; depois confirmar com `flask db current` (`c420a200f2f2 (head)`) e `flask db check` (limpo).
+- **Módulo Meteorologia:** migration `c420a200f2f2` e validação em produção concluídas.
 
 - **Calendário, Cofre, Combustíveis, Convites/Mailjet** — ✅ **resolvido pela baseline do Flask-Migrate** (`3b14f5bd26a5`, stamped no PA em 2026-10-06); os scripts manuais (`migrar_convites_mailjet.py`, `reset_postos_combustiveis.py`, `remover_postos_ignorados.py`) são históricos e **não devem ser executados**
 - **Extensão Chrome do Cofre:** teste de ponta a ponta em produção seguindo `docs/guia-extensao-chrome.md` (login no PIPE → desbloquear cofre → visitar site com login guardado → preencher); confirmar CORS e que a chave do cofre não aparece nos cookies; recarregar ⟳ o cartão da extensão em `chrome://extensions` depois das alterações
@@ -539,13 +546,9 @@ Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`;
 
 ## Próximos passos
 
-1. **Preparar deploy de segurança no PythonAnywhere:** confirmar `SECRET_KEY` forte já definida no ambiente antes de actualizar; instalar as versões de `requirements.txt`, fazer `git pull` e Reload. Não há alterações de esquema/migrations.
-2. **Validar em produção:** login e 2FA (incluindo TOTP), cookies e cabeçalhos HTTPS, importação de CSV e conversão de imagens; confirmar nos logs que não há erros de arranque.
-3. **Confirmar o Resumo Diário e Meteorologia em produção** — re-testar a pré-visualização com Meteorologia activa e observar logs da Open-Meteo.
-4. **Testar notificações do Calendário e dashboard em produção.**
-5. **Extensão Chrome do Cofre** — teste de ponta a ponta; captura pendente expira localmente após 15 minutos.
-6. Futuras alterações de schema seguem Flask-Migrate; nunca editar a baseline `3b14f5bd26a5`.
-7. Manter `CHANGELOG.md` actualizado com cada versão.
+1. **Extensão Chrome do Cofre:** concluir o teste ponta a ponta em produção — iniciar sessão no PIPE, desbloquear o Cofre, preencher credenciais num site, confirmar CORS e que a chave do Cofre não aparece nos cookies; validar também a expiração da captura pendente após 15 minutos.
+2. Futuras alterações de schema seguem Flask-Migrate; nunca editar a baseline `3b14f5bd26a5`.
+3. Manter `CHANGELOG.md` actualizado com cada versão.
 
 ---
 

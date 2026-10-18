@@ -6,6 +6,26 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.20] — 2026-10-18
+Validações de produção concluídas; falta apenas o teste ponta a ponta da extensão Chrome do Cofre.
+
+**Validado em produção**
+- Segurança e autenticação, incluindo 2FA/TOTP, cookies e cabeçalhos HTTPS.
+- Importação de CSV e conversão de imagens; logs de arranque sem erros.
+- Meteorologia, pré-visualização do Resumo Diário, notificações do Calendário e dashboard.
+- A migration de Meteorologia foi aplicada e confirmada.
+
+**Pendente**
+- Teste ponta a ponta da extensão Chrome: login, desbloqueio do Cofre, preenchimento num site, CORS, ausência da chave nos cookies e expiração da captura pendente após 15 minutos.
+
+**Validação**
+- Confirmação manual do utilizador em produção.
+
+**Notas de deploy**
+- Sem alteração de BD nesta versão. Não requer nova migration.
+
+---
+
 ## [v1.8.19] — 2026-10-18
 O Assistente passa a mostrar tarefas em aberto por omissão.
 
