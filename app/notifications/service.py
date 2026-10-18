@@ -36,14 +36,20 @@ class NotificationService:
         if telegram_token:
             self._canais['telegram'] = TelegramChannel(token=telegram_token)
 
-        mailjet_key = os.environ.get('MAILJET_API_KEY')
-        mailjet_secret = os.environ.get('MAILJET_API_SECRET')
-        mailjet_from = os.environ.get('MAILJET_FROM_EMAIL')
-        if mailjet_key and mailjet_from and mailjet_secret:
+        zoho_client_id = os.environ.get('ZOHO_CLIENT_ID')
+        zoho_client_secret = os.environ.get('ZOHO_CLIENT_SECRET')
+        zoho_refresh_token = os.environ.get('ZOHO_REFRESH_TOKEN')
+        zoho_account_id = os.environ.get('ZOHO_ACCOUNT_ID')
+        zoho_from = os.environ.get('ZOHO_FROM_EMAIL')
+        if all((zoho_client_id, zoho_client_secret, zoho_refresh_token,
+                zoho_account_id, zoho_from)):
             self._canais['email'] = EmailChannel(
-                api_key=mailjet_key,
-                api_secret=mailjet_secret,
-                remetente=mailjet_from,
+                client_id=zoho_client_id,
+                client_secret=zoho_client_secret,
+                refresh_token=zoho_refresh_token,
+                account_id=zoho_account_id,
+                remetente=zoho_from,
+                dc=os.environ.get('ZOHO_DC', 'eu'),
             )
 
         self._inicializado = True

@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user
 from app import db
 from app.settings import settings
@@ -105,31 +105,45 @@ def _conselho_telegram(motivo):
 @settings.route('/testar-email', methods=['POST'])
 @login_required
 def testar_email():
-    """Envia email de teste ao utilizador via Mailjet."""
+    """Envia email de teste ao utilizador via Zoho Mail."""
     from app.notifications.channels.email import EmailChannel
-    import os
-
     prefs = current_user.notificacao_prefs
     if not prefs or not prefs.email_activo:
         flash('Activa primeiro o canal de email.', 'erro')
         return redirect(url_for('settings.index'))
 
-    api_key = os.environ.get('MAILJET_API_KEY')
-    api_secret = os.environ.get('MAILJET_API_SECRET')
-    remetente = os.environ.get('MAILJET_FROM_EMAIL')
+    configuracao = {
+        'client_id': current_app.config.get('ZOHO_CLIENT_ID'),
+        'client_secret': current_app.config.get('ZOHO_CLIENT_SECRET'),
+        'refresh_token': current_app.config.get('ZOHO_REFRESH_TOKEN'),
+        'account_id': current_app.config.get('ZOHO_ACCOUNT_ID'),
+        'remetente': current_app.config.get('ZOHO_FROM_EMAIL'),
+        'dc': current_app.config.get('ZOHO_DC', 'eu'),
+    }
 
-    if not api_key or not remetente or not api_secret:
-        flash('MAILJET_API_KEY, MAILJET_API_SECRET ou MAILJET_FROM_EMAIL não configurados no servidor.', 'erro')
+    if not all(configuracao.values()):
+        flash('As variáveis ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN, ZOHO_ACCOUNT_ID e ZOHO_FROM_EMAIL têm de estar configuradas.', 'erro')
         return redirect(url_for('settings.index'))
 
-    canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
-    sucesso = canal.enviar_template(current_user, 'teste', {
-        'nome': current_user.nome_apresentacao,
-    })
+    try:
+        canal = EmailChannel(**configuracao)
+        sucesso = canal.enviar_template(current_user, 'teste', {
+            'nome': current_user.nome_apresentacao,
+        })
+    except Exception as erro:
+        current_app.logger.error(
+            'Falha inesperada no teste de email Zoho: %s', type(erro).__name__)
+        flash('O teste de email falhou antes de concluir o envio. '
+              'Consulta o registo da aplicação para o diagnóstico.', 'erro')
+        return redirect(url_for('settings.index'))
 
     if sucesso:
         flash(f'Email de teste enviado para {current_user.email}.', 'sucesso')
     else:
-        flash('Erro ao enviar. Confirma as credenciais Mailjet no servidor.', 'erro')
+        detalhe = (canal.ultimo_resultado or {}).get('erro')
+        if detalhe:
+            flash(f'Erro ao enviar pelo Zoho Mail ({detalhe}).', 'erro')
+        else:
+            flash('Erro ao enviar. Confirma a configuração do Zoho Mail no servidor.', 'erro')
 
     return redirect(url_for('settings.index'))

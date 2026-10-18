@@ -55,10 +55,14 @@ def _enviar_codigo_telegram(user):
 def _enviar_codigo_email(user):
     """Envia o código 2FA via email. Retorna True se bem-sucedido."""
     codigo = _gerar_e_guardar_codigo(user)
-    api_key = current_app.config.get('MAILJET_API_KEY')
-    api_secret = current_app.config.get('MAILJET_API_SECRET')
-    remetente = current_app.config.get('MAILJET_FROM_EMAIL')
-    canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
+    canal = EmailChannel(
+        client_id=current_app.config.get('ZOHO_CLIENT_ID'),
+        client_secret=current_app.config.get('ZOHO_CLIENT_SECRET'),
+        refresh_token=current_app.config.get('ZOHO_REFRESH_TOKEN'),
+        account_id=current_app.config.get('ZOHO_ACCOUNT_ID'),
+        remetente=current_app.config.get('ZOHO_FROM_EMAIL'),
+        dc=current_app.config.get('ZOHO_DC', 'eu'),
+    )
 
     return canal.enviar_template(user, 'codigo_2fa', {
         'nome': user.nome_apresentacao, 'codigo': codigo,
@@ -449,10 +453,14 @@ def recuperar_password():
             db.session.commit()
 
             link = url_for('auth.reset_password', token=token, _external=True)
-            api_key = current_app.config.get('MAILJET_API_KEY')
-            api_secret = current_app.config.get('MAILJET_API_SECRET')
-            remetente = current_app.config.get('MAILJET_FROM_EMAIL')
-            canal = EmailChannel(api_key=api_key, api_secret=api_secret, remetente=remetente)
+            canal = EmailChannel(
+                client_id=current_app.config.get('ZOHO_CLIENT_ID'),
+                client_secret=current_app.config.get('ZOHO_CLIENT_SECRET'),
+                refresh_token=current_app.config.get('ZOHO_REFRESH_TOKEN'),
+                account_id=current_app.config.get('ZOHO_ACCOUNT_ID'),
+                remetente=current_app.config.get('ZOHO_FROM_EMAIL'),
+                dc=current_app.config.get('ZOHO_DC', 'eu'),
+            )
             canal.enviar_template(utilizador, 'recuperacao_password', {
                 'nome': utilizador.nome_apresentacao, 'link': link,
             })

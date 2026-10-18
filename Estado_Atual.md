@@ -1,4 +1,4 @@
-# PIPE — Estado Actual do Projecto — v1.8.13
+# PIPE — Estado Actual do Projecto — v1.8.15
 
 ## O que é o PIPE
 
@@ -144,7 +144,7 @@ pipe-app/
 │   ├── testar_assistente.py     # smoke test do Assistente IA contra a OpenRouter
 │   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
 │   ├── gerar_icones_extensao.py # gera icon48/icon128 da extensão Chrome (Pillow, sem Flask)
-│   ├── verificar_mailjet.py     # estado real dos emails no Mailjet + `--apenas-hoje`
+│   ├── verificar_mailjet.py     # obsoleto: diagnóstico histórico do Mailjet (não executar)
 │   ├── verificar_telegram.py    # diagnóstico do canal Telegram: getMe + getChat + `--enviar-teste`
 │   └── smoke_combustiveis.py    # smoke test da ferramenta get_combustiveis (Assistente IA)
 ├── tests/
@@ -292,8 +292,9 @@ pipe-app/
 ### Sistema de notificações (`app/notifications/`)
 
 - Modelo `UserNotificationPreferences` (`notificacao_preferencias`) — preferências por canal (Telegram, Email, Tarefas, Calendário)
-- `service.py` orquestra o envio; canais: `TelegramChannel` (python-telegram-bot) e `EmailChannel` (Mailjet)
-- **Emails PIPE (v1.8.10):** `email_templates.py` compõe assunto, HTML e texto simples para convite, recuperação de palavra-passe, 2FA, teste, Euromilhões, tarefas e Calendário; `EmailChannel` envia `HTMLPart` + `TextPart` ao Mailjet com remetente `PIPE`. O serviço separa o conteúdo do email das mensagens Telegram. `PIPE_PUBLIC_URL` define a origem dos links em tarefas agendadas (por omissão `https://felipejn.pythonanywhere.com`).
+- `service.py` orquestra o envio; canais: `TelegramChannel` (python-telegram-bot) e `EmailChannel` (Zoho Mail API REST)
+- **Emails PIPE (v1.8.15):** `email_templates.py` compõe assunto, HTML e texto simples para convite, recuperação de palavra-passe, 2FA, teste, Euromilhões, tarefas e Calendário; `EmailChannel` envia pela API Zoho Mail com OAuth 2.0. O token tem cache em `instance/zoho_access_token.json`, partilhada entre processos da aplicação e tarefas agendadas. `ZOHO_FROM_EMAIL` é enviado tal como configurado e aceita `PIPE <endereço@domínio>` para nome apresentado. `PIPE_PUBLIC_URL` define a origem dos links em tarefas agendadas (por omissão `https://felipejn.pythonanywhere.com`).
+- **Convites por email (v1.8.15):** regista o resultado simples (`enviado`/`falhou`) e o `messageId` opcional; já não consulta estados de entrega. A migration `fd5793bc73bf` renomeia a coluna do ID Mailjet para `email_message_id`, preservando os IDs, e remove `email_verificado_em`. `scripts/verificar_mailjet.py` e `scripts/migrar_convites_mailjet.py` mantêm-se inalterados como referências históricas obsoletas; não executar.
 - **Diagnóstico de falhas (v1.8.4):** ambos os canais guardam o motivo do último envio em `ultimo_resultado` (`{'sucesso', 'message_id', 'erro'}`), no mesmo contrato — o retorno continua `bool` para não partir os chamadores antigos (2FA, definições, resumo diário). `notification_service.ultimo_erro(canal)` expõe o motivo e `_registar_falhas()` escreve-o no log sempre que um canal devolve `False`. **`False` e `None` não são o mesmo:** `None` é canal não activo ou destinatário sem contacto (silencioso, esperado); `False` é o canal a correr e a falhar — e traz motivo.
 - **Canal Telegram** — valida o `ok` do corpo da resposta (a Bot API devolve `{"ok": false, "error_code", "description"}`; `description` vive no **topo** do corpo, ao contrário da OpenRouter, que a aninha em `error`). O motivo fica em `ultimo_resultado['erro']` como `HTTP <error_code> — <description>` (ex.: `HTTP 403 — Forbidden: bot was blocked by the user`), `Erro de rede: …` ou `Destinatário sem chat_id de Telegram.`; o sucesso guarda o `message_id`. **Retry só em falhas transitórias:** rede, 408/425/429/500/502/503/504 repetem uma vez (2 s); 4xx permanentes (400/401/403/404/409) falham de imediato.
 - **Log da scheduled task** — `_descrever(resultado, canal)` traduz cada canal para `ok` / `não activo` / `FALHOU (<motivo>)` nas linhas de Euromilhões, Tarefas e Calendário; o Resumo Diário distingue os dois casos de ausência.
@@ -385,7 +386,7 @@ pipe-app/
 - **Static files** configurados ✅
 - **Scheduled task** — `python /home/felipejn/pipe-app/scripts/pipe_tasks.py` às **07:00** ✅ (configuração confirmada no painel Tasks do PythonAnywhere)
 - **Flask-Migrate — baseline `3b14f5bd26a5`** ✅: a produção foi **stamped** para `3b14f5bd26a5` em 2026-10-06 (a baseline **não** foi executada sobre os dados existentes — o esquema em produção já continha todas as tabelas e colunas); confirmar com `flask db current` (produção: `3b14f5bd26a5 (head)`; depois do deploy do Meteorologia: `c420a200f2f2 (head)`) e `flask db check` (limpo).
-- **Esquema (Calendário, Cofre, Combustíveis, Convites/Mailjet)** ✅ — resolvido pela baseline: `evento`, `cofre_configs`/`cofre_passwords`, as colunas `ativo`/`ciclos_ausente` e `mailjet_message_id`/`email_estado`/`email_verificado_em` já existiam em produção e estão cobertas por `3b14f5bd26a5`; a correcção de `User.is_admin` (`nullable=False`, `server_default=0`) também está integrada na baseline — **nenhum script manual de migração é necessário nem recomendado**
+- **Esquema (Calendário, Cofre, Combustíveis, Convites)** ✅ — a baseline imutável `3b14f5bd26a5` registou o esquema histórico; a migration `fd5793bc73bf` converte o resultado de email e substitui as colunas Mailjet por `email_message_id`.
 - **Configuração de produção** (pacotes via `pip install -r requirements.txt`, variáveis do `.env` como `COFRE_CORS_ORIGINS`, cookies `SameSite=None`/`Secure`) — não é verificável a partir do repositório; confirmar no painel/terminal do PythonAnywhere se ainda não foi feito
 - **Extensão Chrome do Cofre** ⚠️: teste de ponta a ponta em produção pendente (ver «Pendências de deploy»)
 
@@ -417,9 +418,12 @@ application = create_app()
 FLASK_ENV=production
 SECRET_KEY=<gerado com secrets.token_hex(32)>
 TELEGRAM_BOT_TOKEN=...
-MAILJET_API_KEY=...
-MAILJET_API_SECRET=...
-MAILJET_FROM_EMAIL=...
+ZOHO_CLIENT_ID=...
+ZOHO_CLIENT_SECRET=...
+ZOHO_REFRESH_TOKEN=...
+ZOHO_ACCOUNT_ID=...
+ZOHO_FROM_EMAIL=...
+ZOHO_DC=eu
 WISE_API_KEY=...
 APIABERTA_API_KEY=...
 COFRE_CORS_ORIGINS=chrome-extension://<ID da extensão>
@@ -486,7 +490,7 @@ Com a **app parada**, copiar o ficheiro mais recente de `instance/backups/` para
 
 - **Variáveis do `.env` exigem Reload (v1.8.6)** — `config.py` faz `load_dotenv()` **no import do módulo**, ou seja uma única vez, no arranque do processo. Alterar `TELEGRAM_BOT_TOKEN` (ou qualquer variável) no ficheiro **não tem efeito** na app já a correr: o worker continua com o valor antigo. No PythonAnywhere é obrigatório **Reload** depois de escrever o `.env`. Sem isso, um token revogado e substituído continua a dar `HTTP 401 — Unauthorized` — que foi o que aconteceu em 14/10/2026. Nas *scheduled tasks* o efeito é imediato (cada execução é um processo novo), o que torna a armadilha ainda mais enganadora: a task vê o valor novo e a app web não.
 - **`create_all()` só corre em testes (v1.6.0)** — nunca altera uma BD existente (não faz `ALTER TABLE`); o esquema evolui com Flask-Migrate: alterar o modelo → `flask db migrate -m "..."` → rever o diff → `python scripts/backup_bd.py` → `flask db upgrade`. BD local perdida ou para recriar de zero: `del instance\pipe.db` → `flask db upgrade` → `python scripts/criar_admin.py`
-- **Scripts de migração manuais são históricos** — `scripts/migrar_convites_mailjet.py` (e outros `migrar_*.py`) e `scripts/reset_postos_combustiveis.py` estão **OBSOLETOS** desde a v1.6.0 (o baseline do Flask-Migrate cobre o schema); ficam só como documentação — **NÃO alterar os scripts**
+- **Scripts de migração manuais são históricos** — `scripts/migrar_convites_mailjet.py` (e outros `migrar_*.py`) e `scripts/reset_postos_combustiveis.py` estão **OBSOLETOS** desde a v1.6.0 (o baseline do Flask-Migrate cobre o schema); `scripts/verificar_mailjet.py` está **OBSOLETO** desde a v1.8.15. Ficam só como documentação — **NÃO alterar nem executar estes scripts**
 - **Engine fixado em `db.init_app()`** — atribuir `app.config['SQLALCHEMY_DATABASE_URI']` **depois** de `create_app()` não tem efeito sobre o engine já construído; por isso os testes têm de usar `create_app('testing')` antes de qualquer reatribuição (o conftest bloqueia `db.drop_all()` com BD de ficheiro)
 - **Cache do nginx do PythonAnywhere** — serve ficheiros estáticos com cache de longo prazo e **ignora parâmetros de query**; quando se altera o CSS é preciso actualizar o `cache-buster` em `base.html` (`?v=...`) para forçar o reload no browser
 - **OpenRouter pode devolver HTTP 200 com erro** — quando o provider upstream falha, o corpo é `{"error": ...}`; o código do Assistente IA deve usar `_classificar_resposta()` em vez de confiar só em `raise_for_status()`; há fila de fallback de modelos gratuitos

@@ -1,44 +1,42 @@
-"""Testes da confirmação de envio de email dos convites (Mailjet).
-
-O painel mostrava «Convite enviado» só com base na aceitação da API — sem prova
-de entrega. Estes testes cobrem: o regresso do MessageID no `enviar()`, o registo
-do estado no convite, e o endpoint `/admin/convites/<id>/estado-email` que
-consulta a actividade real do Mailjet (entregue / falhou + motivo do bounce).
-"""
+"""Testes do canal Zoho Mail e do resultado de envio dos convites."""
+import json
+import logging
 import os
 import sys
 from datetime import datetime, timedelta
 from unittest import mock
 
 import pytest
+import requests
 from werkzeug.security import generate_password_hash
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app import create_app, db
 from app.auth.models import Convite, User
+from app.notifications.models import UserNotificationPreferences
 from app.notifications.channels.email import EmailChannel
 
-MESSAGE_ID = 1152921544892419067  # formato real do Mailjet (19 dígitos)
 
+TOKEN = 'access-sensivel'
+SEGREDO = 'segredo-sensivel'
+REFRESH = 'refresh-sensivel'
+CONTEUDO = 'conteudo-privado'
 
-# ═════════ FIXTURES ═════════
 
 @pytest.fixture
-def app():
-    """App de teste com SQLite in-memory (nunca toca em instance/pipe.db)."""
+def app(tmp_path):
+    """App de teste com BD em memória e cache Zoho isolada em pasta temporária."""
     app = create_app('testing')
     with app.app_context():
-        uri = str(db.engine.url)
-        assert 'memory' in uri, (
-            f'ABORTADO: os testes estão a apontar para a BD real ({uri}). '
-            'Verificar SQLALCHEMY_DATABASE_URI em TestingConfig.'
-        )
+        assert 'memory' in str(db.engine.url)
         db.create_all()
-        # Garantir que o endpoint de estado encontra o Mailjet configurado
-        app.config['MAILJET_API_KEY'] = 'chave-teste'
-        app.config['MAILJET_API_SECRET'] = 'segredo-teste'
-        app.config['MAILJET_FROM_EMAIL'] = 'teste@exemplo.pt'
+        app.config.update(
+            ZOHO_CLIENT_ID='id-teste', ZOHO_CLIENT_SECRET=SEGREDO,
+            ZOHO_REFRESH_TOKEN=REFRESH, ZOHO_ACCOUNT_ID='conta-teste',
+            ZOHO_FROM_EMAIL='PIPE <pipe@exemplo.pt>', ZOHO_DC='eu',
+            ZOHO_TOKEN_CACHE_PATH=str(tmp_path / 'zoho-token.json'),
+        )
         yield app
         db.session.remove()
 
@@ -50,7 +48,6 @@ def client(app):
 
 @pytest.fixture
 def admin_client(client):
-    """Cliente com sessão de administrador (CSRF desligado no TestingConfig)."""
     with client.application.app_context():
         user = User(username='admin-teste', email='admin@exemplo.pt')
         user.password_hash = generate_password_hash('password-de-teste-123')
@@ -63,232 +60,237 @@ def admin_client(client):
     return client
 
 
-# ═════════ RESPOSTAS FALSAS DO MAILJET ═════════
-
-def _resposta_envio(codigo=200, estado='success'):
-    """Resposta de POST /v3.1/send."""
-    r = mock.Mock(status_code=codigo)
-    if estado == 'success':
-        r.json.return_value = {'Messages': [{'Status': 'success',
-                                             'To': [{'Email': 'para@exemplo.pt',
-                                                     'MessageID': MESSAGE_ID}]}]}
-    else:
-        r.json.return_value = {'Messages': [{'Status': 'error',
-                                             'ErrorMessage': 'Unable to connect to server'}]}
-    return r
+def _canal(app, **kwargs):
+    return EmailChannel(
+        client_id=app.config['ZOHO_CLIENT_ID'],
+        client_secret=app.config['ZOHO_CLIENT_SECRET'],
+        refresh_token=app.config['ZOHO_REFRESH_TOKEN'],
+        account_id=app.config['ZOHO_ACCOUNT_ID'],
+        remetente=app.config['ZOHO_FROM_EMAIL'],
+        dc=app.config['ZOHO_DC'],
+        cache_path=app.config['ZOHO_TOKEN_CACHE_PATH'], **kwargs,
+    )
 
 
-def _fake_get_entregue(url, *args, **kwargs):
-    r = mock.Mock(status_code=200)
-    if 'messagehistory' in url:
-        r.json.return_value = {'Data': [
-            {'EventAt': 1790324894, 'EventType': 'sent', 'Comment': ''},
-            {'EventAt': 1790325000, 'EventType': 'delivered', 'Comment': ''},
-        ]}
-    else:
-        r.json.return_value = {'Data': [{'Status': 'delivered'}]}
-    return r
+def _resposta(codigo=200, corpo=None):
+    resposta = mock.Mock(status_code=codigo)
+    resposta.json.return_value = corpo or {
+        'status': {'code': 200}, 'data': {'messageId': 'zoho-msg-123'}
+    }
+    return resposta
 
 
-def _fake_get_softbounced(url, *args, **kwargs):
-    r = mock.Mock(status_code=200)
-    if 'messagehistory' in url:
-        r.json.return_value = {'Data': [
-            {'EventAt': 1790319683, 'EventType': 'softbounced',
-             'Comment': '550 5.7.40 Your email has been blocked because the '
-                        'From: header is not aligned with the authenticated '
-                        'SPF or DKIM organizational domain.'},
-        ]}
-    else:
-        r.json.return_value = {'Data': [{'Status': 'softbounced'}]}
-    return r
+def _token_resposta(token=TOKEN):
+    return _resposta(200, {'access_token': token, 'expires_in': 3600})
 
 
-# ═════════ CANAL EmailChannel ═════════
+def _guardar_cache(canal, token=TOKEN, restante=3600):
+    canal._guardar_cache(token, restante)
 
-class TestCanalEmail:
-    def test_enviar_extrai_message_id(self):
-        canal = EmailChannel('k', 's', 'remetente@exemplo.pt')
+
+class TestCanalZoho:
+    def test_sucesso_renova_sem_cache_e_envia_payload_zoho(self, app):
+        canal = _canal(app)
         destino = mock.Mock(email='para@exemplo.pt')
         with mock.patch('app.notifications.channels.email.requests.post',
-                        return_value=_resposta_envio()):
-            assert canal.enviar(destino, 'Assunto', 'Corpo') is True
-        assert canal.ultimo_resultado['sucesso'] is True
-        assert canal.ultimo_resultado['message_id'] == MESSAGE_ID
-        assert canal.ultimo_resultado['erro'] is None
+                        side_effect=[_token_resposta(), _resposta()]) as pedido:
+            assert canal.enviar(destino, 'Assunto', CONTEUDO, html='<p>privado</p>')
+        assert pedido.call_count == 2
+        assert pedido.call_args_list[0].args[0] == 'https://accounts.zoho.eu/oauth/v2/token'
+        envio = pedido.call_args_list[1]
+        assert envio.args[0] == 'https://mail.zoho.eu/api/accounts/conta-teste/messages'
+        assert envio.kwargs['headers']['Authorization'] == f'Zoho-oauthtoken {TOKEN}'
+        assert envio.kwargs['headers']['Accept'] == 'application/json'
+        assert envio.kwargs['json']['fromAddress'] == 'PIPE <pipe@exemplo.pt>'
+        assert envio.kwargs['json']['mailFormat'] == 'html'
+        assert envio.kwargs['timeout'] == 10
+        assert canal.ultimo_resultado == {
+            'sucesso': True, 'message_id': 'zoho-msg-123', 'erro': None
+        }
 
-    def test_enviar_falha_regista_motivo(self):
-        canal = EmailChannel('k', 's', 'remetente@exemplo.pt')
-        destino = mock.Mock(email='para@exemplo.pt')
+    def test_reutiliza_cache_valida_sem_renovar(self, app):
+        canal = _canal(app)
+        _guardar_cache(canal)
         with mock.patch('app.notifications.channels.email.requests.post',
-                        return_value=_resposta_envio(codigo=401)):
-            assert canal.enviar(destino, 'Assunto', 'Corpo') is False
+                        return_value=_resposta()) as pedido:
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', 'b')
+        pedido.assert_called_once()
+        assert pedido.call_args.args[0].startswith('https://mail.zoho.eu/')
+
+    def test_cache_perto_da_expiracao_renova(self, app):
+        canal = _canal(app)
+        _guardar_cache(canal, restante=100)
+        with mock.patch('app.notifications.channels.email.requests.post',
+                        side_effect=[_token_resposta('novo-token'), _resposta()]) as pedido:
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', 'b')
+        assert pedido.call_count == 2
+        assert pedido.call_args_list[1].kwargs['headers']['Authorization'] == 'Zoho-oauthtoken novo-token'
+
+    def test_falha_ao_gravar_cache_nao_impede_envio(self, app, monkeypatch):
+        canal = _canal(app)
+        monkeypatch.setattr('app.notifications.channels.email.os.replace',
+                            mock.Mock(side_effect=OSError('disco indisponível')))
+        with mock.patch('app.notifications.channels.email.requests.post',
+                        side_effect=[_token_resposta(), _resposta()]):
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', 'b') is True
+
+    def test_retry_unico_depois_de_token_invalido(self, app):
+        canal = _canal(app)
+        _guardar_cache(canal)
+        invalido = _resposta(401, {'status': {'code': 401}, 'message': 'token'} )
+        with mock.patch('app.notifications.channels.email.requests.post',
+                        side_effect=[invalido, _token_resposta('renovado'), _resposta()]) as pedido:
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', 'b')
+        assert pedido.call_count == 3
+
+    def test_erro_no_corpo_devolve_falha(self, app, caplog):
+        canal = _canal(app)
+        _guardar_cache(canal)
+        falha = _resposta(200, {
+            'status': {'code': 500, 'description': 'Internal Error'},
+            'data': {'moreInfo': 'Falha temporária do servidor Zoho'},
+        })
+        with caplog.at_level(logging.ERROR), mock.patch(
+                'app.notifications.channels.email.requests.post', return_value=falha):
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', CONTEUDO) is False
         assert canal.ultimo_resultado['sucesso'] is False
-        assert canal.ultimo_resultado['message_id'] is None
-        assert canal.ultimo_resultado['erro'] == 'HTTP 401'
+        assert CONTEUDO not in caplog.text
+        assert 'status.description=Internal Error' in caplog.text
+        assert 'data.moreInfo=Falha temporária do servidor Zoho' in caplog.text
 
-    def test_enviar_sem_email_destinatario(self):
-        canal = EmailChannel('k', 's', 'remetente@exemplo.pt')
-        destino = mock.Mock(email=None)
-        assert canal.enviar(destino, 'Assunto', 'Corpo') is False
-        assert canal.ultimo_resultado['erro'] == 'Destinatário sem email.'
+    def test_detalhes_zoho_no_log_redigem_dados_sensiveis_e_truncam(self, app, caplog):
+        canal = _canal(app)
+        _guardar_cache(canal)
+        destinatario = 'destinatario-privado@exemplo.pt'
+        assunto = 'ASSUNTO-PRIVADO'
+        conteudo = 'CONTEUDO-PRIVADO'
+        html = '<p>HTML-PRIVADO</p>'
+        resposta = _resposta(500, {
+            'status': {
+                'code': 500,
+                'description': f'Internal Error {SEGREDO} {REFRESH} {TOKEN} {assunto}',
+            },
+            'message': f'{destinatario} {conteudo} {html}',
+            'data': {'moreInfo': f'Erro {SEGREDO} {REFRESH} {TOKEN} {destinatario} {assunto} {conteudo} {html}'},
+        })
+        utilizador = mock.Mock(email=destinatario)
+        with caplog.at_level(logging.ERROR), mock.patch(
+                'app.notifications.channels.email.requests.post', return_value=resposta):
+            assert canal.enviar(utilizador, assunto, conteudo, html=html) is False
 
-    def test_consultar_estado_entregue(self):
-        canal = EmailChannel('k', 's', 'remetente@exemplo.pt')
-        with mock.patch('app.notifications.channels.email.requests.get',
-                        side_effect=_fake_get_entregue):
-            res = canal.consultar_estado(MESSAGE_ID)
-        assert res['erro'] is None
-        assert res['estado'] == 'delivered'
-        assert res['motivo'] is None
-        assert [e['tipo'] for e in res['eventos']] == ['sent', 'delivered']
-        assert res['eventos'][0]['quando'] != '?'
+        for sensivel in (SEGREDO, REFRESH, TOKEN, destinatario, assunto, conteudo, html):
+            assert sensivel not in caplog.text
+        assert 'status.code=500' in caplog.text
+        assert 'status.description=Internal Error' in caplog.text
 
-    def test_consultar_estado_softbounced_devolve_motivo(self):
-        canal = EmailChannel('k', 's', 'remetente@exemplo.pt')
-        with mock.patch('app.notifications.channels.email.requests.get',
-                        side_effect=_fake_get_softbounced):
-            res = canal.consultar_estado(MESSAGE_ID)
-        assert res['erro'] is None
-        assert res['estado'] == 'softbounced'
-        assert '550 5.7.40' in res['motivo']
+        resumo = EmailChannel._resumo_resposta({'data': {'moreInfo': 'x' * 500}})
+        assert len(resumo) == 300
 
-    def test_consultar_estado_http_401(self):
-        canal = EmailChannel('k', 's', 'remetente@exemplo.pt')
-        resposta = mock.Mock(status_code=401)
-        with mock.patch('app.notifications.channels.email.requests.get',
-                        return_value=resposta):
-            res = canal.consultar_estado(MESSAGE_ID)
-        assert res['erro'] == 'HTTP 401'
-        assert res['estado'] is None
+    def test_falha_de_rede_nao_expoe_dados_sensiveis(self, app, caplog):
+        canal = _canal(app)
+        with caplog.at_level(logging.ERROR), mock.patch(
+                'app.notifications.channels.email.requests.post',
+                side_effect=requests.Timeout(f'{SEGREDO} {REFRESH} {TOKEN} {CONTEUDO}')):
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', CONTEUDO) is False
+        for sensivel in (SEGREDO, REFRESH, TOKEN, CONTEUDO):
+            assert sensivel not in caplog.text
+        assert 'Timeout' in caplog.text
 
+    def test_resposta_json_invalida_falha_sem_registar_corpo(self, app, caplog):
+        canal = _canal(app)
+        _guardar_cache(canal)
+        invalida = mock.Mock(status_code=200)
+        invalida.json.side_effect = ValueError('segredo de corpo')
+        with caplog.at_level(logging.ERROR), mock.patch(
+                'app.notifications.channels.email.requests.post', return_value=invalida):
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', CONTEUDO) is False
+        assert 'segredo de corpo' not in caplog.text
+        assert CONTEUDO not in caplog.text
 
-# ═════════ ROTA: gerar convite ═════════
-
-class TestGerarConvite:
-    def test_guarda_message_id_e_estado(self, admin_client):
-        with mock.patch('app.notifications.channels.email.requests.post',
-                        return_value=_resposta_envio()):
-            r = admin_client.post('/admin/convites/gerar',
-                                  json={'email': 'novo@exemplo.pt',
-                                        'enviar_email': True})
-        assert r.status_code == 200
-        dados = r.get_json()
-        assert dados['email_enviado'] is True
-        assert dados['message_id'] == str(MESSAGE_ID)
-        with admin_client.application.app_context():
-            convite = Convite.query.filter_by(email='novo@exemplo.pt').one()
-            assert convite.mailjet_message_id == str(MESSAGE_ID)
-            assert convite.email_estado == 'aceite'
-
-    def test_falha_mostra_motivo_e_marca_falhou(self, admin_client):
-        with mock.patch('app.notifications.channels.email.requests.post',
-                        return_value=_resposta_envio(estado='error')):
-            r = admin_client.post('/admin/convites/gerar',
-                                  json={'email': 'falha@exemplo.pt',
-                                        'enviar_email': True})
-        assert r.status_code == 500
-        assert 'Unable to connect to server' in r.get_json()['erro']
-        with admin_client.application.app_context():
-            convite = Convite.query.filter_by(email='falha@exemplo.pt').one()
-            assert convite.email_estado == 'falhou'
-            assert convite.mailjet_message_id is None
-
-    def test_sem_envio_de_email_nao_regista_estado(self, admin_client):
-        r = admin_client.post('/admin/convites/gerar',
-                              json={'email': 'link@exemplo.pt',
-                                    'enviar_email': False})
-        assert r.status_code == 200
-        dados = r.get_json()
-        assert dados['email_enviado'] is False
-        with admin_client.application.app_context():
-            convite = Convite.query.filter_by(email='link@exemplo.pt').one()
-            assert convite.email_estado is None
-            assert convite.mailjet_message_id is None
+    def test_falha_de_renovacao_nao_regista_segredos(self, app, caplog):
+        canal = _canal(app)
+        resposta = _resposta(400, {'error': 'invalid_client'})
+        with caplog.at_level(logging.ERROR), mock.patch(
+                'app.notifications.channels.email.requests.post', return_value=resposta):
+            assert canal.enviar(mock.Mock(email='para@exemplo.pt'), 'a', CONTEUDO) is False
+        for sensivel in (SEGREDO, REFRESH, TOKEN, CONTEUDO):
+            assert sensivel not in caplog.text
 
 
-# ═════════ ROTA: estado do email ═════════
+def test_convite_guarda_resultado_e_message_id(admin_client):
+    app = admin_client.application
+    canal = _canal(app)
+    _guardar_cache(canal)
+    with mock.patch('app.notifications.channels.email.requests.post', return_value=_resposta()):
+        resposta = admin_client.post('/admin/convites/gerar', json={
+            'email': 'novo@exemplo.pt', 'enviar_email': True,
+        })
+    assert resposta.status_code == 200
+    assert resposta.get_json()['email_enviado'] is True
+    with app.app_context():
+        convite = Convite.query.filter_by(email='novo@exemplo.pt').one()
+        assert convite.email_estado == 'enviado'
+        assert convite.email_message_id == 'zoho-msg-123'
 
-def _criar_convite(client, email, message_id=MESSAGE_ID):
-    """Convite como fica depois de um envio aceite pelo Mailjet."""
-    with client.application.app_context():
-        admin = User.query.filter_by(username='admin-teste').first()
-        convite = Convite(
-            token=f'token-{email.replace("@", "-").replace(".", "-")}',
-            email=email,
-            criado_por=admin.id,
-            expira_em=datetime.utcnow() + timedelta(days=7),
-            mailjet_message_id=str(message_id) if message_id else None,
-            email_estado='aceite' if message_id else None,
-        )
-        db.session.add(convite)
+
+def test_convite_sem_email_nao_guarda_estado(admin_client):
+    resposta = admin_client.post('/admin/convites/gerar', json={
+        'email': 'link@exemplo.pt', 'enviar_email': False,
+    })
+    assert resposta.status_code == 200
+    with admin_client.application.app_context():
+        convite = Convite.query.filter_by(email='link@exemplo.pt').one()
+        assert convite.email_estado is None
+        assert convite.email_message_id is None
+
+
+def test_tabela_nao_expoe_consulta_de_entrega(admin_client):
+    resposta = admin_client.get('/admin/convites')
+    assert resposta.status_code == 200
+    html = resposta.get_data(as_text=True)
+    assert 'verificarEstadoEmail' not in html
+    assert 'urlEstadoEmail' not in html
+    assert 'Mailjet' not in html
+
+
+def test_rota_antiga_de_estado_foi_removida(admin_client):
+    assert admin_client.get('/admin/convites/1/estado-email').status_code == 404
+
+
+def test_teste_de_email_mostra_diagnostico_sem_segredos(admin_client, monkeypatch):
+    with admin_client.application.app_context():
+        utilizador = User.query.filter_by(username='admin-teste').one()
+        db.session.add(UserNotificationPreferences(
+            user_id=utilizador.id, email_activo=True,
+        ))
         db.session.commit()
-        return convite.id
+
+    def falhar(canal, *args, **kwargs):
+        canal.ultimo_resultado = {
+            'sucesso': False, 'message_id': None,
+            'erro': 'envio: HTTP 403; código Zoho 5501',
+        }
+        return False
+
+    monkeypatch.setattr(EmailChannel, 'enviar_template', falhar)
+    resposta = admin_client.post('/definicoes/testar-email', follow_redirects=True)
+    assert resposta.status_code == 200
+    assert 'HTTP 403' in resposta.get_data(as_text=True)
+    assert SEGREDO not in resposta.get_data(as_text=True)
 
 
-class TestEstadoEmail:
-    def test_confirma_entregue_e_guarda_verificacao(self, admin_client):
-        cid = _criar_convite(admin_client, 'verificar@exemplo.pt')
-        with mock.patch('app.notifications.channels.email.requests.get',
-                        side_effect=_fake_get_entregue):
-            r = admin_client.get(f'/admin/convites/{cid}/estado-email')
-        assert r.status_code == 200
-        dados = r.get_json()
-        assert dados['sucesso'] is True
-        assert dados['estado'] == 'delivered'
-        assert dados['rotulo'] == 'entregue'
-        assert dados['classe'] == 'badge-activo'
-        assert dados['motivo'] is None
-        assert len(dados['eventos']) == 2
-        with admin_client.application.app_context():
-            convite = Convite.query.get(cid)
-            assert convite.email_estado == 'delivered'
-            assert convite.email_verificado_em is not None
-            assert convite.estado_email() == ('entregue', 'badge-activo')
+def test_rota_de_teste_email_envia_com_respostas_zoho_mockadas(admin_client):
+    with admin_client.application.app_context():
+        utilizador = User.query.filter_by(username='admin-teste').one()
+        db.session.add(UserNotificationPreferences(
+            user_id=utilizador.id, email_activo=True,
+        ))
+        db.session.commit()
 
-    def test_softbounced_mostra_motivo_e_rotulo_de_falha(self, admin_client):
-        cid = _criar_convite(admin_client, 'rebentado@exemplo.pt')
-        with mock.patch('app.notifications.channels.email.requests.get',
-                        side_effect=_fake_get_softbounced):
-            r = admin_client.get(f'/admin/convites/{cid}/estado-email')
-        assert r.status_code == 200
-        dados = r.get_json()
-        assert dados['estado'] == 'softbounced'
-        assert 'falhou' in dados['rotulo']
-        assert dados['classe'] == 'badge-expirado'
-        assert '550 5.7.40' in dados['motivo']
+    with mock.patch('app.notifications.channels.email.requests.post',
+                    side_effect=[_token_resposta(), _resposta()]) as pedido:
+        resposta = admin_client.post('/definicoes/testar-email', follow_redirects=True)
 
-    def test_sem_message_id_devolve_400(self, admin_client):
-        cid = _criar_convite(admin_client, 'sem-id@exemplo.pt', message_id=None)
-        r = admin_client.get(f'/admin/convites/{cid}/estado-email')
-        assert r.status_code == 400
-        assert 'sem ID' in r.get_json()['erro']
-
-    def test_consulta_com_falha_devolve_502_e_nao_grava(self, admin_client):
-        cid = _criar_convite(admin_client, 'sem-api@exemplo.pt')
-        resposta = mock.Mock(status_code=401)
-        with mock.patch('app.notifications.channels.email.requests.get',
-                        return_value=resposta):
-            r = admin_client.get(f'/admin/convites/{cid}/estado-email')
-        assert r.status_code == 502
-        assert 'HTTP 401' in r.get_json()['erro']
-        with admin_client.application.app_context():
-            convite = Convite.query.get(cid)
-            assert convite.email_verificado_em is None
-            assert convite.email_estado == 'aceite'  # estado anterior preservado
-
-
-class TestPaginaConvites:
-    def test_tabela_renderiza_estado_e_botao_de_verificacao(self, admin_client):
-        """A página nova tem a coluna do Mailjet, o badge e o botão 🔄."""
-        _criar_convite(admin_client, 'render@exemplo.pt')
-        r = admin_client.get('/admin/convites')
-        assert r.status_code == 200
-        html = r.get_data(as_text=True)
-        assert 'Email (Mailjet)' in html
-        assert 'verificarEstadoEmail(' in html       # botão 🔄 com o id do convite
-        assert 'urlEstadoEmail' in html              # JS de verificação presente
-        assert '>enviado<' in html                   # badge do estado 'aceite'
-        assert 'title="Mailjet ID' in html           # ID visível no hover
-
-
+    assert resposta.status_code == 200
+    assert 'Email de teste enviado' in resposta.get_data(as_text=True)
+    assert pedido.call_count == 2

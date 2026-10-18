@@ -24,11 +24,13 @@ class Config:
     # Notificações — Telegram
     TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-    # Notificações — Mailjet
-    # Obter em: https://app.mailjet.com/settings/api_keys
-    MAILJET_API_KEY = os.environ.get('MAILJET_API_KEY')
-    MAILJET_API_SECRET = os.environ.get('MAILJET_API_SECRET')
-    MAILJET_FROM_EMAIL = os.environ.get('MAILJET_FROM_EMAIL')
+    # Notificações — Zoho Mail (API REST)
+    ZOHO_CLIENT_ID = os.environ.get('ZOHO_CLIENT_ID')
+    ZOHO_CLIENT_SECRET = os.environ.get('ZOHO_CLIENT_SECRET')
+    ZOHO_REFRESH_TOKEN = os.environ.get('ZOHO_REFRESH_TOKEN')
+    ZOHO_ACCOUNT_ID = os.environ.get('ZOHO_ACCOUNT_ID')
+    ZOHO_FROM_EMAIL = os.environ.get('ZOHO_FROM_EMAIL')
+    ZOHO_DC = os.environ.get('ZOHO_DC', 'eu')
     # URL pública usada por emails disparados fora de um pedido web (scheduled task).
     PIPE_PUBLIC_URL = (os.environ.get('PIPE_PUBLIC_URL')
                        or 'https://felipejn.pythonanywhere.com').rstrip('/')

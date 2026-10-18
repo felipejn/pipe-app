@@ -6,6 +6,25 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.15] — 2026-10-18
+Substitui o Mailjet pelo Zoho Mail através da API REST com OAuth 2.0.
+
+**Alterado** (`EmailChannel`, configurações, autenticação, notificações, convites; migration `fd5793bc73bf`)
+- O canal de email renova e guarda em `instance/` o access token Zoho, valida HTTP e `status.code` no corpo e repete uma vez após rejeição do token. Falhas são registadas sem credenciais ou conteúdo das mensagens.
+- `ZOHO_FROM_EMAIL` é enviado sem transformação em `fromAddress`; pode incluir o nome apresentado no formato `PIPE <endereço@domínio>`.
+- Convites guardam apenas o resultado do envio (`enviado`/`falhou`) e o `messageId` opcional. Removidos a consulta de estado Mailjet e o respectivo endpoint/botão.
+- `scripts/verificar_mailjet.py` e `scripts/migrar_convites_mailjet.py` são históricos e obsoletos; permanecem inalterados.
+
+**Validação**
+- Testes mockados do Zoho e dos convites: **16 passaram**. Migration aplicada numa BD SQLite temporária vazia; `flask db check` confirmou que não há operações pendentes.
+- Suite completa: **371 passaram, 1 ignorado e 25 falharam**; as falhas estão em `tests/test_assistente_combustiveis.py`, fora do âmbito do canal de email. `git diff --check` limpo.
+
+**Notas de deploy**
+- Depois do backup da BD (`python scripts/backup_bd.py`), executar `flask db upgrade` para aplicar `fd5793bc73bf` e fazer Reload no PythonAnywhere.
+- Configurar no `.env`/PythonAnywhere `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNT_ID`, `ZOHO_FROM_EMAIL` e `ZOHO_DC=eu`. `ZOHO_FROM_EMAIL` deve usar o endereço da conta autenticada; para definir o nome apresentado, usar `PIPE <endereço@domínio>`.
+
+---
+
 ## [v1.8.13] — 2026-10-18
 O Assistente IA recebe o nome completo do utilizador e usa-o de forma adequada.
 
