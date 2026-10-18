@@ -294,3 +294,15 @@ def test_rota_de_teste_email_envia_com_respostas_zoho_mockadas(admin_client):
     assert resposta.status_code == 200
     assert 'Email de teste enviado' in resposta.get_data(as_text=True)
     assert pedido.call_count == 2
+
+
+def test_email_de_teste_nao_inclui_link_ou_botao_do_euromilhoes(app):
+    from app.notifications.email_templates import compor_email
+
+    with app.app_context():
+        assunto, texto, html = compor_email('teste', {'nome': 'Pipe'})
+
+    assert assunto
+    assert 'euromilhoes_url' not in html
+    assert 'Ver resultados' not in html
+    assert 'euromilhoes/resultados' not in texto

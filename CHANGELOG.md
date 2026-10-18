@@ -6,6 +6,21 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.17] — 2026-10-18
+O email de teste das notificações deixa de incluir o botão antigo para consultar resultados do Euromilhões.
+
+**Corrigido** (`app/templates/emails/email.html`; sem alteração de BD)
+- Removido o botão «Ver resultados» do email enviado ao testar a configuração de notificações por email.
+- Acrescentado teste de regressão para confirmar que o email de teste não contém o link nem o botão do Euromilhões.
+
+**Validação**
+- Testado e aprovado pelo utilizador; `git diff --check` limpo. A execução automatizada não foi possível porque o Python configurado em `.venv` não conseguiu iniciar.
+
+**Notas de deploy**
+- Sem alteração de BD. No PythonAnywhere: actualizar o código e fazer Reload.
+
+---
+
 ## [v1.8.16] — 2026-10-18
 O Assistente IA pode editar tarefas existentes e actualiza compromissos com validações mais claras.
 

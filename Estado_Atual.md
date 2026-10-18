@@ -1,4 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.8.16
+# PIPE — Estado Actual do Projecto — v1.8.17
+
+## Versão v1.8.17 — 2026-10-18
+
+- Removido do email de teste de notificações o botão «Ver resultados» do Euromilhões, que já não se relaciona com a configuração geral de email.
+- **Sem alteração de BD.**
+- **Validação:** teste do utilizador aprovado; teste de regressão acrescentado para garantir que o email não inclui o link ou botão do Euromilhões.
 
 ## O que é o PIPE
 
