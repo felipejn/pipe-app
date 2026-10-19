@@ -6,6 +6,20 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.24] — 2026-10-19
+Adiciona instruções persistentes para o Codex no repositório.
+
+**Adicionado**
+- `AGENTS.md` na raiz, com regras de idioma, aprovação de planos e relatórios, validação, actualização de contexto, commits, push, protecção de alterações locais e instruções de deploy.
+
+**Validação**
+- `git diff --check` limpo; testes de aplicação não aplicáveis a uma alteração apenas documental.
+
+**Notas de deploy**
+- Sem alteração da aplicação ou da base de dados. Para obter as instruções noutro dispositivo, actualizar/clonar o repositório com `git pull`.
+
+---
+
 ## [v1.8.23] — 2026-10-19
 Partilha de tarefas, notas e compromissos entre utilizadores (anonimato preservado — email/login como identificador; sem lista de utilizadores).
 

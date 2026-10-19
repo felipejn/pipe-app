@@ -1,9 +1,11 @@
 # Instruções de trabalho para o Codex
 
-- Comunicar e produzir documentação em português europeu (PT-PT), salvo pedido explícito em contrário.
-- Antes de iniciar alterações, confirmar que a cópia local está actualizada face ao repositório remoto. Consultar o estado e a diferença entre a branch local e a remota; se não for possível actualizar a referência remota, indicar essa limitação antes de avançar.
-- Antes de editar, verificar o estado do Git e preservar alterações locais do utilizador; não as descartar nem as incluir no commit sem autorização explícita.
-- Antes de alterar o projecto, ler `Estado_Atual.md` e `CHANGELOG.md` para compreender o estado e o histórico documentados.
-- Após cada alteração, executar os testes adequados à alteração e, quando viável, a suite completa. Apresentar um relatório conciso do que foi feito e dos resultados; se não for possível executar algum teste, explicar o motivo e indicar o que ficou por validar.
-- Não incluir no commit segredos, credenciais, `.env`, bases de dados locais ou artefactos gerados.
-- Depois de apresentar o relatório da alteração, a aprovação do utilizador autoriza a actualização de `Estado_Atual.md` e `CHANGELOG.md` segundo a estrutura, o estilo e as convenções de versão/data existentes, seguida de commit no padrão do histórico e push para o remoto. Não pedir uma aprovação separada para estes passos. Apresentar o relatório final com testes, documentação, commit e push.
+- Comunicar em português europeu (PT-PT). Produzir em PT-PT os ficheiros de contexto, a documentação e as mensagens de commit.
+- Ser conciso sempre que possível, sem omitir informação necessária para compreender decisões, limitações ou resultados.
+- Antes de iniciar trabalho de implementação, verificar o estado do Git e confirmar que a branch local está actualizada face ao remoto. Consultar a diferença entre ambas; se não for possível actualizar ou verificar a referência remota, indicar essa limitação antes de avançar.
+- Antes de qualquer edição, ler `Estado_Atual.md` e `CHANGELOG.md`, quando existirem, e verificar o estado do Git. Preservar sempre as alterações locais do utilizador; não as descartar nem as incluir num commit sem autorização explícita.
+- Para cada pedido de implementação, apresentar primeiro um plano concreto, sem alterar ficheiros, e aguardar a aprovação explícita do utilizador. Só depois da aprovação iniciar as alterações planeadas. Se o âmbito mudar de forma relevante, apresentar o plano actualizado e aguardar nova aprovação.
+- Após a implementação, executar testes adequados para validar o comportamento implementado e detectar regressões. Quando viável, executar também a suite completa. Apresentar um relatório conciso com alterações, testes e resultados, incluindo o que ficou por validar e o motivo, e aguardar aprovação explícita.
+- Após a aprovação do relatório da implementação, actualizar `Estado_Atual.md` e `CHANGELOG.md` conforme a estrutura, o estilo e as convenções de versão/data existentes. Depois, criar um commit seguindo o padrão do histórico e fazer push para o remoto. Não pedir uma aprovação separada para documentação, commit ou push.
+- Nunca incluir em commits segredos, credenciais, ficheiros `.env`, bases de dados locais ou artefactos gerados. Rever o conteúdo e o estado do Git antes de cada commit.
+- Incluir instruções de deploy sempre que o deploy exigir passos além de `git pull`. Consultar as convenções e o ambiente documentado no projecto; indicar os passos específicos necessários, como instalação de dependências, migrações de base de dados, comandos de verificação, reinício ou reload. Se `git pull` for suficiente, dizê-lo explicitamente.

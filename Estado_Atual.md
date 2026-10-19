@@ -1,4 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.8.23
+# PIPE — Estado Actual do Projecto — v1.8.24
+
+## Versão v1.8.24 — 2026-10-19
+
+- Adicionado `AGENTS.md` à raiz do repositório com instruções persistentes para o Codex: comunicação e documentação em PT-PT, aprovação prévia do plano, validação e aprovação após implementação, documentação/commit/push após aprovação, salvaguarda de alterações locais e segredos, e indicação dos passos de deploy.
+- Sem alteração funcional da aplicação ou da base de dados.
+- Validação: `git diff --check`; testes de aplicação não aplicáveis a uma alteração apenas documental.
 
 ## Versão v1.8.23 — 2026-10-19
 
