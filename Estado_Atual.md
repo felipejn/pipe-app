@@ -1,4 +1,12 @@
-# PIPE — Estado Actual do Projecto — v1.8.21
+# PIPE — Estado Actual do Projecto — v1.8.22
+
+## Versão v1.8.22 — 2026-10-18
+
+- Removidos os scripts históricos `scripts/verificar_mailjet.py` e `scripts/migrar_convites_mailjet.py`, deixando de existir ferramentas obsoletas que chamavam a API Mailjet ou recriavam colunas antigas.
+- O `README.md` apresenta agora o Zoho Mail como canal de email e documenta as variáveis `ZOHO_*` em vez das antigas `MAILJET_*`.
+- Mantêm-se os briefings em `docs/historico/`, os registos do CHANGELOG, os avisos históricos de `Estado_Atual.md` e as migrations como referência da migração Mailjet → Zoho.
+- **Sem alteração de BD.**
+- **Validação:** `tests/test_convites_email.py` — **17 testes passaram**; `git diff --check` limpo; sem referências a `Mailjet` no `README.md`.
 
 ## Versão v1.8.21 — 2026-10-18
 
@@ -181,7 +189,6 @@ pipe-app/
 │   ├── testar_assistente.py     # smoke test do Assistente IA contra a OpenRouter
 │   ├── backup_bd.py             # cópia de segurança de instance/pipe.db (mantém as últimas 10)
 │   ├── gerar_icones_extensao.py # gera icon48/icon128 da extensão Chrome (Pillow, sem Flask)
-│   ├── verificar_mailjet.py     # obsoleto: diagnóstico histórico do Mailjet (não executar)
 │   ├── verificar_telegram.py    # diagnóstico do canal Telegram: getMe + getChat + `--enviar-teste`
 │   └── smoke_combustiveis.py    # smoke test da ferramenta get_combustiveis (Assistente IA)
 ├── tests/

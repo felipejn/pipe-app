@@ -72,7 +72,7 @@ Assistente pessoal com inteligência artificial que consulta dados reais dos mó
 ### 🔐 Sistema de Convites
 Gestão de acesso restrito por convite.
 - Registo apenas com link de convite válido (7 dias de validade)
-- Admin gera convites por email (Mailjet) ou link copiável
+- Admin gera convites por email (Zoho Mail) ou link copiável
 - Cada convite é único (um único registo)
 - Revogação manual de convites não utilizados
 
@@ -86,7 +86,7 @@ Gestão de acesso restrito por convite.
 | Base de dados | SQLite + Flask-SQLAlchemy |
 | Autenticação | Flask-Login + Werkzeug |
 | Formulários | Flask-WTF + WTForms |
-| Notificações | Telegram Bot API + Mailjet |
+| Notificações | Telegram Bot API + Zoho Mail |
 | 2FA | TOTP (pyotp) + Telegram + Email |
 | Imagens | Pillow + pillow-heif |
 | Hosting | PythonAnywhere (plano free) |
@@ -102,7 +102,7 @@ Gestão de acesso restrito por convite.
 - **Rate limiting** — protecção contra brute force nas rotas de autenticação (Flask-Limiter)
 - **Logging de segurança** — tentativas de login falhadas registadas no servidor
 - **Security headers** — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
-- **Notificações** — arquitectura modular com canais independentes (Telegram + Mailjet)
+- **Notificações** — arquitectura modular com canais independentes (Telegram + Zoho Mail)
 - **Área admin** — gestão de utilizadores, activar/desactivar contas
 - **Scheduled task** — script unificado `pipe_tasks.py` a correr diariamente às 07:00
 
@@ -161,9 +161,12 @@ A aplicação fica disponível em `http://127.0.0.1:5000`.
 |---|---|---|
 | `SECRET_KEY` | ✅ | Chave secreta Flask — gerar com `secrets.token_hex(32)` |
 | `TELEGRAM_BOT_TOKEN` | ❌ | Token do bot Telegram para notificações e 2FA |
-| `MAILJET_API_KEY` | ❌ | API key Mailjet para notificações por email |
-| `MAILJET_API_SECRET` | ❌ | API secret Mailjet para notificações por email |
-| `MAILJET_FROM_EMAIL` | ❌ | Endereço de remetente verificado no Mailjet |
+| `ZOHO_CLIENT_ID` | ❌ | Client ID da aplicação Zoho para envio de email |
+| `ZOHO_CLIENT_SECRET` | ❌ | Client secret da aplicação Zoho |
+| `ZOHO_REFRESH_TOKEN` | ❌ | Refresh token Zoho com permissão para enviar emails |
+| `ZOHO_ACCOUNT_ID` | ❌ | Identificador da conta Zoho Mail |
+| `ZOHO_FROM_EMAIL` | ❌ | Endereço de remetente Zoho; aceita `PIPE <endereço@domínio>` |
+| `ZOHO_DC` | ❌ | Data center Zoho; por omissão `eu` |
 
 
 ---

@@ -6,6 +6,27 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.22] — 2026-10-18
+Remove os scripts históricos do Mailjet e alinha a documentação actual com o Zoho Mail.
+
+**Removido**
+- `scripts/verificar_mailjet.py` — diagnóstico da API Mailjet, obsoleto desde a v1.8.15 e incompatível com a coluna actual `email_message_id`.
+- `scripts/migrar_convites_mailjet.py` — migração manual obsoleta desde a v1.6.0, substituída pelo Flask-Migrate.
+- Mantêm-se como referência histórica os briefings em `docs/historico/`, os registos do CHANGELOG e as migrations; nenhum destes determina a remoção dos ficheiros históricos.
+
+**Alterado**
+- `README.md` deixa de apresentar o Mailjet no canal de convites/notificações e substitui as variáveis `MAILJET_*` pelas variáveis `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNT_ID`, `ZOHO_FROM_EMAIL` e `ZOHO_DC`.
+- `Estado_Atual.md` deixa de listar os scripts removidos na árvore de scripts, preservando os avisos históricos sobre a migração Mailjet → Zoho.
+
+**Validação**
+- `pytest -q --basetemp=.pytest-tmp-mailjet tests/test_convites_email.py`: **17 testes passaram**, 34 avisos preexistentes.
+- `git diff --check` limpo; pesquisa de `Mailjet` no `README.md` sem resultados.
+
+**Notas de deploy**
+- **Sem alteração de BD.** PythonAnywhere: `git pull` → `pip install -r requirements.txt` → Reload.
+
+---
+
 ## [v1.8.21] — 2026-10-18
 Resiliência da Meteorologia: cache da última previsão quando a API está em baixo.
 
