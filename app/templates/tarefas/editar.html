@@ -66,6 +66,7 @@
       <div class="form-acoes">
         <a href="{{ url_for('tarefas.index', lista=tarefa.lista_id if tarefa.lista_id else '') }}"
            class="btn btn-secundario">Cancelar</a>
+        <button type="button" onclick="abrirModalPartilhar('tarefa', {{ tarefa.id }})" class="btn btn-secundario" style="background:#4caf50; border-color:#4caf50;">Partilhar</button>
         <button type="submit" class="btn btn-primario">
           {{ 'Criar tarefa' if not tarefa.id else 'Guardar alterações' }}
         </button>
@@ -73,4 +74,5 @@
     </form>
   </div>
 </div>
+{% include 'partilha/modal_partilhar.html' %}
 {% endblock %}

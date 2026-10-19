@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block titulo %}Partilhados comigo{% endblock %}
+{% block conteudo %}
+<div class="pagina-partilha">
+  <h1>Recursos partilhados comigo</h1>
+  <div id="lista-partilhados"></div>
+</div>
+<script>
+fetch('/partilha/minhas')
+  .then(r => r.json())
+  .then(dados => {
+    const div = document.getElementById('lista-partilhados');
+    if (!dados.length) {
+      div.innerHTML = '<p style="color:#aaa;">Nenhum recurso partilhado contigo.</p>';
+      return;
+    }
+    div.innerHTML = '<table style="width:100%; border-collapse:collapse; margin-top:12px;"><thead><tr style="border-bottom:1px solid #555; text-align:left;"><th>Tipo</th><th>Título</th><th>Dono</th><th>Nível</th></tr></thead><tbody>' +
+      dados.map(r => '<tr style="border-bottom:1px solid #333;"><td>' + r.tipo_recurso + '</td><td>' + (r.titulo || '-') + '</td><td>' + r.dono_email + '</td><td>' + r.nivel + '</td></tr>').join('') +
+      '</tbody></table>';
+  });
+</script>
+{% endblock %}
