@@ -6,6 +6,7 @@ from app import db
 from app.tarefas import tarefas
 from app.tarefas.models import Lista, Tarefa, TagTarefa
 from app.tarefas.forms import ListaForm, TarefaForm
+from app.partilha.utils import obter_recurso_ou_404
 
 
 # ── Utilitários ────────────────────────────────────────────────────────────────
@@ -15,7 +16,8 @@ def _obter_lista_ou_404(lista_id):
 
 
 def _obter_tarefa_ou_404(tarefa_id):
-    return Tarefa.query.filter_by(id=tarefa_id, user_id=current_user.id).first_or_404()
+    """Obtem uma tarefa a que o utilizador tem acesso (dono ou partilhado com edicao)."""
+    return obter_recurso_ou_404('tarefa', tarefa_id, current_user.id, nivel_minimo='edicao')
 
 
 def _processar_tags(texto_tags):

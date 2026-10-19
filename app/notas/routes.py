@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.notas import notas
 from app.notas.models import Nota, ItemChecklist, EtiquetaNota
+from app.partilha.utils import obter_recurso_ou_404
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ def criar():
 @notas.route('/<int:nota_id>', methods=['GET', 'POST'])
 @login_required
 def editar(nota_id):
-    nota = Nota.query.filter_by(id=nota_id, user_id=current_user.id).first_or_404()
+    nota = obter_recurso_ou_404('nota', nota_id, current_user.id, nivel_minimo='edicao')
 
     if request.method == 'POST':
         nota.titulo = request.form.get('titulo', '').strip() or None

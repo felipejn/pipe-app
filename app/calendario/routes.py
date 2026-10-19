@@ -4,6 +4,7 @@ from app.calendario import calendario_bp
 from app.calendario.models import Evento
 from app import db
 from app.extensions import limiter
+from app.partilha.utils import obter_recurso_ou_404
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -73,7 +74,7 @@ def api_criar_evento():
 @login_required
 @limiter.limit("30/minute")
 def api_editar_evento(id):
-    evento = Evento.query.filter_by(id=id, user_id=current_user.id).first_or_404()
+    evento = obter_recurso_ou_404('evento', id, current_user.id, nivel_minimo='edicao')
     dados  = request.get_json()
     inicio = _data_calendario_local(dados['data_inicio'])
     fim    = _data_calendario_local(dados['data_fim'])
@@ -95,7 +96,7 @@ def api_editar_evento(id):
 @login_required
 @limiter.limit("30/minute")
 def api_apagar_evento(id):
-    evento = Evento.query.filter_by(id=id, user_id=current_user.id).first_or_404()
+    evento = obter_recurso_ou_404('evento', id, current_user.id, nivel_minimo='edicao')
     db.session.delete(evento)
     db.session.commit()
     return jsonify({'ok': True})

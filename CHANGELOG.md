@@ -6,6 +6,22 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.23] — 2026-10-19
+Partilha de tarefas, notas e compromissos entre utilizadores (anonimato preservado — email/login como identificador; sem lista de utilizadores).
+
+**Adicionado**
+- `app/partilha/` — módulo completo: `models.py` (`PartilhaRecurso`), `utils.py` (`obter_recurso_ou_404`, `pode_aceder_recurso`), `routes.py` (endpoints `/partilha/<tipo>/<id>`, `/partilha/<id>/aceitar`, `/partilha/minhas`, `/partilha/criadas`, `/partilha/<id>` DELETE), `__init__.py` (blueprint `partilha_bp` com `url_prefix='/partilha'`).
+- `tests/test_partilha.py` — 11 casos de teste (criar, aceitar, acesso, negação a não-partilhados, edição vs leitura, listar partilhados, remoção, auto-partilha, email inexistente/vazio).
+- Migração Alembic `c43fd13b2c0b` (`adiciona_tabela_partilha_recurso`) — tabela `partilha_recurso` com FKs, `UniqueConstraint(tipo_recurso, recurso_id, utilizador_id)`, `CheckConstraint` para `nivel` e `estado`, `ON DELETE CASCADE`.
+
+**Alterado**
+- `app/tarefas/routes.py`, `app/notas/routes.py`, `app/calendario/routes.py` — substituído `_obter_tarefa_ou_404` (e equivalentes) por `obter_recurso_ou_404()` que verifica dono OU partilha aceita com nível adequado.
+- `app/__init__.py` — registado `partilha_bp`; adicionada importação `PartilhaRecurso` ao bloco `TESTING`.
+
+**Nota de deploy**: `flask db upgrade` (migração `c43fd13b2c0b`) antes do reload.
+
+---
+
 ## [v1.8.22] — 2026-10-18
 Remove os scripts históricos do Mailjet e alinha a documentação actual com o Zoho Mail.
 

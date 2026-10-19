@@ -101,6 +101,9 @@ def create_app(config_name='default'):
     from app.calendario import calendario_bp
     app.register_blueprint(calendario_bp, url_prefix='/calendario')
 
+    from app.partilha import partilha_bp
+    app.register_blueprint(partilha_bp)
+
     from app.combustiveis import bp as combustiveis_bp
     app.register_blueprint(combustiveis_bp)
 
@@ -190,6 +193,7 @@ def create_app(config_name='default'):
             from app.conversoes.models import Conversao  # noqa: F401
             from app.auth.models import Convite  # noqa: F401
             from app.calendario.models import Evento  # noqa: F401
+            from app.partilha.models import PartilhaRecurso  # noqa: F401
             from app.combustiveis.models import Posto, PrecoHistorico  # noqa: F401
             from app.meteorologia.models import LocalizacaoMeteorologia  # noqa: F401
             from app.resumo_diario.models import ConfiguracaoResumoDiario  # noqa: F401

@@ -1,4 +1,14 @@
-# PIPE — Estado Actual do Projecto — v1.8.22
+# PIPE — Estado Actual do Projecto — v1.8.23
+
+## Versão v1.8.23 — 2026-10-19
+
+- **Partilha de recursos:** implementação completa da funcionalidade de partilha de tarefas (`tarefa`), notas (`nota`) e compromissos (`evento`) entre utilizadores, preservando anonimato (partilha feita via email/login, sem lista de utilizadores).
+- Novo módulo `app/partilha/` com modelo `PartilhaRecurso` (tabela `partilha_recurso`), helpers de autorização (`obter_recurso_ou_404`, `pode_aceder_recurso`), blueprint com endpoints `/partilha/<tipo>/<id>`, `/partilha/<id>/aceitar`, `/partilha/minhas`, `/partilha/criadas`, `/partilha/<id>` (DELETE).
+- Rotas existentes de tarefas (`tarefas/routes.py`), notas (`notas/routes.py`) e calendário (`calendario/routes.py`) atualizadas para aceitar acesso por dono ou partilha aceita (nível mínimo `edicao` para escrita).
+- Migração Alembic `c43fd13b2c0b` (`adiciona_tabela_partilha_recurso`).
+- Testes `tests/test_partilha.py`: **11 testes passaram** (criar, aceitar, acesso, negação, nível edição, listar partilhados, remover, auto-partilha, email inexistente, email vazio).
+- **Com alteração de BD.**
+- **Validação:** `tests/test_partilha.py` — 11/11; `tests/test_partilha.py` + `tests/test_tarefas.py` + `tests/test_notas.py` — sem regressões; `git diff --check` limpo.
 
 ## Versão v1.8.22 — 2026-10-18
 
