@@ -1072,3 +1072,4 @@ Todas as entradas "Versão vX" da `Estado_Atual.md` têm entrada correspondente 
 - **(e)** Última versão real confirmada pelo Git: **v1.7.0** (2026-10-07 — dashboard resumos por provider em `fe50dc2`/`838e558` + CSS em `fe50dc2`, módulo Meteorologia em `5dfb48b` com migration `c420a200f2f2`); a v1.6.0 (`741706c`/`501b7c9`, 2026-10-06 — Flask-Migrate) foi a versão imediatamente anterior.
 
 **Versões do documento SEM entrada directa:** v1.2 (Calendário) e v1.3 (Combustíveis) — não são secções "Versão vX" autónomas na `Estado_Atual.md`, foram integradas como "fase 1.3.x" dentro da v1.4.2 e referidas no Histórico anterior. Nenhuma informação foi omitida.
+--- v1.8.23 fix --- z-index 1001; btn secundario consistente; modal por cima do overlay do calendario.

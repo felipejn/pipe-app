@@ -596,3 +596,5 @@ Padrões: AJAX via `'X-CSRFToken': '{{ csrf_token() }}'` + `request.get_json()`;
 ---
 
 **Histórico de versões: ver [CHANGELOG.md](CHANGELOG.md)**
+Documentação atualizada: v1.8.23 (partilha completa — backend + frontend)
+- Correcção z-index 1001 + design btn secundario (calendario/index.html, partilha/modal_partilhar.html) — aprovado 2026-10-19
