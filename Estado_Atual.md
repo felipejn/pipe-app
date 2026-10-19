@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.25
+# PIPE — Estado Actual do Projecto — v1.8.26
+
+## Versão v1.8.26 — 2026-10-19
+
+- `README.md` do GitHub reescrito em inglês, orientado a recrutadores: hero com badges (versão, Python, Flask, 434 testes, deploy), índice de âncoras, overview/highlights, tabela com os 12 módulos (antes só 8), spotlights do Cofre, Assistente IA, Meteorologia e Partilha, tabela de segurança, stack actualizada (Flask 3.1.3, Flask-Migrate, Flask-Session), diagrama de arquitectura, testes, quickstart completo com variáveis de ambiente, deploy em 3 passos, links à documentação e nota de licença (sem `LICENSE` no repositório).
+- Substituídos o «versão 1.0» desactualizado, o placeholder de screenshot e as referências obsoletas; corrigido «SMTP» para envio por API (Zoho Mail OAuth 2.0).
+- Sem alteração de código nem de BD.
+- Validação: `pytest --collect-only -q` — **434 testes recolhidos**; suite em sandbox com `--basetemp` local — **396 passaram, 33 subtests** (excluídos `tests/test_assistente_combustiveis.py`, falhas conhecidas por fixtures de preços, e `tests/test_criar_admin.py`, dependente da API Aberta); subconjuntos focados (partilha, notificações Telegram, resumo diário, segurança, convites) — **64 passaram**; `git diff --check` limpo; links internos do README verificados.
 
 ## Versão v1.8.25 — 2026-10-19
 

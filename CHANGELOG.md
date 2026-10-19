@@ -6,6 +6,25 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.26] — 2026-10-19
+README redesenhado em inglês para a página do GitHub, orientado a recrutadores.
+
+**Alterado** (`README.md`, apenas documental)
+- Reescrita completa (206 → 263 linhas) em inglês: hero com badges (versão, Python, Flask, testes, deploy) e links directos (demo, changelog, estado, guia da extensão), índice de âncoras, overview e highlights com números do projecto.
+- Tabela dos **12 módulos** (antes 8 — faltavam Calendário, Combustíveis, Meteorologia, Resumo Diário, Partilha e Loja de Módulos) + spotlight do Cofre (AES-256-GCM, PBKDF2 600k, chave só server-side), do Assistente IA (19 ferramentas, guardrails, fuso Lisboa), da Meteorologia com cache e da partilha por e-mail com anonimato.
+- Tabela de segurança, stack **actualizada** (Flask 3.1.3, Flask-Migrate, Flask-Session, flask-cors), diagrama de arquitectura, secção de testes com a guarda do `conftest`, quickstart e tabela de variáveis de ambiente (só `SECRET_KEY` obrigatória), deploy em 3 passos e tabela de links à documentação.
+- Removidos o «versão 1.0» desactualizado, o placeholder de screenshot e as referências obsoletas; corrigido «SMTP» para envio por API (Zoho Mail OAuth 2.0); nota de licença: não existe `LICENSE` no repositório (all rights reserved por omissão).
+
+**Validação**
+- `pytest --collect-only -q`: **434 testes recolhidos**. Suite em sandbox (`--basetemp` local, sem rede): **396 passaram, 0 falharam, 33 subtests** em 66 s — excluídos `test_assistente_combustiveis.py` (falhas conhecidas, fixtures de preços fora da janela) e `test_criar_admin.py` (dependente da API Aberta).
+- Subconjuntos focados (partilha, notificações Telegram, resumo diário, segurança, convites, extensão): **64 passaram**.
+- `git diff --check` limpo; links internos do README (`CHANGELOG.md`, `Estado_Atual.md`, `docs/guia-extensao-chrome.md`, `chrome-extension/README.md`) verificados.
+
+**Notas de deploy**
+- Sem alteração de código da aplicação, de BD ou de dependências. **`git pull` é suficiente** (o README só é lido no GitHub; sem Reload, sem `flask db upgrade`).
+
+---
+
 ## [v1.8.25] — 2026-10-19
 Personaliza o Resumo Diário e torna a mensagem Telegram mais natural.
 
