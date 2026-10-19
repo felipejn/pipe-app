@@ -38,8 +38,10 @@ class TelegramChannel(BaseChannel):
         # chamadores (2FA, settings, resumo diário, testes).
         self.ultimo_resultado = {'sucesso': False, 'message_id': None, 'erro': None}
 
-    def _compor_texto(self, assunto, corpo, parse_mode):
+    def _compor_texto(self, assunto, corpo, parse_mode, incluir_assunto=True):
         """Monta o texto final; em HTML escapa o conteúdo não confiável."""
+        if not incluir_assunto:
+            return html.escape(str(corpo)) if parse_mode == 'HTML' else str(corpo)
         if parse_mode == 'HTML':
             # Chamadas HTML são para conteúdo não confiável: escapar título e
             # corpo impede que <, &, * ou _ estraguem o parsing do Telegram.
@@ -109,7 +111,8 @@ class TelegramChannel(BaseChannel):
                 'erro': f'HTTP {codigo} — {descricao}',
                 'transitorio': status in _STATUS_TRANSITORIOS}
 
-    def enviar(self, utilizador, assunto, corpo, dados=None, parse_mode='Markdown'):
+    def enviar(self, utilizador, assunto, corpo, dados=None, parse_mode='Markdown',
+               incluir_assunto=True):
         """Envia mensagem Telegram ao utilizador.
 
         Requer que utilizador.telegram_chat_id esteja preenchido. Guarda o
@@ -122,7 +125,7 @@ class TelegramChannel(BaseChannel):
             }
             return False
 
-        texto = self._compor_texto(assunto, corpo, parse_mode)
+        texto = self._compor_texto(assunto, corpo, parse_mode, incluir_assunto)
         chat_id = utilizador.telegram_chat_id
 
         resultado = self._enviar_uma_vez(chat_id, texto, parse_mode)

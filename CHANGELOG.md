@@ -6,6 +6,24 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.25] — 2026-10-19
+Personaliza o Resumo Diário e torna a mensagem Telegram mais natural.
+
+**Alterado**
+- O Resumo Diário usa o primeiro nome do utilizador na saudação determinística e dá esse nome ao modelo para uma abertura natural e variada.
+- O prompt especifica português europeu (PT-PT), tratamento por «tu» e um tom caloroso, leve e conversacional. O modelo recebe a hora local de Lisboa para escolher uma saudação coerente; respostas com brasileirismos conhecidos são rejeitadas e recorrem ao texto determinístico.
+- As mensagens do Resumo Diário no Telegram, manuais e automáticas, deixam de apresentar o assunto «Resumo Diário» como cabeçalho.
+
+**Validação**
+- Testes do Resumo Diário (`test_resumo_diario.py`, `test_resumo_diario_fase2.py`, `test_resumo_diario_fase4.py`): **65 passaram**.
+- Testes focados do Resumo Diário e Telegram, incluindo `test_notifications_telegram.py`: **91 passaram**.
+- `git diff --check` limpo.
+
+**Notas de deploy**
+- **Sem alteração de BD.** PythonAnywhere: push + Reload.
+
+---
+
 ## [v1.8.24] — 2026-10-19
 Adiciona instruções persistentes para o Codex no repositório.
 

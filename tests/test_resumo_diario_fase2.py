@@ -144,6 +144,7 @@ def test_envio_forca_telegram_com_chat_id_mesmo_com_canal_desligado(contexto):
     gerar.assert_called_once()
     assert enviar.call_args.kwargs['force_channel'] == 'telegram'
     assert enviar.call_args.kwargs['telegram_parse_mode'] == 'HTML'
+    assert enviar.call_args.kwargs['telegram_include_subject'] is False
 
 
 def test_servico_forcado_usa_so_telegram_sem_exigir_canal_activo(contexto):
@@ -155,8 +156,10 @@ def test_servico_forcado_usa_so_telegram_sem_exigir_canal_activo(contexto):
         def __init__(self):
             self.chamadas = []
 
-        def enviar(self, utilizador, assunto, corpo, dados=None, parse_mode='Markdown'):
-            self.chamadas.append((utilizador.telegram_chat_id, parse_mode))
+        def enviar(self, utilizador, assunto, corpo, dados=None, parse_mode='Markdown',
+                   incluir_assunto=True):
+            self.chamadas.append((utilizador.telegram_chat_id, parse_mode,
+                                  incluir_assunto))
             return True
 
     with app.app_context():
@@ -176,7 +179,7 @@ def test_servico_forcado_usa_so_telegram_sem_exigir_canal_activo(contexto):
             force_channel='telegram', telegram_parse_mode='HTML')
 
     assert resultado == {'telegram': True, 'email': None}
-    assert canal_tg.chamadas == [('12345', 'HTML')]
+    assert canal_tg.chamadas == [('12345', 'HTML', True)]
     assert canal_email.chamadas == []
 
 

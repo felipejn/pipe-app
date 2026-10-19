@@ -66,6 +66,7 @@ def enviar():
         body=resumo['texto'] or 'Não há novidades para hoje.',
         force_channel='telegram',
         telegram_parse_mode='HTML',
+        telegram_include_subject=False,
     )
     if resultado.get('telegram') is None:
         return jsonify({

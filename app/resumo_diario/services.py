@@ -80,7 +80,8 @@ def enviar_resumos_diarios(data=None, simular=False):
             resultado = notification_service.send(
                 user=user, type='resumo_diario', subject='Resumo Diário',
                 body=resumo['texto'] or 'Não há novidades para hoje.',
-                force_channel='telegram', telegram_parse_mode='HTML')
+                force_channel='telegram', telegram_parse_mode='HTML',
+                telegram_include_subject=False)
             if resultado.get('telegram'):
                 configuracao = configuracao or obter_ou_criar_configuracao(user.id)
                 configuracao.ultimo_envio = data
@@ -365,7 +366,8 @@ def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
         data = date.fromisoformat(data)
     if not isinstance(data, date):
         raise TypeError('A data tem de ser datetime.date ou uma data ISO.')
-    if User.query.filter_by(id=user_id).first() is None:
+    utilizador = User.query.filter_by(id=user_id).first()
+    if utilizador is None:
         raise ValueError('Utilizador inexistente.')
 
     if opcoes is None:
@@ -452,6 +454,6 @@ def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
     texto = _texto_limitado(blocos)
     texto_final, origem, motivo = redacao.redigir(
         texto, data, modo=modo, titulos=_titulos_das_secoes(secoes),
-        limite=LIMITE_CARACTERES)
+        limite=LIMITE_CARACTERES, nome=utilizador.nome)
     return {'data': data.isoformat(), 'secoes': secoes, 'texto': texto_final,
             'origem': origem, 'motivo': motivo}

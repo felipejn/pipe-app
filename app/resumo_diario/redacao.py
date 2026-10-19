@@ -11,7 +11,8 @@ configurável por modo (``RESUMO_LLM_ORCAMENTO_WEB`` /
 import logging
 import os
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.assistente.cliente import (
     PrazoExcedidoError,
@@ -22,6 +23,7 @@ from app.assistente.cliente import (
 # origem/modelo do texto têm de aparecer no log da scheduled task (INFO)
 # para calibrar a taxa de fallback em produção.
 logger = logging.getLogger('app.resumo_diario.redacao')
+FUSO_HORARIO = ZoneInfo('Europe/Lisbon')
 
 ORCAMENTO_WEB_POR_OMISSAO = 10.0   # segundos — página interactiva
 ORCAMENTO_TASK_POR_OMISSAO = 30.0  # segundos — scheduled task e simulação
@@ -34,14 +36,19 @@ _PADRAO_HTML = re.compile(r'</?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?/?>')
 # Markdown: '**negrito**', '`código`' e '#' no início de linha. Um '*' simples
 # é permitido porque os títulos do utilizador podem tê-lo (ex.: '*teste*').
 _PADRAO_MARKDOWN = re.compile(r'\*\*|`|^\s*#', re.MULTILINE)
+_PADRAO_PT_BR = re.compile(
+    r'\b(?:e\s+aí|você|vocês|legal|bacana|beleza|tudo\s+bem\s+com\s+você)\b',
+    re.IGNORECASE,
+)
 
 MENSAGEM_SISTEMA = (
-    'Escreves como um assistente pessoal que conhece o teu dia — tom natural e descontraído, como uma mensagem de manhã cedo.\n'
+    'Escreves em português europeu (PT-PT), como um assistente pessoal que conhece o teu dia — tom natural e descontraído, como uma mensagem de manhã cedo.\n'
     'Regras:\n'
-    '- Abre com uma saudação natural e variada — não sigas sempre o mesmo formato. Podes ou não mencionar o dia da semana. Nunca inventes um dia da semana diferente do indicado nos dados.\n'
-    '- Máximo {limite} caracteres, linguagem simples e direta.\n'
+    '- Usa vocabulário, construções e ortografia de Portugal. Trata o utilizador por «tu» e usa formas como «tens», «podes» e «não te esqueças»; evita construções brasileiras como «E aí», «você», «legal» e «Vamos conseguir».\n'
+    '- Abre com uma saudação natural e variada em português europeu — não sigas sempre o mesmo formato. Usa a hora local de Lisboa indicada na mensagem para escolher uma saudação coerente («Bom dia», «Boa tarde» ou «Boa noite»). Usa o primeiro nome se estiver indicado. Evita «E aí» e outras fórmulas brasileiras. Podes ou não mencionar o dia da semana. Nunca inventes um dia diferente do indicado nos dados.\n'
+    '- Máximo {limite} caracteres. Usa linguagem simples e directa, de forma conversacional, como uma mensagem espontânea para alguém próximo.\n'
     '- Transições naturais entre tópicos; não usa rótulos de secção como "Meteorologia:".\n'
-    '- Expressões do dia-a-dia: "bora", "dá para", "não te esqueças".\n'
+    '- Mantém um tom caloroso, leve e bem-disposto. Podes usar expressões coloquiais naturais de Portugal, como «bora» ou «dá para», e uma frase simpática de incentivo quando encaixar. Evita soar formal, robótico ou como um relatório; não forces entusiasmo nem intimidade.\n'
     '- Usa APENAS os dados fornecidos; nunca inventa factos.\n'
     '- Todos os tópicos PRESENTES nos dados têm de aparecer; se um tópico não está nos dados, não o menciones.\n'
     '- Nunca escrevas frases sobre o que falta («não há…», «sem…», «não foi fornecido») nem uses as palavras «dados», «secção» ou «resumo».\n'
@@ -122,9 +129,12 @@ def _contexto_data(data):
     resumo de segunda). Usa a ``data`` do resumo (que pode ser simulada), não
     ``datetime.now()`` — um resumo para outro dia tem de receber esse dia.
     """
+    agora = datetime.now(FUSO_HORARIO)
     return (
         f'Hoje é {_DIAS_SEMANA[data.weekday()]}, '
         f'{data.strftime("%d/%m/%Y")}.\n'
+        f'Hora actual em Lisboa: {agora.strftime("%H:%M")} '
+        '(Europe/Lisbon).\n'
     )
 
 
@@ -206,6 +216,8 @@ def validar_resposta(conteudo, dados, data, titulos, limite):
         return False, 'html'
     if _PADRAO_MARKDOWN.search(texto):
         return False, 'markdown'
+    if _PADRAO_PT_BR.search(texto):
+        return False, 'português não europeu'
 
     # Metalinguagem de ausência (v1.8.3): o LLM a falar dos dados/secções em
     # vez de redigir o dia («sem dados», «não fornecido», «secção»). Isenta
@@ -271,7 +283,8 @@ def _registar_origem(origem, motivo=None, modelo=None):
         logger.info('[Resumo Diário] Texto determinístico (%s).', motivo)
 
 
-def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900):
+def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900,
+            nome=None):
     """Redige o resumo com LLM; em qualquer falha devolve o determinístico.
 
     Args:
@@ -288,6 +301,9 @@ def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900):
         é None com LLM e a causa da queda no determinístico.
     """
     dados = texto_deterministico or ''
+    nome = nome.strip() if isinstance(nome, str) and nome.strip() else None
+    if nome and dados.strip():
+        dados = f'Bom dia, {nome}!\n\n{dados}'
     if not dados.strip():
         _registar_origem('deterministico', 'sem secções')
         return dados, 'deterministico', 'sem secções'
@@ -301,7 +317,11 @@ def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900):
                 {'role': 'system',
                  'content': MENSAGEM_SISTEMA.format(limite=limite)},
                 {'role': 'user',
-                 'content': f'{_contexto_data(data)}Dados do resumo:\n{dados}'},
+                 'content': (f'{_contexto_data(data)}' +
+                             (f'Nome próprio do utilizador: {nome}. '
+                              'Usa-o na saudação, com variações naturais.\n'
+                              if nome else '') +
+                             f'Dados do resumo:\n{dados}')},
             ],
             prazo_total=_orcamento(modo),
         )

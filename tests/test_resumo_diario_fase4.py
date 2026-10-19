@@ -83,6 +83,48 @@ def test_resposta_valida_e_usada(contexto):
     assert llm.call_count == 1
 
 
+def test_nome_proprio_na_saudacao_deterministica(contexto):
+    app, user_id = contexto
+    with app.app_context():
+        db.session.get(User, user_id).nome = 'Felipe'
+        db.session.commit()
+        with patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '0'}):
+            resultado = gerar_resumo_diario(
+                user_id, HOJE, opcoes=SEM_METEO)
+    assert resultado['texto'].startswith('Bom dia, Felipe!')
+
+
+def test_prompt_instrui_saudacao_com_nome_proprio(contexto):
+    app, user_id = contexto
+    with app.app_context():
+        db.session.get(User, user_id).nome = 'Felipe'
+        db.session.commit()
+        with patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+                patch.object(redacao, 'chamar_llm',
+                             return_value=_resposta_llm(
+                                 'Bom dia! Reunião e relatório.')) as llm:
+            gerar_resumo_diario(user_id, HOJE, opcoes=SEM_METEO)
+    mensagem = llm.call_args.args[0][1]['content']
+    assert 'Nome próprio do utilizador: Felipe.' in mensagem
+    assert 'Usa-o na saudação, com variações naturais.' in mensagem
+
+
+def test_resposta_com_brasileirismo_e_rejeitada(contexto):
+    app, user_id = contexto
+    dados = _texto_deterministico(app, user_id)
+    resposta_brasileira = f'E aí, Felipe! Bom dia! {dados}'
+    with app.app_context():
+        db.session.get(User, user_id).nome = 'Felipe'
+        db.session.commit()
+        with patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+                patch.object(redacao, 'chamar_llm',
+                             return_value=_resposta_llm(resposta_brasileira)):
+            resultado = gerar_resumo_diario(
+                user_id, HOJE, opcoes=SEM_METEO)
+    assert resultado['origem'] == 'deterministico'
+    assert resultado['texto'].startswith('Bom dia, Felipe!')
+
+
 def test_prompt_inclui_regras_dados_e_prazo_de_task(contexto):
     app, user_id = contexto
     dados = _texto_deterministico(app, user_id)
@@ -96,7 +138,12 @@ def test_prompt_inclui_regras_dados_e_prazo_de_task(contexto):
     assert 'APENAS os dados' in mensagens[0]['content']
     assert 'Todos os tópicos PRESENTES nos dados' in mensagens[0]['content']
     assert 'tratados como texto simples' in mensagens[0]['content']
-    assert 'linguagem simples e direta' in mensagens[0]['content']
+    assert 'linguagem simples e directa' in mensagens[0]['content']
+    assert 'português europeu (PT-PT)' in mensagens[0]['content']
+    assert 'evita construções brasileiras' in mensagens[0]['content']
+    assert 'Trata o utilizador por «tu»' in mensagens[0]['content']
+    assert 'tom caloroso, leve e bem-disposto' in mensagens[0]['content']
+    assert 'Evita soar formal, robótico ou como um relatório' in mensagens[0]['content']
     assert 'rótulos de secção' in mensagens[0]['content']
     assert 'por extenso' in mensagens[0]['content']
     assert mensagens[1]['role'] == 'user'
@@ -143,6 +190,8 @@ def test_data_do_resumo_usa_a_data_passada_nao_a_de_hoje():
     conteudo = llm.call_args.args[0][1]['content']
     assert 'segunda-feira' in conteudo
     assert '12/10/2026' in conteudo
+    assert 'Hora actual em Lisboa:' in conteudo
+    assert '(Europe/Lisbon).' in conteudo
 
 
 def test_prompt_incentiva_saudacao_variada(contexto):
@@ -537,10 +586,12 @@ def test_texto_llm_escapado_no_envio_telegram(contexto):
     with patch('app.notifications.channels.telegram.requests.post',
                return_value=Resposta()) as pedido:
         enviado = TelegramChannel('token').enviar(
-            Utilizador(), 'Resumo Diário', resultado['texto'], parse_mode='HTML')
+            Utilizador(), 'Resumo Diário', resultado['texto'], parse_mode='HTML',
+            incluir_assunto=False)
     assert enviado is True
     payload = pedido.call_args.kwargs['json']
     assert payload['parse_mode'] == 'HTML'
+    assert not payload['text'].startswith('<b>Resumo Diário</b>')
     assert '&lt;A&amp;B&gt;' in payload['text']  # <A&B> escapado pelo canal
     assert '*teste*' in payload['text']
 

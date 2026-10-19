@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.24
+# PIPE — Estado Actual do Projecto — v1.8.25
+
+## Versão v1.8.25 — 2026-10-19
+
+- O Resumo Diário usa o primeiro nome do utilizador na saudação; o modelo recebe instruções explícitas de português europeu, tom caloroso e conversacional, e hora local de Lisboa para escolher uma saudação coerente.
+- As mensagens do Resumo Diário no Telegram são enviadas sem cabeçalho/assunto, tanto manualmente como na tarefa automática.
+- Sem alteração de BD.
+- Validação: `tests/test_resumo_diario.py`, `tests/test_resumo_diario_fase2.py` e `tests/test_resumo_diario_fase4.py` — 65 testes passaram; em conjunto com `tests/test_notifications_telegram.py` — 91 testes passaram; `git diff --check` limpo.
 
 ## Versão v1.8.24 — 2026-10-19
 
