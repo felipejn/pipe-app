@@ -1,9 +1,14 @@
 """Servicos da Meteorologia — Etapas A (Localizacao) e B (Previsao).
 
 Funcoes puras (sem Flask): recebem dados simples e devolvem dados
-simples, para futura reutilizacao pelo Assistente.
+simples, para futura reutilizacao pelo Assistente. A cache da ultima
+previsao e o unico ponto que toca o BD — e opcional (best-effort) e
+esta isolado das funcoes puras.
 """
 from datetime import datetime
+
+import json
+import logging
 
 import requests
 
@@ -13,9 +18,15 @@ USER_AGENT = 'PIPE-Meteorologia/1.0'
 TIMEOUT_SEGUNDOS = 8
 TIMEZONE_PREDEFINIDO = 'Europe/Lisbon'
 
-# Gancho de cache (V1: sem cache — todo o acesso a Forecast API fica
-# dentro de obter_previsao, assinatura estavel (lat, lon); evolucao
-# futura = wrapper interno com dict + TTL, sem tocar rotas/templates).
+# Cache da ultima previsao com sucesso (fallback quando a API falha).
+# Uma linha por coordenadas arredondadas (~1 km); payload em JSON no
+# formato devolvido por obter_previsao. IDADE_MAXIMA limita o que se
+# serve como "guardado": passado esse prazo, sao dados que ja nao
+# descrevem o presente (temperatura atual / horaria) e o utilizador
+# fica melhor servido com a mensagem de indisponivel. VIDA_LIMPA limita
+# quantas localizacoes sao guardadas (limpeza oportuna na escrita).
+IDADE_MAXIMA_CACHE_HORAS = 24
+VIDA_LIMPA_CACHE_DIAS = 30
 
 TETO_NOME = 120
 TETO_PAIS = 80
@@ -247,7 +258,13 @@ def _campo_compat(dados, nome_documentado, nome_antigo):
 
 
 def obter_previsao(lat, lon):
-    """Previsao normalizada para (lat, lon) ou None se a API falhar."""
+    """Previsao normalizada para (lat, lon) ou None se a API falhar.
+
+    Com a API em baixo, serve a ultima previsao guardada (ate
+    IDADE_MAXIMA_CACHE_HORAS) com de_cache=True; sem cache valida,
+    devolve None. A escrita/leitura da cache e best-effort: qualquer
+    falha (BD indisponivel, sem app context) nunca afecta o resultado.
+    """
     coords = _coordenadas_validas(lat, lon)
     if coords is None:
         return None
@@ -262,7 +279,7 @@ def obter_previsao(lat, lon):
         resposta.raise_for_status()
         dados = resposta.json()
     except Exception:
-        return None
+        return _servir_cache_ou_none(lat, lon)
     try:
         atual_api = dados.get('current') or {}
         if not isinstance(atual_api, dict) or not atual_api:
@@ -332,7 +349,7 @@ def obter_previsao(lat, lon):
                 'temp_min': _num(mins[i]) if i < len(mins) else None,
                 'prob_precipitacao': _num(probs_d[i]) if i < len(probs_d) else None,
             })
-        return {
+        payload = {
             'atual': atual,
             'horaria': horaria,
             'diaria': diaria,
@@ -341,7 +358,86 @@ def obter_previsao(lat, lon):
             'fonte': 'Open-Meteo',
         }
     except Exception:
+        return _servir_cache_ou_none(lat, lon)
+
+    _gravar_previsao_cache(lat, lon, payload)
+    return payload
+
+
+def _gravar_previsao_cache(lat, lon, payload):
+    """Grava a previsao actualizada na cache (best-effort).
+
+    Usa begin_nested + IntegrityError para recuperar de corrida entre
+    dois pedidos a gravar a mesma chave; rollback em qualquer falha.
+    """
+    from datetime import datetime, timedelta
+
+    from flask import has_app_context
+    from sqlalchemy.exc import IntegrityError
+
+    if not has_app_context():
+        return
+    from app import db
+    from app.meteorologia.models import PrevisaoCache
+
+    chave = f'{lat:.2f},{lon:.2f}'
+    try:
+        with db.session.begin_nested():
+            linha = PrevisaoCache.query.filter_by(chave=chave).first()
+            if linha is None:
+                linha = PrevisaoCache(chave=chave)
+                db.session.add(linha)
+            linha.payload = json.dumps(payload)
+            linha.obtida_em = datetime.utcnow()
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+    except Exception:
+        db.session.rollback()
+        logging.getLogger(__name__).warning(
+            'Falha ao gravar cache de previsao para %s', chave, exc_info=True)
+    finally:
+        # Limpeza oportuna: remove linhas velhas para a tabela nao crescer.
+        try:
+            limite = datetime.utcnow() - timedelta(days=VIDA_LIMPA_CACHE_DIAS)
+            PrevisaoCache.query.filter(
+                PrevisaoCache.obtida_em < limite).delete(
+                synchronize_session=False)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+def _servir_cache_ou_none(lat, lon):
+    """Devolve a previsao guardada (ate IDADE_MAXIMA) ou None.
+
+    Marca o resultado com de_cache=True e obtida_em (timestamp da
+    ultima gravacao com sucesso), para a UI e o Assistente avisarem
+    da frescura.
+    """
+    from datetime import timedelta
+
+    from flask import has_app_context
+
+    if not has_app_context():
         return None
+    from app import db
+    from app.meteorologia.models import PrevisaoCache
+
+    chave = f'{lat:.2f},{lon:.2f}'
+    try:
+        linha = PrevisaoCache.query.filter_by(chave=chave).first()
+        if linha is None:
+            return None
+        idade = datetime.utcnow() - linha.obtida_em
+        if idade > timedelta(hours=IDADE_MAXIMA_CACHE_HORAS):
+            return None
+        payload = json.loads(linha.payload)
+    except Exception:
+        logging.getLogger(__name__).warning(
+            'Falha ao ler cache de previsao para %s', chave, exc_info=True)
+        return None
+    return dict(payload, de_cache=True, obtida_em=linha.obtida_em)
 
 
 def obter_previsao_utilizador(user_id):

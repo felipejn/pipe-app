@@ -1583,6 +1583,7 @@ def _previsao_compacta(previsao, local):
         'meta': {
             'atualizada_em': previsao.get('atualizada_em'),
             'fonte': previsao.get('fonte'),
+            'de_cache': bool(previsao.get('de_cache')),
         },
     }
 
@@ -1625,6 +1626,7 @@ def _previsao_detalhada(previsao, local):
         'meta': {
             'atualizada_em': previsao.get('atualizada_em'),
             'fonte': previsao.get('fonte'),
+            'de_cache': bool(previsao.get('de_cache')),
         },
     }
 
@@ -1635,6 +1637,10 @@ def get_meteorologia(user_id, detalhado=False):
     Ferramenta de leitura. Requer que o utilizador tenha definido uma localização
     em Meteorologia -> Definir localização; sem localização guardada devolve um
     erro orientador (o modelo encaminha para o módulo, nunca inventa dados).
+
+    Quando a API Open-Meteo está em baixo mas existe previsão guardada (<= 24 h),
+    os dados vêm com meta.de_cache=True — o modelo deve avisar a frescura em vez
+    de os apresentar como actuais.
     """
     # Via unica: query à localização do utilizador + obter_previsao(lat, lon).
     local = LocalizacaoMeteorologia.query.filter_by(user_id=user_id).first()

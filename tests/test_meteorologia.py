@@ -529,3 +529,92 @@ class TestPaginaPrevisao:
         resposta = authenticated_client.get('/meteorologia/')
         assert resposta.status_code == 200
         assert '—'.encode('utf-8') in resposta.data
+
+
+# ── Cache da última previsão (fallback da API) ──
+
+
+def _api_em_baixo(monkeypatch):
+    import requests
+    import app.meteorologia.services as servicos
+
+    def rebentar(*a, **k):
+        raise requests.Timeout('esgotado')
+
+    monkeypatch.setattr(servicos.requests, 'get', rebentar)
+
+
+class TestCachePrevisao:
+    def test_sucesso_grava_cache_e_depois_api_em_baixo_serve_guardado(
+            self, app, monkeypatch):
+        from app.meteorologia import services as servicos
+        _mock_forecast(monkeypatch)
+        with app.app_context():
+            p1 = servicos.obter_previsao(41.65, -8.43)
+            assert p1 is not None
+            assert not p1.get('de_cache')
+        _api_em_baixo(monkeypatch)
+        with app.app_context():
+            p2 = servicos.obter_previsao(41.65, -8.43)
+            assert p2 is not None
+            assert p2['de_cache'] is True
+            assert p2['atual']['temperatura'] == 21.5
+            assert 'obtida_em' in p2
+
+    def test_api_em_baixo_sem_cache_devolve_none(self, app, monkeypatch):
+        from app.meteorologia import services as servicos
+        _api_em_baixo(monkeypatch)
+        with app.app_context():
+            assert servicos.obter_previsao(41.65, -8.43) is None
+
+    def test_cache_expirada_devolve_none(self, app, monkeypatch):
+        from datetime import datetime, timedelta
+
+        from app import db
+        from app.meteorologia import services as servicos
+        from app.meteorologia.models import PrevisaoCache
+        _api_em_baixo(monkeypatch)
+        with app.app_context():
+            linha = PrevisaoCache(
+                chave='41.65,-8.43',
+                payload='{"atual": {"temperatura": 1.0}}',
+                obtida_em=datetime.utcnow()
+                - timedelta(hours=servicos.IDADE_MAXIMA_CACHE_HORAS + 1))
+            db.session.add(linha)
+            db.session.commit()
+            assert servicos.obter_previsao(41.65, -8.43) is None
+
+    def test_gravacao_regravada_sem_duplicados(self, app, monkeypatch):
+        from app import db
+        from app.meteorologia import services as servicos
+        from app.meteorologia.models import PrevisaoCache
+        _mock_forecast(monkeypatch)
+        with app.app_context():
+            servicos.obter_previsao(41.65, -8.43)
+            servicos.obter_previsao(41.65, -8.43)
+            assert PrevisaoCache.query.count() == 1
+
+    def test_sem_app_context_nao_rebenta(self, monkeypatch):
+        from app.meteorologia import services as servicos
+        _mock_forecast(monkeypatch)
+        # Sem app context: escreve/le cache e nunca levanta exceção.
+        p = servicos.obter_previsao(41.65, -8.43)
+        assert p is not None
+        _api_em_baixo(monkeypatch)
+        assert servicos.obter_previsao(41.65, -8.43) is None
+
+    def test_index_mostra_aviso_cache(self, authenticated_client, monkeypatch):
+        import app.meteorologia.services as servicos
+        _mock_forecast(monkeypatch)
+        r = authenticated_client.post('/meteorologia/api/localizacao', json={
+            'nome': 'Vila Verde', 'latitude': 41.65,
+            'longitude': -8.43, 'pais': 'Portugal'})
+        assert r.status_code == 200
+        # Primeira chamada preenche a cache; a segunda simula API em baixo.
+        assert authenticated_client.get('/meteorologia/').status_code == 200
+        _api_em_baixo(monkeypatch)
+        resposta = authenticated_client.get('/meteorologia/')
+        assert resposta.status_code == 200
+        corpo = resposta.data.decode('utf-8')
+        assert 'guardados' in corpo
+        assert 'Horas guardadas' in corpo

@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.20
+# PIPE — Estado Actual do Projecto — v1.8.21
+
+## Versão v1.8.21 — 2026-10-18
+
+- **Resiliência da Meteorologia:** quando a API Open-Meteo está em baixo, o módulo, o Assistente e o Resumo Diário servem a última previsão com sucesso guardada (até 24 h), marcada como `de_cache`; a UI mostra aviso e intitula a secção «Horas guardadas» para não rotular horas passadas como futuras. Sem cache válida, mantém-se o comportamento de indisponível.
+- Nova tabela `meteorologia_previsao_cache` (uma linha por coordenadas ~1 km, payload JSON, `obtida_em` indexado). Migração `a91e7c30d4b2` (down: `fd5793bc73bf`).
+- **Com alteração de BD.**
+- **Validação:** testes focados da Meteorologia: 42 passaram; Assistente + Resumo Diário: 22 passaram; `git diff --check` limpo. Suite completa ver no CHANGELOG.
 
 ## Versão v1.8.20 — 2026-10-18
 

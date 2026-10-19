@@ -6,6 +6,27 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.21] — 2026-10-18
+Resiliência da Meteorologia: cache da última previsão quando a API está em baixo.
+
+**Adicionado** (`app/meteorologia/`; **com alteração de BD** — migração `a91e7c30d4b2`)
+- **Tabela `meteorologia_previsao_cache`** — uma linha por coordenadas arredondadas (~1 km), `payload` em JSON e `obtida_em` indexado; limpeza oportuna de linhas com mais de 30 dias.
+- **`services.obter_previsao`** — com a API em baixo, serve a última previsão guardada até `IDADE_MAXIMA_CACHE_HORAS` (24 h) com `de_cache=True` e `obtida_em`; sem cache válida, devolve `None` (comportamento anterior). Gravação/leitura best-effort com `begin_nested` + `IntegrityError` (recupera de corrida) e `rollback` em falha — nunca afecta o resultado nem envenena a sessão. Falha na gravação não impede a devolução do payload fresco.
+- **Módulo Meteorologia (rota `index`)** — com dados de cache, mostra aviso «API em baixo — a mostrar dados guardados de …» e intitula a secção «Horas guardadas» (em vez de «Próximas 24 horas») para não rotular horas passadas como futuras; `previsao_indisponivel` fica só para sem cache/expirada.
+- **Assistente** — `get_meteorologia` (`meta.de_cache`) orienta o modelo a avisar da frescura; o invariante ≤ 2000 chars serializados continua a passar.
+- **Resumo Diário** — beneficia automaticamente da cache (o `obter_previsao` é partilhado).
+
+**Testes** (`tests/test_meteorologia.py` — nova classe `TestCachePrevisao`)
+- API em baixo serve cache com `de_cache` e `obtida_em`; sem cache → `None`; cache expirada (>24 h) → `None`; regravação sem duplicados; sem app context nunca rebenta; rota `index` mostra aviso e «Horas guardadas».
+
+**Validação**
+- Meteorologia: **42 passaram**; Assistente + Resumo Diário: **22 passaram**; `git diff --check` limpo.
+
+**Notas de deploy**
+- **Com alteração de BD.** PythonAnywhere: `git pull` → `pip install -r requirements.txt` → `flask db upgrade` (aplica `a91e7c30d4b2`) → `flask db check` → Reload.
+
+---
+
 ## [v1.8.20] — 2026-10-18
 Validações de produção concluídas; falta apenas o teste ponta a ponta da extensão Chrome do Cofre.
 

@@ -1,4 +1,4 @@
-"""Modelo da localizacao guardada (Etapa A — uma por utilizador)."""
+"""Modelos: localizacao guardada (Etapa A) e cache da previsao."""
 from datetime import datetime
 
 from app import db
@@ -24,3 +24,24 @@ class LocalizacaoMeteorologia(db.Model):
 
     def __repr__(self):
         return f'<LocalizacaoMeteorologia {self.nome} user={self.user_id}>'
+
+
+class PrevisaoCache(db.Model):
+    """Ultima previsao com sucesso por coordenadas (fallback da API).
+
+    Uma linha por localizacao (~1 km de precisao); payload em JSON com o
+    mesmo formato devolvido por ``obter_previsao``. Serve o módulo
+    Meteorologia, o Assistente e o Resumo Diário quando a Open-Meteo
+    está em baixo — nunca mais velho que IDADE_MAXIMA_CACHE_HORAS.
+    """
+
+    __tablename__ = 'meteorologia_previsao_cache'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chave = db.Column(db.String(32), nullable=False, unique=True, index=True)
+    payload = db.Column(db.Text, nullable=False)
+    obtida_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
+                          index=True)
+
+    def __repr__(self):
+        return f'<PrevisaoCache {self.chave} obtida_em={self.obtida_em}>'

@@ -53,14 +53,16 @@ def index():
     previsao; com local e API em baixo -> mensagem amigável (200, nunca 500)."""
     local = LocalizacaoMeteorologia.query.filter_by(
         user_id=current_user.id).first()
-    previsao, erro = None, None
+    previsao, erro, aviso_cache = None, None, False
     if local is not None:
         payload, motivo = services.obter_previsao_utilizador(current_user.id)
         if motivo == 'api_indisponivel':
             erro = 'previsao_indisponivel'
         elif motivo == 'ok':
             previsao = payload
+            aviso_cache = bool(payload.get('de_cache'))
     return render_template(
         'meteorologia/index.html',
-        local=local, previsao=previsao, erro=erro, url_localizacao=(
+        local=local, previsao=previsao, erro=erro,
+        aviso_cache=aviso_cache, url_localizacao=(
             url_for('meteorologia.localizacao')))

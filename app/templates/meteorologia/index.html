@@ -26,7 +26,11 @@
       {{ local.nome }}{% if local.regiao %} — {{ local.regiao }}{% endif %} ({{ local.pais }})
       · <a href="{{ url_localizacao }}">📍 Mudar localização</a>
     </p>
+    {% if aviso_cache %}
+    <p class="texto-subtil" style="color:#d9a441;">⚠️ API em baixo — a mostrar dados guardados de {{ previsao.atualizada_em }}.</p>
+    {% else %}
     <p class="texto-subtil">Actualizado a {{ previsao.atualizada_em }} ({{ previsao.timezone }}) · Fonte: {{ previsao.fonte }}</p>
+    {% endif %}
   </div>
 
   {% set a = previsao.atual %}
@@ -50,7 +54,7 @@
   </div>
 
   <div class="cartao" style="margin-bottom:1rem;">
-    <h3 style="margin-top:0;">Próximas 24 horas</h3>
+    <h3 style="margin-top:0;">{{ 'Horas guardadas' if aviso_cache else 'Próximas 24 horas' }}</h3>
     <div style="display:flex;gap:.6rem;overflow-x:auto;padding-bottom:.3rem;">
       {% for h in previsao.horaria %}
       <div class="cartao" style="min-width:78px;text-align:center;padding:.5rem;flex-shrink:0;">
