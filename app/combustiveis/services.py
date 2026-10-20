@@ -230,11 +230,20 @@ def _get_com_retry(session, params):
     tentativas usa backoff exponencial.
     """
     for tentativa in range(1, TENTATIVAS_MAX + 1):
-        resp = session.get(BASE_URL, params=params, headers=_headers(), timeout=20)
+        try:
+            resp = session.get(BASE_URL, params=params, headers=_headers(), timeout=20)
+        except requests.RequestException:
+            if tentativa == TENTATIVAS_MAX:
+                raise
+            time.sleep(PAUSA_ENTRE_PEDIDOS * tentativa)
+            continue
         if resp.status_code == 429 or resp.status_code >= 500:
             if tentativa == TENTATIVAS_MAX:
                 resp.raise_for_status()
-                return resp
+                # Defesa adicional caso a implementação de Response não lance.
+                raise requests.HTTPError(
+                    f'HTTP {resp.status_code} após {TENTATIVAS_MAX} tentativas'
+                )
             espera = PAUSA_ENTRE_PEDIDOS
             try:
                 espera = max(espera, float(resp.headers.get('Retry-After', 0)))
@@ -244,7 +253,26 @@ def _get_com_retry(session, params):
             continue
         resp.raise_for_status()
         return resp
-    return resp
+    raise requests.RequestException(
+        f'Pedido HTTP falhou após {TENTATIVAS_MAX} tentativas'
+    )
+
+
+def _json_com_retry(session, params):
+    """Obtém e descodifica uma página, repetindo respostas JSON inválidas."""
+    ultimo_erro = None
+    for tentativa in range(1, TENTATIVAS_MAX + 1):
+        resp = _get_com_retry(session, params)
+        try:
+            return resp.json()
+        except (ValueError, requests.exceptions.RequestException) as exc:
+            ultimo_erro = exc
+            if tentativa < TENTATIVAS_MAX:
+                time.sleep(PAUSA_ENTRE_PEDIDOS * tentativa)
+
+    raise requests.RequestException(
+        f'Resposta JSON inválida após {TENTATIVAS_MAX} tentativas: {ultimo_erro}'
+    ) from ultimo_erro
 
 
 def _paginar_fuel(session, fuel_slug):
@@ -261,8 +289,7 @@ def _paginar_fuel(session, fuel_slug):
     while True:
         params = {'fuel': fuel_slug, 'district': DISTRITO_INTERESSE,
                   'page': page, 'limit': PAGE_LIMIT}
-        resp = _get_com_retry(session, params)
-        corpo = resp.json()
+        corpo = _json_com_retry(session, params)
 
         for registo in corpo.get('data', []):
             if registo.get('municipality') in MUNICIPIOS_INTERESSE:
@@ -316,57 +343,59 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
     for fuel_slug in FUEL_SLUGS:
         try:
             registos = _paginar_fuel(session, fuel_slug)
-        except requests.RequestException as exc:
-            erros.append(f'Falhou fuel={fuel_slug}: {exc}')
+        except Exception as exc:
+            erros.append(_mensagem_erro_fuel(fuel_slug, exc))
             continue
 
-        for r in registos:
-            # Postos em NOMES_IGNORADOS são descartados na origem: não criam
-            # nem actualizam Posto, não gravam histórico e não contam como
-            # vistos (logo, se ainda existirem na BD, o arquivamento
-            # automático trata deles).
-            if _nome_ignorado(r.get('name')):
-                continue
+        # Um savepoint impede que uma resposta estruturalmente inválida ou uma
+        # falha de flush deixe alterações parciais deste combustível na sessão.
+        postos_vistos_fuel = set()
+        precos_fuel = 0
+        try:
+            with db.session.begin_nested():
+                for r in registos:
+                    # Postos ignorados são descartados antes de qualquer escrita.
+                    if _nome_ignorado(r.get('name')):
+                        continue
 
-            posto_id = r['station_id']
-            posto = Posto.query.get(posto_id) or Posto(id=posto_id)
-            posto.nome = r.get('name')
-            posto.marca = r.get('brand')
-            posto.morada = r.get('address')
-            posto.localidade = r.get('locality')
-            posto.cod_postal = r.get('postal_code')
-            posto.concelho = r.get('municipality')
-            db.session.add(posto)
-            db.session.flush()
+                    posto_id = r['station_id']
+                    posto = Posto.query.get(posto_id) or Posto(id=posto_id)
+                    posto.nome = r.get('name')
+                    posto.marca = r.get('brand')
+                    posto.morada = r.get('address')
+                    posto.localidade = r.get('locality')
+                    posto.cod_postal = r.get('postal_code')
+                    posto.concelho = r.get('municipality')
+                    db.session.add(posto)
+                    db.session.flush()
 
-            # Posto presente nesta recolha: fica (ou volta a ficar) activo e o
-            # contador de ausências é reiniciado. Cobre tanto o caso normal
-            # como a reactivação automática de um posto que tinha sido
-            # arquivado e voltou a aparecer na API. Tem de vir antes do bloco
-            # de deduplicação, para também correr no ramo do `continue`.
-            posto.ativo = True
-            posto.ciclos_ausente = 0
+                    # Reactiva o posto e reinicia o contador de ausências.
+                    posto.ativo = True
+                    posto.ciclos_ausente = 0
 
-            # Deduplicação: só grava histórico quando há alteração real. A API
-            # devolve updated_at (timestamp DGEG) + preço; se coincidirem com o
-            # último registo conhecido do mesmo posto+combustível, nada grava.
-            ultimo = (PrecoHistorico.query
-                      .filter_by(posto_id=posto.id, tipo_combustivel=r.get('fuel_name'))
-                      .order_by(PrecoHistorico.data_recolha.desc()).first())
-            if (ultimo is not None
-                    and ultimo.preco == r.get('price_eur')
-                    and ultimo.data_atualizacao_dgeg == r.get('updated_at')):
-                postos_vistos.add(posto_id)
-                continue
+                    # Só grava histórico quando preço ou timestamp mudaram.
+                    ultimo = (PrecoHistorico.query
+                              .filter_by(posto_id=posto.id, tipo_combustivel=r.get('fuel_name'))
+                              .order_by(PrecoHistorico.data_recolha.desc()).first())
+                    if (ultimo is not None
+                            and ultimo.preco == r.get('price_eur')
+                            and ultimo.data_atualizacao_dgeg == r.get('updated_at')):
+                        postos_vistos_fuel.add(posto_id)
+                        continue
 
-            db.session.add(PrecoHistorico(
-                posto_id=posto.id,
-                tipo_combustivel=r.get('fuel_name'),
-                preco=r.get('price_eur'),
-                data_atualizacao_dgeg=r.get('updated_at'),
-            ))
-            precos_gravados += 1
-            postos_vistos.add(posto_id)
+                    db.session.add(PrecoHistorico(
+                        posto_id=posto.id,
+                        tipo_combustivel=r.get('fuel_name'),
+                        preco=r.get('price_eur'),
+                        data_atualizacao_dgeg=r.get('updated_at'),
+                    ))
+                    precos_fuel += 1
+                    postos_vistos_fuel.add(posto_id)
+        except Exception as exc:
+            erros.append(_mensagem_erro_fuel(fuel_slug, exc))
+        else:
+            postos_vistos.update(postos_vistos_fuel)
+            precos_gravados += precos_fuel
 
     sucesso = len(erros) == 0
 
@@ -395,7 +424,38 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
         estado.ultima_atualizacao = datetime.utcnow()
     estado.ultima_execucao_sucesso = sucesso
     estado.mensagem_erro = '; '.join(erros) if erros else None
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        erro_commit = f'Falha ao guardar a recolha na base de dados: {type(exc).__name__}: {exc}'
+        erros.append(erro_commit)
+        sucesso = False
+        # O rollback invalida todas as alterações desta recolha, incluindo as
+        # dos combustíveis que tinham sido processados sem erros.
+        postos_vistos.clear()
+        precos_gravados = 0
+        postos_arquivados = 0
+        try:
+            estado = _obter_estado()
+            estado.ultima_execucao_sucesso = False
+            estado.mensagem_erro = '; '.join(erros)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            # Se a própria BD continuar indisponível, devolve-se o erro ao
+            # chamador sem mascarar a falha com uma segunda excepção.
+
+    try:
+        postos_na_bd = Posto.query.count()
+    except Exception as exc:
+        db.session.rollback()
+        erros.append(
+            f'Falha ao consultar o total de postos na base de dados: '
+            f'{type(exc).__name__}: {exc}'
+        )
+        sucesso = False
+        postos_na_bd = None
 
     return {
         'executado': True,
@@ -404,9 +464,19 @@ def atualizar_precos_se_necessario(forcar=False, hoje=None):
         'postos_atualizados': len(postos_vistos),  # compat. retroativa
         'precos_novos': precos_gravados,
         'postos_arquivados': postos_arquivados,
-        'postos_na_bd': Posto.query.count(),
-        'erro': estado.mensagem_erro,
+        'postos_na_bd': postos_na_bd,
+        'erro': '; '.join(erros) if erros else estado.mensagem_erro,
     }
+
+
+def _mensagem_erro_fuel(fuel_slug, exc):
+    """Converte falhas de API/processamento em mensagens operacionais claras."""
+    detalhe = str(exc).strip() or type(exc).__name__
+    if 'resposta json inválida' in detalhe.casefold():
+        detalhe = detalhe[0].lower() + detalhe[1:]
+    elif not isinstance(exc, requests.RequestException):
+        detalhe = f'erro ao processar os dados ({type(exc).__name__}: {detalhe})'
+    return f'Falhou fuel={fuel_slug}: {detalhe}'
 
 def obter_tipos_combustivel_disponiveis(concelhos, tipos_utilizador=None):
     query = (

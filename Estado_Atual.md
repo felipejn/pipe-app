@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.26
+# PIPE — Estado Actual do Projecto — v1.8.27
+
+## Versão v1.8.27 — 2026-10-20
+
+- Reforçada a resiliência da recolha de combustíveis: pedidos repetidos em falhas de ligação/timeout e respostas HTTP 429/5xx; páginas com JSON inválido também são repetidas.
+- Falhas de estrutura ou processamento ficam isoladas por combustível, sem manter escritas parciais; falhas no commit fazem rollback e são registadas no estado quando a base de dados continua disponível.
+- Sem alteração de BD ou dependências.
+- Validação: testes de resiliência, seed e deduplicação — **22 passaram**; compilação Python e `git diff --check` limpos. A suite completa não terminou dentro do tempo disponível; `tests/test_assistente_combustiveis.py` mantém falhas conhecidas devido a fixtures fora da janela de preços activos.
 
 ## Versão v1.8.26 — 2026-10-19
 

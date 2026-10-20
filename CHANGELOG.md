@@ -6,6 +6,23 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.27] — 2026-10-20
+Reforça a resiliência da recolha do módulo Combustíveis.
+
+**Alterado**
+- Pedidos HTTP repetem falhas de ligação/timeout e respostas 429/5xx; páginas com JSON inválido são pedidas novamente até ao limite de tentativas.
+- Erros de estrutura ou processamento ficam isolados por combustível e as escritas parciais desse combustível são revertidas. Uma falha no commit provoca rollback e fica registada no estado se a base de dados estiver disponível.
+- Sem alteração de BD ou dependências.
+
+**Validação**
+- `test_combustiveis_resiliencia.py`, `test_combustiveis_seed.py` e `test_combustiveis_dedup.py`: **22 passaram**.
+- Compilação Python e `git diff --check` limpos. A suite completa foi interrompida após ficar sem progresso; `test_assistente_combustiveis.py` tem falhas conhecidas por fixtures de preços fora da janela activa.
+
+**Notas de deploy**
+- Sem alteração de BD ou dependências. PythonAnywhere: push + Reload.
+
+---
+
 ## [v1.8.26] — 2026-10-19
 README redesenhado em inglês para a página do GitHub, orientado a recrutadores.
 
