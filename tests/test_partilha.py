@@ -112,6 +112,60 @@ def _criar_evento(app, user_id, titulo='Meu evento'):
         return e.id
 
 
+def test_apagar_utilizador_remove_partilhas_criadas_e_recebidas(
+    app, client, utilizador_a, utilizador_b, utilizador_c,
+):
+    with app.app_context():
+        administrador = db.session.get(User, utilizador_a['id'])
+        administrador.is_admin = True
+        tarefa = _criar_tarefa(app, utilizador_c['id'])
+        db.session.add_all([
+            PartilhaRecurso(
+                tipo_recurso='tarefa', recurso_id=999,
+                dono_id=utilizador_b['id'], utilizador_id=utilizador_c['id'],
+            ),
+            PartilhaRecurso(
+                tipo_recurso='tarefa', recurso_id=tarefa,
+                dono_id=utilizador_c['id'], utilizador_id=utilizador_b['id'],
+            ),
+        ])
+        db.session.commit()
+
+    with client.session_transaction() as sess:
+        sess['_user_id'] = str(utilizador_a['id'])
+        sess['_fresh'] = True
+
+    resposta = client.post(f"/admin/utilizadores/{utilizador_b['id']}/apagar")
+
+    assert resposta.status_code == 302
+    with app.app_context():
+        assert db.session.get(User, utilizador_b['id']) is None
+        assert PartilhaRecurso.query.filter(
+            db.or_(
+                PartilhaRecurso.dono_id == utilizador_b['id'],
+                PartilhaRecurso.utilizador_id == utilizador_b['id'],
+            )
+        ).count() == 0
+        assert db.session.get(Tarefa, tarefa) is not None
+
+
+def test_admin_nao_pode_apagar_a_propria_conta(app, client, utilizador_a):
+    with app.app_context():
+        administrador = db.session.get(User, utilizador_a['id'])
+        administrador.is_admin = True
+        db.session.commit()
+
+    with client.session_transaction() as sess:
+        sess['_user_id'] = str(utilizador_a['id'])
+        sess['_fresh'] = True
+
+    resposta = client.post(f"/admin/utilizadores/{utilizador_a['id']}/apagar")
+
+    assert resposta.status_code == 302
+    with app.app_context():
+        assert db.session.get(User, utilizador_a['id']) is not None
+
+
 # ── Caso 1: criar partilha (A cria recurso, A partilha com B via email) ──────
 
 def test_criar_partilha_por_email(app, client, utilizador_a, utilizador_b):

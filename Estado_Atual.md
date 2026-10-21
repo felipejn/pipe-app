@@ -1,4 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.8.30
+# PIPE — Estado Actual do Projecto — v1.8.31
+
+## Versão v1.8.31 — 2026-10-21
+
+- A eliminação de um utilizador na administração remove primeiro as partilhas criadas e recebidas, evitando violação da restrição `NOT NULL` em `partilha_recurso.dono_id`; recursos de outros utilizadores são preservados.
+- Validação: `tests/test_partilha.py` — 20 testes aprovados; `git diff --check` sem erros. `tests/test_convites_email.py` e a suite completa ficaram por validar devido a erros de acesso às pastas temporárias no ambiente.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, actualizar com `git pull` e executar Reload.
 
 ## Versão v1.8.30 — 2026-10-21
 

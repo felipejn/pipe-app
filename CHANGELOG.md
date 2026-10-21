@@ -6,6 +6,22 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.31] — 2026-10-21
+Corrige a eliminação de utilizadores com partilhas associadas.
+
+**Alterado**
+- A administração apaga as partilhas criadas e recebidas pelo utilizador antes de eliminar a conta. Os recursos que pertencem a outros utilizadores mantêm-se.
+- Sem alterações de base de dados ou dependências.
+
+**Validação**
+- `pytest tests/test_partilha.py -q`: 20 testes aprovados; `git diff --check` sem erros.
+- `tests/test_convites_email.py` e a suite completa não foram validados devido a erros de acesso às pastas temporárias no ambiente.
+
+**Notas de deploy**
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.30] — 2026-10-21
 Define o MiniMax como modelo principal do Assistente IA.
 

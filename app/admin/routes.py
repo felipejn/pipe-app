@@ -8,6 +8,7 @@ from app import db
 from app.admin import admin
 from app.admin.decorators import admin_required
 from app.auth.models import User, Convite
+from app.partilha.models import PartilhaRecurso
 from app.notifications.channels.email import EmailChannel
 
 
@@ -95,6 +96,12 @@ def apagar_utilizador(user_id):
         return redirect(url_for('admin.utilizadores'))
 
     username = user.username
+    PartilhaRecurso.query.filter(
+        db.or_(
+            PartilhaRecurso.dono_id == user.id,
+            PartilhaRecurso.utilizador_id == user.id,
+        )
+    ).delete(synchronize_session=False)
     db.session.delete(user)
     db.session.commit()
 
