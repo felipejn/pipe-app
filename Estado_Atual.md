@@ -1,4 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.8.29
+# PIPE — Estado Actual do Projecto — v1.8.30
+
+## Versão v1.8.30 — 2026-10-21
+
+- O Assistente IA usa `minimax/minimax-m3.1-flash:free` por omissão; Cohere e os restantes modelos actuais mantêm-se como fallbacks.
+- Validação: `pytest tests/test_assistente_cliente.py -q` — 25 testes aprovados; `git diff --check` sem erros.
+- Sem alterações de base de dados ou dependências. No PythonAnywhere, actualizar `OPENROUTER_MODEL` para o MiniMax, fazer `git pull` e executar Reload.
 
 ## Versão v1.8.29 — 2026-10-21
 

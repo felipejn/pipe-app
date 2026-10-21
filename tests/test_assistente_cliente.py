@@ -47,7 +47,7 @@ def _resposta_erro_servico():
     })
 
 
-MODELO_DEFAULT = "cohere/north-mini-code:free"  # hardcoded para consistência entre testes e cliente
+MODELO_DEFAULT = "minimax/minimax-m3.1-flash:free"  # hardcoded para consistência entre testes e cliente
 _MODELOS_FALLBACK_BRUTOS = [
     "cohere/north-mini-code:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
@@ -56,6 +56,15 @@ _MODELOS_FALLBACK_BRUTOS = [
     "poolside/laguna-s-2.1:free",
 ]
 MODELOS_FALLBACK = [m for m in _MODELOS_FALLBACK_BRUTOS if m != MODELO_DEFAULT]
+
+
+class ListagemModelosTests(TestCase):
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_minimax_e_primeiro_e_modelos_atuais_sao_fallback(self):
+        self.assertEqual(
+            _listar_modelos(),
+            [MODELO_DEFAULT] + MODELOS_FALLBACK,
+        )
 
 
 class ClassificacaoTests(TestCase):

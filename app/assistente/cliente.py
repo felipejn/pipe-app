@@ -11,6 +11,7 @@ OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 _MAX_TENTATIVAS = 3
 _ESPERA_RETRY = [2, 5, 10]  # segundos de backoff entre tentativas
 _MODELOS_FALLBACK = [
+    'cohere/north-mini-code:free',
     'nvidia/nemotron-3-super-120b-a12b:free',
     'liquid/lfm-2.5-2.6b:free',
     'dots-studio/dots-3-note-preview:free',
@@ -36,7 +37,7 @@ class ContextoExcedidoError(Exception):
 
 def _listar_modelos():
     """Devolve lista de modelos gratuitos disponiveis, ordenados por preferencia."""
-    padrao = os.environ.get('OPENROUTER_MODEL') or 'cohere/north-mini-code:free'
+    padrao = os.environ.get('OPENROUTER_MODEL') or 'minimax/minimax-m3.1-flash:free'
     modelos = [padrao]
     for modelo in _MODELOS_FALLBACK:
         if modelo != padrao and modelo not in modelos:

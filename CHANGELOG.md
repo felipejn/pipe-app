@@ -6,6 +6,21 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.30] — 2026-10-21
+Define o MiniMax como modelo principal do Assistente IA.
+
+**Alterado**
+- `minimax/minimax-m3.1-flash:free` passa a ser o modelo por omissão; Cohere e os restantes modelos anteriores são mantidos como fallbacks.
+- Actualizado `.env.example` e coberta por teste a ordem do modelo principal e dos fallbacks.
+
+**Validação**
+- `pytest tests/test_assistente_cliente.py -q`: 25 testes aprovados; `git diff --check` sem erros.
+
+**Notas de deploy**
+- Sem alterações de base de dados ou dependências. No PythonAnywhere, actualizar `OPENROUTER_MODEL=minimax/minimax-m3.1-flash:free`, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.29] — 2026-10-21
 
 ### Alterado
