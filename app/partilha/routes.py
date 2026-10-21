@@ -1,4 +1,4 @@
-from flask import abort, current_app, jsonify, request
+from flask import abort, current_app, jsonify, render_template, request
 from flask_login import login_required, current_user
 
 from app import db
@@ -62,21 +62,62 @@ def partilhadas_comigo():
 def partilhas_criadas():
     """Lista partilhas que o utilizador autenticado criou (é o dono)."""
     partilhas = PartilhaRecurso.query.filter_by(dono_id=current_user.id).all()
-
-    return jsonify([
-        {
+    resultado = []
+    for p in partilhas:
+        modelo = _obter_modelo(p.tipo_recurso)
+        recurso = modelo.query.filter_by(id=p.recurso_id).first() if modelo else None
+        resultado.append({
             'id': p.id,
             'tipo_recurso': p.tipo_recurso,
             'recurso_id': p.recurso_id,
+            'titulo': (
+                getattr(recurso, 'texto', None) or getattr(recurso, 'titulo', None)
+                if recurso else None
+            ) or f'{p.tipo_recurso} #{p.recurso_id}',
             'utilizador_id': p.utilizador_id,
             'utilizador_email': p.utilizador.email,
             'utilizador_nome': p.utilizador.nome_apresentacao,
             'nivel': p.nivel,
             'estado': p.estado,
             'criado_em': p.criado_em.isoformat() if p.criado_em else None,
-        }
-        for p in partilhas
-    ])
+        })
+    return jsonify(resultado)
+
+
+@partilha_bp.route('/pendentes', methods=['GET'])
+@login_required
+@limiter.limit("30/minute")
+def partilhas_pendentes():
+    """Lista convites pendentes recebidos pelo utilizador autenticado."""
+    partilhas = PartilhaRecurso.query.filter_by(
+        utilizador_id=current_user.id, estado='pendente',
+    ).all()
+
+    resultado = []
+    for p in partilhas:
+        modelo = _obter_modelo(p.tipo_recurso)
+        recurso = modelo.query.filter_by(id=p.recurso_id).first()
+        if recurso is None:
+            continue
+        resultado.append({
+            'partilha_id': p.id,
+            'tipo_recurso': p.tipo_recurso,
+            'recurso_id': p.recurso_id,
+            'nivel': p.nivel,
+            'dono_email': p.dono.email,
+            'titulo': getattr(recurso, 'texto', None)
+                      or getattr(recurso, 'titulo', f'{p.tipo_recurso} #{p.recurso_id}'),
+        })
+
+    return jsonify(resultado)
+
+
+@partilha_bp.route('/convites', methods=['GET'])
+@login_required
+@limiter.limit("30/minute")
+def gerir_convites():
+    """Apresenta a página de gestão de convites recebidos."""
+    return render_template('partilha/convites.html')
 
 
 # ── Rotas com segmento estático (antes de /<tipo_recurso>/<int:>) ─────────────
@@ -214,22 +255,22 @@ def criar_partilha(tipo_recurso, recurso_id):
 
     # Notificar o utilizador alvo.
     try:
-        tipo_label = {
-            'tarefa': 'tarefa',
-            'nota': 'nota',
-            'evento': 'compromisso',
+        artigo_tipo = {
+            'tarefa': 'a tarefa',
+            'nota': 'a nota',
+            'evento': 'o compromisso',
         }[tipo_recurso]
         titulo_recurso = getattr(recurso, 'texto', None) or getattr(
             recurso, 'titulo', f'{tipo_recurso} #{recurso.id}'
         )
-        notification_service.send(
+        resultado_notificacao = notification_service.send(
             user=utilizador_alvo,
             type='partilha_recurso',
-            subject=f'Foi partilhado consigo um {tipo_label}',
+            subject='Recebeu um convite para um recurso partilhado',
             body=(
                 f'O utilizador {current_user.nome_apresentacao} partilhou consigo '
-                f'o {tipo_label} "{titulo_recurso}" com permissao de "{nivel}". '
-                f'Aceite ou rejeite em /partilha/minhas.'
+                f'{artigo_tipo} "{titulo_recurso}" com permissao de "{nivel}". '
+                f'Aceite ou rejeite em /partilha/convites.'
             ),
             data={
                 'partilha_id': partilha.id,
@@ -238,7 +279,14 @@ def criar_partilha(tipo_recurso, recurso_id):
                 'dono_id': current_user.id,
                 'nivel': nivel,
             },
+            force_channel='email',
         )
+        if resultado_notificacao.get('email') is not True:
+            current_app.logger.warning(
+                'Notificacao de partilha nao entregue (partilha_id=%s, motivo=%s)',
+                partilha.id,
+                notification_service.ultimo_erro('email') or 'canal de email indisponivel',
+            )
     except Exception:
         current_app.logger.warning(
             'Falha ao enviar notificacao de partilha (partilha_id=%s)', partilha.id

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block titulo %}{{ nota.titulo or 'Nota partilhada' }}{% endblock %}
+{% block conteudo %}
+<article class="notas-editar-pagina" aria-label="Nota partilhada em modo de leitura">
+  <div class="nota-editar-cartao{% if nota.cor_css() %} nota-com-cor{% endif %}"
+       {% if nota.cor_css() %}style="background:{{ nota.cor_css() }}"{% endif %}>
+    <div class="nota-editar-barra-topo">
+      <a href="{{ url_for('notas.index') }}" class="btn btn-secundario btn-sm">← Voltar às notas</a>
+      <span class="campo-hint">Partilhada contigo · leitura</span>
+    </div>
+    <h1 class="nota-editar-titulo">{{ nota.titulo or 'Sem título' }}</h1>
+    {% if nota.tipo == 'checklist' %}
+    <ul class="nota-checklist-preview">
+      {% for item in nota.itens.all() %}
+      <li class="nota-checklist-item">
+        <input type="checkbox" {% if item.feito %}checked{% endif %} disabled>
+        <span class="item-texto {% if item.feito %}item-feito{% endif %}">{{ item.texto }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif nota.corpo %}<div class="nota-corpo-preview">{{ nota.corpo }}</div>{% endif %}
+  </div>
+</article>
+{% endblock %}

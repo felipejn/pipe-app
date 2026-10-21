@@ -6,7 +6,8 @@ from app import db
 from app.tarefas import tarefas
 from app.tarefas.models import Lista, Tarefa, TagTarefa
 from app.tarefas.forms import ListaForm, TarefaForm
-from app.partilha.utils import obter_recurso_ou_404
+from app.partilha.utils import obter_recurso_ou_404, pode_aceder_recurso
+from app.partilha.models import PartilhaRecurso
 
 
 # ── Utilitários ────────────────────────────────────────────────────────────────
@@ -121,6 +122,16 @@ def index():
         Tarefa.prioridade.desc(),
     )
     tarefas_lista = q.all()
+    partilhas_tarefa = PartilhaRecurso.query.filter_by(
+        tipo_recurso='tarefa', utilizador_id=current_user.id, estado='aceite',
+    ).all()
+    niveis_partilha = {p.recurso_id: p.nivel for p in partilhas_tarefa}
+    tarefas_partilhadas = Tarefa.query.filter(
+        Tarefa.id.in_(niveis_partilha.keys())
+    ).order_by(
+        Tarefa.concluida.asc(), Tarefa.data_limite.asc().nullslast(),
+        Tarefa.prioridade.desc(),
+    ).all() if niveis_partilha else []
 
     form_lista  = ListaForm()
     form_tarefa = TarefaForm()
@@ -132,6 +143,7 @@ def index():
         lista_activa=lista_activa,
         mostrar_todas=mostrar_todas,
         tarefas_lista=tarefas_lista,
+        tarefas_partilhadas=[(t, niveis_partilha[t.id]) for t in tarefas_partilhadas],
         filtro=filtro,
         busca=busca,
         form_lista=form_lista,
@@ -242,14 +254,24 @@ def nova_tarefa():
 
     listas       = Lista.query.filter_by(user_id=current_user.id).order_by(Lista.ordem).all()
     tarefa_vazia = Tarefa(lista_id=lista_id)
-    return render_template('tarefas/editar.html', form=form, tarefa=tarefa_vazia, listas=listas)
+    return render_template(
+        'tarefas/editar.html', form=form, tarefa=tarefa_vazia, listas=listas,
+        e_dono=True, pode_editar=True,
+    )
 
 
 @tarefas.route('/<int:tarefa_id>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_tarefa(tarefa_id):
     """Formulário de edição de tarefa existente."""
-    tarefa = _obter_tarefa_ou_404(tarefa_id)
+    tarefa = obter_recurso_ou_404(
+        'tarefa', tarefa_id, current_user.id,
+        nivel_minimo='edicao' if request.method == 'POST' else 'leitura',
+    )
+    e_dono = tarefa.user_id == current_user.id
+    if not e_dono and request.method == 'GET':
+        if not pode_aceder_recurso('tarefa', tarefa_id, current_user.id, 'edicao'):
+            return render_template('tarefas/visualizar.html', tarefa=tarefa)
     form   = TarefaForm(obj=tarefa)
 
     if request.method == 'GET':
@@ -257,24 +279,30 @@ def editar_tarefa(tarefa_id):
         form.lista_id.data = str(tarefa.lista_id)
 
     if form.validate_on_submit():
-        novo_lista_id = request.form.get('lista_id', type=int) or tarefa.lista_id
-        _obter_lista_ou_404(novo_lista_id)
+        novo_lista_id = tarefa.lista_id
+        if e_dono:
+            novo_lista_id = request.form.get('lista_id', type=int) or tarefa.lista_id
+            _obter_lista_ou_404(novo_lista_id)
 
         tarefa.texto       = form.texto.data.strip()
         tarefa.prioridade  = form.prioridade.data
         tarefa.data_limite = form.data_limite.data
         tarefa.notas       = form.notas.data.strip() if form.notas.data else None
-        tarefa.lista_id    = novo_lista_id
+        if e_dono:
+            tarefa.lista_id = novo_lista_id
         tarefa.tags        = _processar_tags(form.tags.data)
         # Se o prazo mudou, resetar notificação para voltar a avisar
         tarefa.notificada_em = None
 
         db.session.commit()
         flash('Tarefa actualizada.', 'sucesso')
-        return redirect(url_for('tarefas.index', lista=tarefa.lista_id))
+        return redirect(url_for('tarefas.index', lista=tarefa.lista_id if e_dono else 'todas'))
 
     listas = Lista.query.filter_by(user_id=current_user.id).order_by(Lista.ordem).all()
-    return render_template('tarefas/editar.html', form=form, tarefa=tarefa, listas=listas)
+    return render_template(
+        'tarefas/editar.html', form=form, tarefa=tarefa, listas=listas,
+        e_dono=e_dono, pode_editar=True,
+    )
 
 
 @tarefas.route('/<int:tarefa_id>/apagar', methods=['POST'])

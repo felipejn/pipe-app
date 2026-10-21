@@ -96,7 +96,7 @@
       <button class="btn-guardar" onclick="guardarEvento()">Guardar</button>
       <button class="btn-apagar" id="btn-apagar-evento" style="display:none;" onclick="apagarEvento()">Apagar</button>
       <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
-      <button type="button" onclick="abrirModalPartilhar('evento', eventoEditandoId)" class="btn btn-secundario" style="background:#4caf50; border-color:#4caf50;">Partilhar</button>
+          <button type="button" id="btn-partilhar-evento" onclick="abrirModalPartilhar('evento', eventoEditandoId)" class="btn btn-secundario" style="background:#4caf50; border-color:#4caf50;">Partilhar</button>
     </div>
   </div>
 </div>
@@ -130,8 +130,8 @@
     </div>
 
     <div class="modal-acoes">
-      <button class="btn-guardar" onclick="editarEDetalhe()">✏️ Editar</button>
-      <button class="btn-apagar" onclick="apagarEDetalhe()">🗑️ Apagar</button>
+      <button class="btn-guardar" id="btn-editar-detalhe" onclick="editarEDetalhe()">✏️ Editar</button>
+      <button class="btn-apagar" id="btn-apagar-detalhe" onclick="apagarEDetalhe()">🗑️ Apagar</button>
       <button class="btn-cancelar" onclick="fecharDetalhe()">Fechar</button>
     </div>
   </div>
@@ -431,8 +431,9 @@ async function carregarAgenda() {
           ${e.localizacao ? `<div class="agenda-info-local">📍 ${escHtml(e.localizacao)}</div>` : ''}
         </div>
         <div class="agenda-acoes">
-          <button onclick="event.stopPropagation(); abrirModalEditar(${e.id})" title="Editar">✏️</button>
-          <button onclick="event.stopPropagation(); confirmarApagar(${e.id})" title="Apagar">🗑️</button>
+          ${e.pode_editar ? `<button onclick="event.stopPropagation(); abrirModalEditar(${e.id})" title="Editar">✏️</button>` : ''}
+          ${e.e_dono ? `<button onclick="event.stopPropagation(); confirmarApagar(${e.id})" title="Apagar">🗑️</button>` : ''}
+          ${e.partilhado ? '<span class="evento-partilhado-selo">Partilhado</span>' : ''}
         </div>`;
       lista.appendChild(div);
     });
@@ -506,7 +507,8 @@ function construirGrelha(eventos) {
     evsDia.slice(0, max).forEach(e => {
       const p = document.createElement('div');
       p.className = `cal-pilula evento-${e.cor}`;
-      p.textContent = e.titulo;
+      p.textContent = `${e.partilhado ? '↗ ' : ''}${e.titulo}`;
+      if (e.partilhado) p.title = 'Partilhado contigo';
       p.onclick = (ev) => { ev.stopPropagation(); abrirDetalhe(e.id, e); };
       contentor.appendChild(p);
     });
@@ -544,6 +546,7 @@ function abrirModalCriar() {
   document.getElementById('ev-dia-inteiro').checked = false;
   document.getElementById('ev-notificar').checked = true;
   document.getElementById('btn-apagar-evento').style.display = 'none';
+  document.getElementById('btn-partilhar-evento').style.display = '';
   document.getElementById('modal-erro').style.display = 'none';
   // Default: hoje, hora cheia seguinte
   const agora = new Date();
@@ -565,7 +568,7 @@ function abrirModalCriarData(dataStr) {
 async function abrirModalEditar(id, eventoInline) {
   eventoEditandoId = id;
   document.getElementById('modal-titulo-texto').textContent = 'Editar evento';
-  document.getElementById('btn-apagar-evento').style.display = '';
+  document.getElementById('btn-apagar-evento').style.display = 'none';
   document.getElementById('modal-erro').style.display = 'none';
 
   // Usar dados inline se disponíveis (mensal), senão buscar da cache/API
@@ -576,6 +579,10 @@ async function abrirModalEditar(id, eventoInline) {
     e = eventosCache.find(x => x.id === id);
   }
   if (!e) return;
+
+  if (!e.pode_editar) return;
+  document.getElementById('btn-apagar-evento').style.display = e.e_dono ? '' : 'none';
+  document.getElementById('btn-partilhar-evento').style.display = e.e_dono ? '' : 'none';
 
   document.getElementById('ev-titulo').value = e.titulo;
   document.getElementById('ev-descricao').value = e.descricao || '';
@@ -624,6 +631,8 @@ async function abrirDetalhe(id, eventoInline) {
 
   const notif = document.getElementById('det-notificar');
   notif.textContent = e.notificar ? '🔔 Notificar' : '🔕 Sem notificação';
+  document.getElementById('btn-editar-detalhe').style.display = e.pode_editar ? '' : 'none';
+  document.getElementById('btn-apagar-detalhe').style.display = e.e_dono ? '' : 'none';
   document.getElementById('modal-detalhe').style.display = 'flex';
 }
 

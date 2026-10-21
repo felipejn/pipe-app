@@ -79,6 +79,16 @@ class NotificationService:
         resultados = {}
 
         if force_channel is not None:
+            if force_channel == 'email':
+                canal_email = self._canais.get('email')
+                if canal_email:
+                    resultados['email'] = canal_email.enviar(
+                        user, subject, body, data)
+                else:
+                    resultados['email'] = None
+                self._registar_falhas(user, resultados)
+                resultados['telegram'] = None
+                return resultados
             if force_channel != 'telegram':
                 raise ValueError('Canal forçado desconhecido.')
             canal_tg = self._canais.get('telegram')

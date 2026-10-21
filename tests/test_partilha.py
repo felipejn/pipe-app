@@ -14,11 +14,14 @@ from app.tarefas.models import Lista, Tarefa
 from app.notas.models import Nota
 from app.calendario.models import Evento
 from app.partilha.models import PartilhaRecurso
+from app.notifications import notification_service
 from datetime import datetime, timedelta
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
+    monkeypatch.setattr(notification_service, '_inicializado', True)
+    monkeypatch.setattr(notification_service, '_canais', {})
     app = create_app('testing')
     with app.app_context():
         db.create_all()
@@ -122,6 +125,193 @@ def test_criar_partilha_por_email(app, client, utilizador_a, utilizador_b):
         assert partilha is not None
         assert partilha.dono_id == utilizador_a['id']
         assert partilha.estado == 'pendente'
+
+
+def test_criar_partilha_notifica_email_mesmo_sem_preferencias_activas(
+    app, client, utilizador_a, utilizador_b, monkeypatch,
+):
+    chamadas = []
+
+    class CanalEmail:
+        def enviar(self, utilizador, assunto, corpo, dados=None, html=None):
+            chamadas.append((utilizador.email, assunto, corpo))
+            return True
+
+    monkeypatch.setattr(notification_service, '_inicializado', True)
+    monkeypatch.setattr(notification_service, '_canais', {'email': CanalEmail()})
+    _login(client, utilizador_a['email'])
+    recurso_id = _criar_tarefa(app, utilizador_a['id'], texto='Tarefa partilhada')
+
+    resposta = client.post(
+        f'/partilha/tarefa/{recurso_id}',
+        json={'email': utilizador_b['email'], 'nivel': 'leitura'},
+    )
+
+    assert resposta.status_code == 201
+    assert len(chamadas) == 1
+    assert chamadas[0][0] == utilizador_b['email']
+    assert 'Tarefa partilhada' in chamadas[0][2]
+
+
+def test_recursos_aceites_aparecem_nos_modulos_com_acesso_de_leitura(
+    app, client, utilizador_a, utilizador_b,
+):
+    _login(client, utilizador_a['email'])
+    tarefa_id = _criar_tarefa(app, utilizador_a['id'], texto='Tarefa visível partilhada')
+    nota_id = _criar_nota(app, utilizador_a['id'], titulo='Nota visível partilhada')
+    evento_id = _criar_evento(app, utilizador_a['id'], titulo='Compromisso visível partilhado')
+    partilha_ids = []
+    for tipo, recurso_id in (
+        ('tarefa', tarefa_id), ('nota', nota_id), ('evento', evento_id),
+    ):
+        resposta = client.post(
+            f'/partilha/{tipo}/{recurso_id}',
+            json={'email': utilizador_b['email'], 'nivel': 'leitura'},
+        )
+        assert resposta.status_code == 201
+        partilha_ids.append(resposta.get_json()['id'])
+
+    _login(client, utilizador_b['email'])
+    for partilha_id in partilha_ids:
+        assert client.post(f'/partilha/{partilha_id}/aceitar').status_code == 200
+
+    tarefas_html = client.get('/tarefas/').get_data(as_text=True)
+    notas_html = client.get('/notas/').get_data(as_text=True)
+    inicio = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    fim = (datetime.utcnow() + timedelta(days=1)).isoformat()
+    eventos = client.get(
+        f'/calendario/api/eventos?inicio={inicio}&fim={fim}'
+    ).get_json()
+
+    assert 'Tarefa visível partilhada' in tarefas_html
+    assert 'Nota visível partilhada' in notas_html
+    evento_partilhado = next(
+        e for e in eventos if e['titulo'] == 'Compromisso visível partilhado'
+    )
+    assert evento_partilhado['partilhado'] is True
+    assert evento_partilhado['pode_editar'] is False
+    pagina_tarefa = client.get(f'/tarefas/{tarefa_id}/editar')
+    pagina_nota = client.get(f'/notas/{nota_id}')
+    assert pagina_tarefa.status_code == 200
+    assert 'acesso de leitura' in pagina_tarefa.get_data(as_text=True)
+    assert pagina_nota.status_code == 200
+    assert 'Partilhada contigo · leitura' in pagina_nota.get_data(as_text=True)
+
+
+def test_dono_cancela_partilha_na_pagina_de_gestao_com_csrf(
+    app, client, utilizador_a, utilizador_b,
+):
+    import re
+
+    _login(client, utilizador_a['email'])
+    recurso_id = _criar_tarefa(app, utilizador_a['id'], texto='Partilha a cancelar')
+    criada = client.post(
+        f'/partilha/tarefa/{recurso_id}',
+        json={'email': utilizador_b['email'], 'nivel': 'leitura'},
+    ).get_json()
+
+    app.config['WTF_CSRF_ENABLED'] = True
+    pagina = client.get('/partilha/convites')
+    html = pagina.get_data(as_text=True)
+    assert 'Partilhadas por mim' in html
+    assert "url: '/partilha/criadas'" in html
+    assert "method: 'DELETE'" in html
+    token = re.search(rb'<meta name="csrf-token" content="([^"]+)"', pagina.data).group(1).decode()
+
+    sem_token = client.delete(f"/partilha/{criada['id']}")
+    assert sem_token.status_code == 400
+    cancelada = client.delete(
+        f"/partilha/{criada['id']}", headers={'X-CSRFToken': token},
+    )
+    assert cancelada.status_code == 200
+    assert client.get('/partilha/criadas').get_json() == []
+
+
+def test_pagina_gerir_partilhas_descreve_o_conteudo_das_tres_listas(
+    client, utilizador_a,
+):
+    _login(client, utilizador_a['email'])
+
+    pagina = client.get('/partilha/convites')
+
+    assert pagina.status_code == 200
+    assert (
+        'Gere os convites recebidos, os recursos partilhados contigo '
+        'e as partilhas que enviaste.'
+    ) in pagina.get_data(as_text=True)
+
+
+def test_criar_partilha_com_csrf_ativo(app, client, utilizador_a, utilizador_b):
+    import re
+
+    _login(client, utilizador_a['email'])
+    recurso_id = _criar_tarefa(app, utilizador_a['id'])
+    app.config['WTF_CSRF_ENABLED'] = True
+
+    pagina = client.get(f'/tarefas/{recurso_id}/editar')
+    assert pagina.status_code == 200
+    token = re.search(rb'<meta name="csrf-token" content="([^"]+)"', pagina.data).group(1).decode()
+    assert b"'X-CSRFToken': csrfToken" in pagina.data
+
+    url = f'/partilha/tarefa/{recurso_id}'
+    dados = {'email': utilizador_b['email'], 'nivel': 'leitura'}
+    sem_token = client.post(url, json=dados)
+    assert sem_token.status_code == 400
+
+    com_token = client.post(url, json=dados, headers={'X-CSRFToken': token})
+    assert com_token.status_code == 201
+
+
+def test_listar_convites_pendentes_e_pagina_de_gestao(app, client, utilizador_a, utilizador_b):
+    import re
+
+    _login(client, utilizador_a['email'])
+    recurso_id = _criar_tarefa(app, utilizador_a['id'], texto='Convite pendente')
+    convite_tarefa = client.post(
+        f'/partilha/tarefa/{recurso_id}',
+        json={'email': utilizador_b['email'], 'nivel': 'edicao'},
+    ).get_json()
+    nota_id = _criar_nota(app, utilizador_a['id'], titulo='Nota por aceitar')
+    convite_nota = client.post(
+        f'/partilha/nota/{nota_id}',
+        json={'email': utilizador_b['email'], 'nivel': 'leitura'},
+    ).get_json()
+
+    _login(client, utilizador_b['email'])
+    pendentes = client.get('/partilha/pendentes')
+    assert pendentes.status_code == 200
+    convites = pendentes.get_json()
+    assert len(convites) == 2
+    convite = next(item for item in convites if item['recurso_id'] == recurso_id)
+    assert convite['tipo_recurso'] == 'tarefa'
+    assert convite['recurso_id'] == recurso_id
+    assert convite['nivel'] == 'edicao'
+    assert convite['dono_email'] == utilizador_a['email']
+    assert convite['titulo'] == 'Convite pendente'
+
+    app.config['WTF_CSRF_ENABLED'] = True
+    pagina = client.get('/partilha/convites')
+    assert pagina.status_code == 200
+    pagina_html = pagina.get_data(as_text=True)
+    assert 'Convites pendentes' in pagina_html
+    assert 'Aceitar' in pagina_html and 'Rejeitar' in pagina_html
+    assert 'Gerir partilhas' in pagina_html
+    token = re.search(rb'<meta name="csrf-token" content="([^"]+)"', pagina.data).group(1).decode()
+
+    sem_token = client.post(f"/partilha/{convite_tarefa['id']}/aceitar")
+    assert sem_token.status_code == 400
+    aceite = client.post(
+        f"/partilha/{convite_tarefa['id']}/aceitar",
+        headers={'X-CSRFToken': token},
+    )
+    rejeitado = client.post(
+        f"/partilha/{convite_nota['id']}/rejeitar",
+        headers={'X-CSRFToken': token},
+    )
+    assert aceite.status_code == 200
+    assert rejeitado.status_code == 200
+    assert client.get('/partilha/pendentes').get_json() == []
+    assert any(item['recurso_id'] == recurso_id for item in client.get('/partilha/minhas').get_json())
 
 
 # ── Caso 2: aceitar partilha ─────────────────────────────────────────────────

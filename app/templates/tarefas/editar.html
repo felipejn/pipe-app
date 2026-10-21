@@ -40,14 +40,14 @@
       {# Lista (mover para outra lista) #}
       <div class="campo-grupo">
         <label class="campo-label">Lista</label>
-        <select name="lista_id" class="campo-select">
+        {% if e_dono %}<select name="lista_id" class="campo-select">
           {% for lista in listas %}
           <option value="{{ lista.id }}"
                   {% if lista.id == (tarefa.lista_id or form.lista_id.data|int) %}selected{% endif %}>
             {{ lista.icone }} {{ lista.nome }}
           </option>
           {% endfor %}
-        </select>
+        </select>{% else %}<p class="campo-texto">{{ tarefa.lista.nome }}</p>{% endif %}
       </div>
 
       {# Tags #}
@@ -66,7 +66,7 @@
       <div class="form-acoes">
         <a href="{{ url_for('tarefas.index', lista=tarefa.lista_id if tarefa.lista_id else '') }}"
            class="btn btn-secundario">Cancelar</a>
-        <button type="button" onclick="abrirModalPartilhar('tarefa', {{ tarefa.id }})" class="btn btn-secundario" style="background:#4caf50; border-color:#4caf50;">Partilhar</button>
+        {% if e_dono %}<button type="button" onclick="abrirModalPartilhar('tarefa', {{ tarefa.id }})" class="btn btn-secundario" style="background:#4caf50; border-color:#4caf50;">Partilhar</button>{% endif %}
         <button type="submit" class="btn btn-primario">
           {{ 'Criar tarefa' if not tarefa.id else 'Guardar alterações' }}
         </button>

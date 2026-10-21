@@ -5,6 +5,8 @@ from app.calendario.models import Evento
 from app import db
 from app.extensions import limiter
 from app.partilha.utils import obter_recurso_ou_404
+from app.partilha.models import PartilhaRecurso
+from sqlalchemy import or_
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -29,8 +31,15 @@ def index():
 def api_eventos():
     inicio = request.args.get('inicio')
     fim    = request.args.get('fim')
+    partilhas = PartilhaRecurso.query.filter_by(
+        tipo_recurso='evento', utilizador_id=current_user.id, estado='aceite',
+    ).all()
+    niveis_partilha = {p.recurso_id: p.nivel for p in partilhas}
+    filtro_acesso = Evento.user_id == current_user.id
+    if niveis_partilha:
+        filtro_acesso = or_(filtro_acesso, Evento.id.in_(niveis_partilha.keys()))
     eventos = Evento.query.filter(
-        Evento.user_id     == current_user.id,
+        filtro_acesso,
         Evento.data_inicio <  _data_calendario_local(fim),
         Evento.data_fim    >  _data_calendario_local(inicio)
     ).all()
@@ -43,7 +52,10 @@ def api_eventos():
         'data_fim':    e.data_fim.isoformat(),
         'dia_inteiro': e.dia_inteiro,
         'cor':         e.cor,
-        'notificar':   e.notificar
+        'notificar':   e.notificar,
+        'pode_editar': e.user_id == current_user.id or niveis_partilha.get(e.id) == 'edicao',
+        'partilhado': e.user_id != current_user.id,
+        'e_dono': e.user_id == current_user.id,
     } for e in eventos])
 
 @calendario_bp.route('/api/eventos', methods=['POST'])

@@ -1,12 +1,13 @@
 {# _cartao.html — cartão de uma nota na grelha #}
 <div class="nota-cartao {% if nota.fixada %}nota-fixada{% endif %}{% if nota.cor_css() %} nota-com-cor{% endif %}"
      data-nota-id="{{ nota.id }}"
+     {% if nota_partilhada %}tabindex="0" role="link" aria-label="Abrir nota partilhada: {{ nota.titulo or 'Sem título' }}"{% endif %}
      data-busca="{{ (nota.titulo or '') | lower }} {{ (nota.corpo or '') | lower }} {{ nota.etiquetas | map(attribute='nome') | join(' ') | lower }}"
      data-href="{{ url_for('notas.editar', nota_id=nota.id) }}"
      {% if nota.cor_css() %}style="background:{{ nota.cor_css() }}"{% endif %}>
 
     {# Barra de acções (aparece no hover) #}
-    <div class="nota-acoes">
+    {% if not nota_partilhada %}<div class="nota-acoes">
         {% if not nota.arquivada %}
         <button class="nota-acao-btn" data-nota-accao="fixar"
                 title="{% if nota.fixada %}Desafixar{% else %}Fixar{% endif %}">
@@ -19,10 +20,10 @@
             {% if nota.arquivada %}♻️{% else %}📦{% endif %}
         </button>
         <button class="nota-acao-btn nota-acao-apagar" data-nota-accao="apagar" title="Apagar">🗑️</button>
-    </div>
+    </div>{% endif %}
 
     {# Palete de cores (oculta por defeito) #}
-    <div class="nota-palete-cores">
+    {% if not nota_partilhada %}<div class="nota-palete-cores">
         {% for nome_cor, val_cor in {
             'padrao':'',
             'vermelho':'#F28B82','laranja':'#FBBC05',
@@ -36,7 +37,7 @@
             {% if not val_cor %}✕{% endif %}
         </button>
         {% endfor %}
-    </div>
+    </div>{% endif %}
 
     {# Conteúdo — clique no cartão navega via JS (data-href) #}
     {% if nota.titulo %}
@@ -49,6 +50,7 @@
         <li class="nota-checklist-item">
             <input type="checkbox" {% if item.feito %}checked{% endif %}
                    data-item-id="{{ item.id }}"
+                   {% if nota_partilhada %}disabled{% endif %}
                    onclick="event.stopPropagation()">
             <span class="item-texto {% if item.feito %}item-feito{% endif %}">{{ item.texto }}</span>
         </li>

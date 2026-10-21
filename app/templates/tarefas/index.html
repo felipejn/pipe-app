@@ -175,6 +175,8 @@
                 Nenhuma tarefa encontrada para "{{ busca }}".
               {% elif filtro != 'todas' %}
                 Nenhuma tarefa para este filtro.
+              {% elif tarefas_partilhadas %}
+                Não tens tarefas próprias nesta vista. As tarefas partilhadas aparecem abaixo.
               {% elif mostrar_todas %}
                 Não tens tarefas ainda. Cria uma lista e começa!
               {% else %}
@@ -206,6 +208,32 @@
     </section>
   </div>
 </div>
+
+{% if tarefas_partilhadas %}
+<section class="tarefas-partilhadas" aria-labelledby="titulo-tarefas-partilhadas">
+  <h2 id="titulo-tarefas-partilhadas" class="secao-label">Partilhadas contigo</h2>
+  <div class="tarefas-lista">
+    {% for tarefa_partilhada, nivel_partilha in tarefas_partilhadas %}
+    <article class="tarefa-item prioridade-{{ tarefa_partilhada.prioridade }} {% if tarefa_partilhada.concluida %}concluida{% endif %}">
+      {% if nivel_partilha == 'edicao' %}
+      <button class="check-circulo {% if tarefa_partilhada.concluida %}marcado{% endif %}"
+              onclick="toggleConcluida(this, {{ tarefa_partilhada.id }})"
+              aria-label="{{ 'Marcar como pendente' if tarefa_partilhada.concluida else 'Marcar como concluída' }}">
+        <span class="check-visto">✓</span>
+      </button>
+      {% else %}<span class="check-circulo {% if tarefa_partilhada.concluida %}marcado{% endif %}" aria-hidden="true"><span class="check-visto">✓</span></span>{% endif %}
+      <a class="tarefa-corpo" href="{{ url_for('tarefas.editar_tarefa', tarefa_id=tarefa_partilhada.id) }}">
+        <span class="tarefa-texto">{{ tarefa_partilhada.texto }}</span>
+        <span class="tarefa-meta"><span class="badge">Partilhada contigo · {{ 'edição' if nivel_partilha == 'edicao' else 'leitura' }}</span>
+          {% if tarefa_partilhada.data_limite %}<span class="badge badge-data">{{ tarefa_partilhada.data_limite.strftime('%d/%m/%Y') }}</span>{% endif %}
+        </span>
+      </a>
+      {% if nivel_partilha == 'edicao' %}<div class="tarefa-acoes"><a href="{{ url_for('tarefas.editar_tarefa', tarefa_id=tarefa_partilhada.id) }}" class="btn-acao" title="Editar">✏</a></div>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
 {# ── Modal: Nova Lista ─────────────────────────────────── #}
 <div class="modal-overlay" id="modal-lista" onclick="fecharModalLista(event)">

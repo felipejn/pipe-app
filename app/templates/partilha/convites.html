@@ -1,0 +1,308 @@
+{% extends 'base.html' %}
+{% block titulo %}Partilhas{% endblock %}
+{% block conteudo %}
+<section class="pagina-partilha" aria-labelledby="titulo-partilhas">
+  <header class="partilha-cabecalho">
+    <p class="partilha-etiqueta">Tarefas · Notas · Compromissos</p>
+    <h1 id="titulo-partilhas">Partilhas</h1>
+    <p>Gere os convites recebidos, os recursos partilhados contigo e as partilhas que enviaste.</p>
+  </header>
+
+  <p id="partilhas-estado" class="partilha-estado" role="status" aria-live="polite">A carregar partilhas…</p>
+
+  <section class="partilha-seccao" aria-labelledby="titulo-pendentes">
+    <div class="partilha-titulo-seccao">
+      <h2 id="titulo-pendentes">Convites pendentes</h2>
+      <span id="total-pendentes" class="partilha-contagem" aria-label="Convites pendentes">—</span>
+    </div>
+    <div id="lista-pendentes" class="partilha-lista"></div>
+  </section>
+
+  <section class="partilha-seccao" aria-labelledby="titulo-aceites">
+    <div class="partilha-titulo-seccao">
+      <h2 id="titulo-aceites">Partilhados contigo</h2>
+      <span id="total-aceites" class="partilha-contagem" aria-label="Partilhas aceites">—</span>
+    </div>
+    <div id="lista-aceites" class="partilha-lista"></div>
+  </section>
+
+  <section class="partilha-seccao" aria-labelledby="titulo-criadas">
+    <div class="partilha-titulo-seccao">
+      <h2 id="titulo-criadas">Partilhadas por mim</h2>
+      <span id="total-criadas" class="partilha-contagem" aria-label="Partilhas criadas">—</span>
+    </div>
+    <div id="lista-criadas" class="partilha-lista"></div>
+  </section>
+</section>
+
+<style>
+.pagina-partilha { width: 100%; max-width: 880px; min-width: 0; margin: 0 auto; }
+.partilha-cabecalho { margin-bottom: 1.5rem; }
+.partilha-cabecalho h1 { margin: .15rem 0 .4rem; }
+.partilha-cabecalho > p:last-child { color: var(--cor-texto-suave); }
+.partilha-etiqueta { color: var(--cor-primaria); font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.partilha-estado { min-height: 1.6em; margin: .5rem 0 1rem; color: var(--cor-texto-suave); }
+.partilha-estado[data-tipo="erro"] { color: var(--cor-erro-texto); }
+.partilha-seccao { margin-top: 1.5rem; }
+.partilha-titulo-seccao { display: flex; align-items: center; gap: .65rem; margin-bottom: .75rem; }
+.partilha-titulo-seccao h2 { font-size: 1.1rem; }
+.partilha-contagem { min-width: 1.7rem; padding: .05rem .45rem; border-radius: 999px; background: var(--cor-superficie-2); color: var(--cor-texto-suave); text-align: center; font-size: .8rem; }
+.partilha-lista { display: grid; gap: .65rem; }
+.partilha-item { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-width: 0; padding: 1rem; border: 1px solid var(--cor-borda); border-radius: var(--raio); background: var(--cor-superficie); }
+.partilha-detalhe { min-width: 0; overflow-wrap: anywhere; }
+.partilha-recurso { display: block; overflow-wrap: anywhere; font-weight: 650; }
+.partilha-meta { color: var(--cor-texto-suave); font-size: .88rem; }
+.partilha-acoes { display: flex; flex-wrap: wrap; gap: .5rem; min-width: 0; flex-shrink: 0; }
+.partilha-acoes button { min-height: 40px; }
+.partilha-vazio { padding: 1rem; border: 1px dashed var(--cor-borda); border-radius: var(--raio); color: var(--cor-texto-suave); }
+.partilha-falha { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: 1rem; border: 1px solid var(--cor-borda); border-left: 3px solid var(--cor-erro); border-radius: var(--raio); background: var(--cor-superficie); color: var(--cor-erro-texto); }
+.partilha-estado-recurso { display: inline-block; width: fit-content; margin-top: .4rem; padding: .1rem .55rem; border-radius: 999px; background: var(--cor-superficie-2); color: var(--cor-texto-suave); font-size: .76rem; font-weight: 650; }
+.partilha-estado-recurso[data-estado="aceite"] { background: rgba(16,185,129,.14); color: var(--cor-sucesso-texto); }
+.partilha-estado-recurso[data-estado="rejeitado"] { background: rgba(239,68,68,.14); color: var(--cor-erro-texto); }
+@media (max-width: 560px) {
+  .partilha-item { align-items: stretch; flex-direction: column; }
+  .partilha-acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .partilha-acoes.partilha-acoes-unica { grid-template-columns: minmax(0, 1fr); }
+  .partilha-acoes button { width: 100%; min-width: 0; }
+}
+</style>
+
+<script>
+const tokenCsrf = document.querySelector('meta[name="csrf-token"]')?.content;
+const tipoRecurso = {tarefa: 'Tarefa', nota: 'Nota', evento: 'Compromisso'};
+const estadoPartilhas = document.getElementById('partilhas-estado');
+
+function criarElemento(tag, texto, classe) {
+  const elemento = document.createElement(tag);
+  if (texto !== undefined) elemento.textContent = texto;
+  if (classe) elemento.className = classe;
+  return elemento;
+}
+
+async function obterLista(url) {
+  const resposta = await fetch(url);
+  const json = (resposta.headers.get('content-type') || '').includes('application/json')
+    ? await resposta.json()
+    : {};
+  if (!resposta.ok) {
+    throw new Error(json.erro || `O servidor rejeitou o pedido (HTTP ${resposta.status}).`);
+  }
+  return json;
+}
+
+function apresentarErro(erro) {
+  estadoPartilhas.dataset.tipo = 'erro';
+  const mensagem = erro instanceof TypeError
+    ? 'Não foi possível contactar o servidor. Verifica a ligação e tenta novamente.'
+    : erro.message;
+  const tentar = criarElemento('button', 'Tentar novamente', 'btn btn-secundario');
+  tentar.type = 'button';
+  tentar.style.marginLeft = '.6rem';
+  tentar.addEventListener('click', carregarPartilhas);
+  estadoPartilhas.replaceChildren(document.createTextNode(`${mensagem} `), tentar);
+}
+
+function mensagemErro(erro) {
+  return erro instanceof TypeError
+    ? 'Não foi possível contactar o servidor. Verifica a ligação e tenta novamente.'
+    : erro.message;
+}
+
+function actualizarEstadoListas() {
+  const falhas = document.querySelectorAll('.partilha-falha').length;
+  estadoPartilhas.dataset.tipo = falhas ? 'erro' : '';
+  estadoPartilhas.textContent = falhas
+    ? `${falhas} ${falhas === 1 ? 'lista não pôde ser actualizada' : 'listas não puderam ser actualizadas'}. Podes tentar novamente em cada secção.`
+    : '';
+}
+
+function apresentarErroLista(configuracao, erro) {
+  const lista = document.getElementById(configuracao.listaId);
+  const falha = criarElemento('div', undefined, 'partilha-falha');
+  falha.setAttribute('role', 'alert');
+  const mensagem = criarElemento('span', mensagemErro(erro));
+  const tentar = criarElemento('button', 'Tentar novamente', 'btn btn-secundario');
+  tentar.type = 'button';
+  tentar.addEventListener('click', async () => {
+    tentar.disabled = true;
+    tentar.textContent = 'A actualizar…';
+    await carregarListaPartilha(configuracao);
+    actualizarEstadoListas();
+  });
+  falha.append(mensagem, tentar);
+  lista.replaceChildren(falha);
+  document.getElementById(configuracao.contagemId).textContent = '—';
+}
+
+const listasPartilha = [
+  {
+    url: '/partilha/pendentes',
+    listaId: 'lista-pendentes',
+    contagemId: 'total-pendentes',
+    apresentar: itens => apresentarLista('lista-pendentes', itens, true)
+  },
+  {
+    url: '/partilha/minhas',
+    listaId: 'lista-aceites',
+    contagemId: 'total-aceites',
+    apresentar: itens => apresentarLista('lista-aceites', itens, false)
+  },
+  {
+    url: '/partilha/criadas',
+    listaId: 'lista-criadas',
+    contagemId: 'total-criadas',
+    apresentar: apresentarCriadas
+  }
+];
+
+async function carregarListaPartilha(configuracao) {
+  try {
+    const itens = await obterLista(configuracao.url);
+    configuracao.apresentar(itens);
+    document.getElementById(configuracao.contagemId).textContent = itens.length;
+    return true;
+  } catch (erro) {
+    apresentarErroLista(configuracao, erro);
+    return false;
+  }
+}
+
+function apresentarLista(id, itens, pendentes) {
+  const lista = document.getElementById(id);
+  lista.replaceChildren();
+  if (!itens.length) {
+    lista.append(criarElemento('p', pendentes
+      ? 'Não tens convites pendentes.'
+      : 'Ainda não tens recursos partilhados contigo.', 'partilha-vazio'));
+    return;
+  }
+
+  itens.forEach(item => {
+    const cartao = criarElemento('article', undefined, 'partilha-item');
+    const detalhe = criarElemento('div', undefined, 'partilha-detalhe');
+    detalhe.append(
+      criarElemento('span', item.titulo || 'Sem título', 'partilha-recurso'),
+      criarElemento('span', `${tipoRecurso[item.tipo_recurso] || 'Recurso'} · ${item.dono_email}${item.nivel ? ` · ${item.nivel}` : ''}`, 'partilha-meta')
+    );
+    cartao.append(detalhe);
+
+    if (pendentes) {
+      const acoes = criarElemento('div', undefined, 'partilha-acoes');
+      const aceitar = criarElemento('button', 'Aceitar', 'btn btn-primario');
+      const rejeitar = criarElemento('button', 'Rejeitar', 'btn btn-secundario');
+      aceitar.type = rejeitar.type = 'button';
+      aceitar.addEventListener('click', () => decidirConvite(item.partilha_id, 'aceitar', acoes));
+      rejeitar.addEventListener('click', () => decidirConvite(item.partilha_id, 'rejeitar', acoes));
+      acoes.append(aceitar, rejeitar);
+      cartao.append(acoes);
+    }
+    lista.append(cartao);
+  });
+}
+
+function apresentarCriadas(itens) {
+  const lista = document.getElementById('lista-criadas');
+  lista.replaceChildren();
+  if (!itens.length) {
+    lista.append(criarElemento('p', 'Ainda não partilhaste recursos.', 'partilha-vazio'));
+    return;
+  }
+
+  itens.forEach(item => {
+    const cartao = criarElemento('article', undefined, 'partilha-item');
+    const detalhe = criarElemento('div', undefined, 'partilha-detalhe');
+    const estados = {pendente: 'Convite pendente', aceite: 'Acesso activo', rejeitado: 'Convite rejeitado'};
+    const estado = criarElemento('span', estados[item.estado] || item.estado, 'partilha-estado-recurso');
+    estado.dataset.estado = item.estado;
+    detalhe.append(
+      criarElemento('span', item.titulo || 'Sem título', 'partilha-recurso'),
+      criarElemento('span', `${tipoRecurso[item.tipo_recurso] || 'Recurso'} · ${item.utilizador_email} · ${item.nivel}`, 'partilha-meta'),
+      estado
+    );
+    cartao.append(detalhe);
+
+    if (item.estado === 'pendente' || item.estado === 'aceite') {
+      const acoes = criarElemento('div', undefined, 'partilha-acoes partilha-acoes-unica');
+      const cancelar = criarElemento('button', 'Cancelar partilha', 'btn btn-secundario');
+      cancelar.type = 'button';
+      cancelar.addEventListener('click', () => cancelarPartilha(item.id, acoes));
+      acoes.append(cancelar);
+      cartao.append(acoes);
+    }
+    lista.append(cartao);
+  });
+}
+
+async function carregarPartilhas() {
+  estadoPartilhas.dataset.tipo = '';
+  estadoPartilhas.textContent = 'A carregar partilhas…';
+  const resultados = await Promise.all(listasPartilha.map(carregarListaPartilha));
+  actualizarEstadoListas();
+  return resultados.every(Boolean);
+}
+
+async function cancelarPartilha(id, acoes) {
+  if (!window.confirm('Cancelar esta partilha? A outra pessoa deixará de ter acesso.')) return;
+  const botoes = [...acoes.querySelectorAll('button')];
+  botoes.forEach(botao => { botao.disabled = true; });
+  acoes.setAttribute('aria-busy', 'true');
+  estadoPartilhas.dataset.tipo = '';
+  estadoPartilhas.textContent = 'A cancelar partilha…';
+  try {
+    const resposta = await fetch(`/partilha/${id}`, {
+      method: 'DELETE',
+      headers: {'X-CSRFToken': tokenCsrf}
+    });
+    const dados = (resposta.headers.get('content-type') || '').includes('application/json')
+      ? await resposta.json()
+      : {};
+    if (!resposta.ok) {
+      throw new Error(dados.erro || `O servidor rejeitou o pedido (HTTP ${resposta.status}).`);
+    }
+    const listasActualizadas = await carregarPartilhas();
+    estadoPartilhas.textContent = listasActualizadas
+      ? 'Partilha cancelada.'
+      : 'Partilha cancelada. Uma ou mais listas precisam de ser actualizadas.';
+  } catch (erro) {
+    apresentarErro(erro);
+    const actualizar = estadoPartilhas.querySelector('button');
+    if (actualizar) actualizar.textContent = 'Actualizar lista';
+  } finally {
+    acoes.removeAttribute('aria-busy');
+  }
+}
+
+async function decidirConvite(id, decisao, acoes) {
+  const botoes = [...acoes.querySelectorAll('button')];
+  botoes.forEach(botao => { botao.disabled = true; });
+  acoes.setAttribute('aria-busy', 'true');
+  estadoPartilhas.dataset.tipo = '';
+  estadoPartilhas.textContent = decisao === 'aceitar' ? 'A aceitar convite…' : 'A rejeitar convite…';
+  try {
+    const resposta = await fetch(`/partilha/${id}/${decisao}`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': tokenCsrf}
+    });
+    const json = (resposta.headers.get('content-type') || '').includes('application/json')
+      ? await resposta.json()
+      : {};
+    if (!resposta.ok) {
+      throw new Error(json.erro || `O servidor rejeitou o pedido (HTTP ${resposta.status}).`);
+    }
+    const listasActualizadas = await carregarPartilhas();
+    const decisaoConcluida = decisao === 'aceitar' ? 'Convite aceite.' : 'Convite rejeitado.';
+    estadoPartilhas.textContent = listasActualizadas
+      ? decisaoConcluida
+      : `${decisaoConcluida} Uma ou mais listas precisam de ser actualizadas.`;
+  } catch (erro) {
+    apresentarErro(erro);
+    const atualizar = estadoPartilhas.querySelector('button');
+    if (atualizar) atualizar.textContent = 'Actualizar lista';
+  } finally {
+    acoes.removeAttribute('aria-busy');
+  }
+}
+
+carregarPartilhas();
+</script>
+{% endblock %}

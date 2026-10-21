@@ -1,4 +1,12 @@
-# PIPE — Estado Actual do Projecto — v1.8.27
+# PIPE — Estado Actual do Projecto — v1.8.28
+
+## Versão v1.8.28 — 2026-10-21
+
+- Melhorada a página de gestão de partilhas: texto introdutório mais claro, estados visuais explícitos e acções responsivas em ecrãs estreitos.
+- O carregamento das listas é independente; uma falha numa secção apresenta erro e opção de nova tentativa sem bloquear as restantes.
+- Validação: `pytest tests/test_partilha.py -q` (17 testes); suite abrangente (409 testes, 1 ignorado e 33 subtestes), excluindo os testes conhecidos dependentes de janela de dados externos e API; `git diff --check` sem erros.
+- Verificação visual em Chrome, em vistas desktop e móvel; a navegação global continua cortada no ecrã estreito e não foi alterada nesta revisão.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, actualizar com `git pull` e executar Reload.
 
 ## Versão v1.8.27 — 2026-10-20
 

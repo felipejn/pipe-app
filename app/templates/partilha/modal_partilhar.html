@@ -2,12 +2,12 @@
   <div class="modal-conteudo" style="background:#1a1a2e; padding:24px; border-radius:12px; max-width:420px; width:92%; border:1px solid #333; color:#eee;">
     <h3 style="margin-top:0;">Partilhar recurso</h3>
     <p style="font-size:0.9em; color:#aaa;">Escreva o email do utilizador (login) com quem deseja partilhar.</p>
-    <form id="form-partilhar" onsubmit="event.preventDefault(); enviarPartilha();">
+    <form id="form-partilhar" novalidate onsubmit="event.preventDefault(); enviarPartilha();">
       <input type="hidden" id="partilhar-tipo" value="tarefa">
       <input type="hidden" id="partilhar-id" value="">
       <div style="margin-bottom:12px;">
         <label for="partilhar-email" style="display:block; font-size:0.8em; margin-bottom:4px;">Email do utilizador</label>
-        <input id="partilhar-email" type="email" placeholder="utilizador@exemplo.com" style="width:100%; padding:8px; border-radius:6px; border:1px solid #555; background:#222; color:#eee;" required>
+        <input id="partilhar-email" type="email" aria-describedby="partilhar-mensagem" placeholder="utilizador@exemplo.com" style="width:100%; padding:8px; border-radius:6px; border:1px solid #555; background:#222; color:#eee;" required>
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block; font-size:0.8em; margin-bottom:4px;">Nível de acesso</label>
@@ -28,6 +28,7 @@ function abrirModalPartilhar(tipo, id) {
   document.getElementById('partilhar-tipo').value = tipo;
   document.getElementById('partilhar-id').value = id;
   document.getElementById('partilhar-email').value = '';
+  document.getElementById('partilhar-email').removeAttribute('aria-invalid');
   document.getElementById('partilhar-mensagem').textContent = '';
   const m = document.getElementById('modal-partilhar');
   m.style.display = 'flex';
@@ -36,30 +37,58 @@ function abrirModalPartilhar(tipo, id) {
 function fecharModalPartilhar() {
   document.getElementById('modal-partilhar').style.display = 'none';
 }
-function enviarPartilha() {
+async function enviarPartilha() {
   const tipo = document.getElementById('partilhar-tipo').value;
   const id = document.getElementById('partilhar-id').value;
   const email = document.getElementById('partilhar-email').value.trim();
+  const campoEmail = document.getElementById('partilhar-email');
   const nivel = document.querySelector('input[name="partilhar-nivel"]:checked').value;
   const msg = document.getElementById('partilhar-mensagem');
+  const botao = document.querySelector('#form-partilhar button[type="submit"]');
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+  if (!email || !campoEmail.validity.valid) {
+    msg.style.color = 'var(--cor-erro-texto)';
+    msg.textContent = 'Indica um endereço de email válido.';
+    campoEmail.setAttribute('aria-invalid', 'true');
+    campoEmail.focus();
+    return;
+  }
+  campoEmail.removeAttribute('aria-invalid');
   msg.style.color = '#aaa';
-  msg.textContent = 'Enviando...';
-  fetch('/partilha/' + tipo + '/' + id, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({email: email, nivel: nivel})
-  })
-  .then(r => r.json().then(data => ({ok: r.ok, status: r.status, data})))
-  .then(({ok, status, data}) => {
-    if (ok) {
-      msg.style.color = '#4caf50';
-      msg.textContent = 'Partilha enviada com sucesso.';
-      setTimeout(fecharModalPartilhar, 1200);
-    } else {
-      msg.style.color = '#ff6b6b';
-      msg.textContent = data.erro || ('Erro ' + status);
+  msg.textContent = 'A enviar convite…';
+  botao.disabled = true;
+  botao.setAttribute('aria-busy', 'true');
+  try {
+    const resposta = await fetch('/partilha/' + tipo + '/' + id, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
+      body: JSON.stringify({email: email, nivel: nivel})
+    });
+    const dados = (resposta.headers.get('content-type') || '').includes('application/json')
+      ? await resposta.json()
+      : {};
+    if (!resposta.ok) {
+      throw new Error(dados.erro || `O servidor rejeitou o pedido (HTTP ${resposta.status}).`);
     }
-  })
-  .catch(() => { msg.style.color = '#ff6b6b'; msg.textContent = 'Erro de rede.'; });
+    msg.style.color = 'var(--cor-sucesso-texto)';
+    msg.textContent = 'Convite enviado com sucesso.';
+    setTimeout(fecharModalPartilhar, 1200);
+  } catch (erro) {
+    msg.style.color = 'var(--cor-erro-texto)';
+    msg.textContent = erro instanceof TypeError
+      ? 'Não foi possível contactar o servidor. Verifica a ligação e tenta novamente.'
+      : erro.message;
+  } finally {
+    botao.disabled = false;
+    botao.removeAttribute('aria-busy');
+  }
 }
+document.getElementById('partilhar-email').addEventListener('input', event => {
+  if (event.target.validity.valid && event.target.value.trim()) {
+    event.target.removeAttribute('aria-invalid');
+  }
+});
 </script>

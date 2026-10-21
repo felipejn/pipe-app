@@ -5,6 +5,7 @@ from app import db
 from app.notas import notas
 from app.notas.models import Nota, ItemChecklist, EtiquetaNota
 from app.partilha.utils import obter_recurso_ou_404
+from app.partilha.models import PartilhaRecurso
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +34,20 @@ def index():
 
     notas_lista = q.order_by(Nota.fixada.desc(), Nota.data_edicao.desc()).all()
 
+    partilhas_nota = PartilhaRecurso.query.filter_by(
+        tipo_recurso='nota', utilizador_id=current_user.id, estado='aceite',
+    ).all()
+    notas_partilhadas = Nota.query.filter(
+        Nota.id.in_([p.recurso_id for p in partilhas_nota]),
+        Nota.arquivada == False,  # noqa: E712
+    ).order_by(Nota.data_edicao.desc()).all() if partilhas_nota and not arquivo else []
+    if busca:
+        termo = busca.casefold()
+        notas_partilhadas = [
+            n for n in notas_partilhadas
+            if termo in (n.titulo or '').casefold() or termo in (n.corpo or '').casefold()
+        ]
+
     fixadas   = [n for n in notas_lista if n.fixada]  if not arquivo else []
     restantes = [n for n in notas_lista if not n.fixada] if not arquivo else notas_lista
 
@@ -43,6 +58,7 @@ def index():
         'notas/index.html',
         fixadas=fixadas,
         restantes=restantes,
+        notas_partilhadas=notas_partilhadas,
         etiquetas=etiquetas_user,
         busca=busca,
         etiqueta_activa=etiqueta,
@@ -97,7 +113,14 @@ def criar():
 @notas.route('/<int:nota_id>', methods=['GET', 'POST'])
 @login_required
 def editar(nota_id):
-    nota = obter_recurso_ou_404('nota', nota_id, current_user.id, nivel_minimo='edicao')
+    nota = obter_recurso_ou_404(
+        'nota', nota_id, current_user.id,
+        nivel_minimo='edicao' if request.method == 'POST' else 'leitura',
+    )
+    if request.method == 'GET' and nota.user_id != current_user.id:
+        from app.partilha.utils import pode_aceder_recurso
+        if not pode_aceder_recurso('nota', nota_id, current_user.id, 'edicao'):
+            return render_template('notas/visualizar.html', nota=nota)
 
     if request.method == 'POST':
         nota.titulo = request.form.get('titulo', '').strip() or None
@@ -137,7 +160,7 @@ def editar(nota_id):
     etiquetas_user = EtiquetaNota.query.filter_by(user_id=current_user.id)\
                                        .order_by(EtiquetaNota.nome).all()
     return render_template('notas/editar.html', nota=nota, etiquetas_todas=etiquetas_user,
-                           cores=Nota.CORES)
+                           cores=Nota.CORES, e_dono=nota.user_id == current_user.id)
 
 
 # ---------------------------------------------------------------------------

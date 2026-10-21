@@ -42,6 +42,8 @@
         {% endif %}
         <a href="{{ url_for('modulos.loja') }}"
            class="btn-logout {% if request.blueprint == 'modulos' %}activo{% endif %}" title="Loja de Módulos">🛒</a>
+        <a href="{{ url_for('partilha.gerir_convites') }}"
+           class="btn-logout {% if request.blueprint == 'partilha' %}activo{% endif %}" title="Gerir partilhas" aria-label="Gerir partilhas">🔗</a>
         <a href="{{ url_for('settings.index') }}"
            class="btn-logout {% if request.blueprint == 'settings' %}activo{% endif %}">⚙️</a>
         <button type="button" class="btn-tema" id="btn-alternar-tema" title="Alternar tema"

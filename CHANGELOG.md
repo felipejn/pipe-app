@@ -6,6 +6,23 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.28] — 2026-10-21
+
+### Alterado
+
+- Melhorada a página de gestão de partilhas, com texto de orientação mais directo, estados das partilhas enviadas e acções adaptadas a ecrãs estreitos.
+- Cada lista carrega de forma independente e apresenta a sua própria opção de nova tentativa quando ocorre uma falha.
+
+### Validação
+
+- `pytest tests/test_partilha.py -q`: 17 testes aprovados.
+- Suite abrangente: 409 testes aprovados, 1 ignorado e 33 subtestes aprovados; excluídos os testes conhecidos dependentes de janela de dados externos e API.
+- Verificação visual em Chrome nas vistas desktop e móvel; `git diff --check` sem erros.
+
+### Notas de deploy
+
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
 ## [v1.8.27] — 2026-10-20
 Reforça a resiliência da recolha do módulo Combustíveis.
 

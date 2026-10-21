@@ -104,8 +104,18 @@
             </div>
             {% endif %}
 
+            {% if notas_partilhadas %}
+            <div class="notas-secao-titulo" id="labelPartilhadas">Partilhadas contigo</div>
+            <div class="notas-grelha" id="grelhaPartilhadas">
+                {% for nota in notas_partilhadas %}
+                    {% set nota_partilhada = true %}
+                    {% include 'notas/_cartao.html' %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
             {# ── Estado vazio (servidor) ──────────────────── #}
-            {% if not fixadas and not restantes %}
+            {% if not fixadas and not restantes and not notas_partilhadas %}
             <div class="estado-vazio" id="estadoVazioServidor">
                 <div class="estado-vazio-icone">{% if arquivo %}📦{% elif busca %}🔍{% else %}📝{% endif %}</div>
                 <p>
@@ -318,6 +328,14 @@ document.addEventListener('click', function (e) {
     if (aberta && aberta.style.display !== 'none') return;
     const cartao = e.target.closest('[data-href]');
     if (cartao) location.href = cartao.dataset.href;
+});
+
+document.addEventListener('keydown', function (e) {
+    const cartao = e.target.closest('.nota-cartao[role="link"]');
+    if (cartao && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        window.location.href = cartao.dataset.href;
+    }
 });
 
 // ── Acções nos cartões (fixar, arquivar, apagar, cor) ──────────────────────

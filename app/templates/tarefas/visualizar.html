@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block titulo %}{{ tarefa.texto }}{% endblock %}
+{% block conteudo %}
+<div class="pagina-editar-tarefa">
+  <div class="editar-cabecalho">
+    <a href="{{ url_for('tarefas.index') }}" class="btn-voltar">← Voltar às tarefas</a>
+    <h1 class="editar-titulo">{{ tarefa.texto }}</h1>
+  </div>
+  <article class="cartao" aria-label="Tarefa partilhada em modo de leitura">
+    <p><strong>Estado:</strong> {{ 'Concluída' if tarefa.concluida else 'Por fazer' }}</p>
+    <p><strong>Prioridade:</strong> {{ tarefa.prioridade|capitalize }}</p>
+    {% if tarefa.data_limite %}<p><strong>Prazo:</strong> {{ tarefa.data_limite.strftime('%d/%m/%Y') }}</p>{% endif %}
+    {% if tarefa.notas %}<div><strong>Notas</strong><p>{{ tarefa.notas }}</p></div>{% endif %}
+    <p class="campo-hint">Tens acesso de leitura a esta tarefa.</p>
+  </article>
+</div>
+{% endblock %}
