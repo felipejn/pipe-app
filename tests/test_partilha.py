@@ -15,6 +15,7 @@ from app.notas.models import Nota
 from app.calendario.models import Evento
 from app.partilha.models import PartilhaRecurso
 from app.notifications import notification_service
+from app.notifications.channels.email import EmailChannel
 from datetime import datetime, timedelta
 
 
@@ -28,6 +29,15 @@ def app(monkeypatch):
     yield app
     with app.app_context():
         db.drop_all()
+
+
+@pytest.fixture(autouse=True)
+def bloquear_envio_real_de_email(monkeypatch):
+    def envio_proibido(*args, **kwargs):
+        raise AssertionError('Os testes de partilha não podem enviar emails reais.')
+
+    monkeypatch.setattr(EmailChannel, 'enviar', envio_proibido)
+    monkeypatch.setattr(EmailChannel, 'enviar_template', envio_proibido)
 
 
 @pytest.fixture
@@ -133,8 +143,8 @@ def test_criar_partilha_notifica_email_mesmo_sem_preferencias_activas(
     chamadas = []
 
     class CanalEmail:
-        def enviar(self, utilizador, assunto, corpo, dados=None, html=None):
-            chamadas.append((utilizador.email, assunto, corpo))
+        def enviar_template(self, utilizador, tipo, contexto):
+            chamadas.append((utilizador.email, tipo, contexto))
             return True
 
     monkeypatch.setattr(notification_service, '_inicializado', True)
@@ -150,7 +160,34 @@ def test_criar_partilha_notifica_email_mesmo_sem_preferencias_activas(
     assert resposta.status_code == 201
     assert len(chamadas) == 1
     assert chamadas[0][0] == utilizador_b['email']
-    assert 'Tarefa partilhada' in chamadas[0][2]
+    assert chamadas[0][1] == 'partilha_recurso'
+    assert chamadas[0][2]['recurso'] == 'Tarefa partilhada'
+    assert chamadas[0][2]['nivel'] == 'leitura'
+    assert chamadas[0][2]['link_convites'].endswith('/partilha/convites')
+
+
+def test_email_de_partilha_usa_design_padrao(app):
+    from app.notifications.email_templates import compor_email
+
+    with app.app_context():
+        assunto, texto, html = compor_email('partilha_recurso', {
+            'nome': 'B Utilizador',
+            'quem_partilhou': 'A Utilizador',
+            'artigo_tipo': 'a tarefa',
+            'recurso': 'Tarefa partilhada',
+            'nivel': 'edicao',
+            'link_convites': 'https://pipe.example/partilha/convites',
+        })
+
+    assert assunto == 'Recebeste um recurso partilhado'
+    assert 'PIPE' not in assunto
+    assert 'PIPE' in html
+    assert 'Tarefa partilhada' in html
+    assert 'Tarefa partilhada' in texto
+    assert 'Permissão: Edição' in html
+    assert 'Permissão: Edição' in texto
+    assert 'https://pipe.example/partilha/convites' in html
+    assert 'https://pipe.example/partilha/convites' in texto
 
 
 def test_recursos_aceites_aparecem_nos_modulos_com_acesso_de_leitura(
@@ -239,6 +276,7 @@ def test_pagina_gerir_partilhas_descreve_o_conteudo_das_tres_listas(
         'Gere os convites recebidos, os recursos partilhados contigo '
         'e as partilhas que enviaste.'
     ) in pagina.get_data(as_text=True)
+    assert "edicao: 'Edição'" in pagina.get_data(as_text=True)
 
 
 def test_criar_partilha_com_csrf_ativo(app, client, utilizador_a, utilizador_b):

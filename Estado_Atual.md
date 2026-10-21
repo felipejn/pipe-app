@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.28
+# PIPE — Estado Actual do Projecto — v1.8.29
+
+## Versão v1.8.29 — 2026-10-21
+
+- Emails de partilha usam o design padrão do PIPE, com assunto conciso, permissão traduzida e ligação para gerir convites.
+- A página de gestão apresenta «Leitura» e «Edição» em vez dos identificadores internos; os testes de partilha bloqueiam envios reais pelo Zoho.
+- Validação: `pytest tests/test_partilha.py tests/test_convites_email.py -q` — 35 testes aprovados; `git diff --check` sem erros. A suite completa não foi executada.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, actualizar com `git pull` e executar Reload.
 
 ## Versão v1.8.28 — 2026-10-21
 

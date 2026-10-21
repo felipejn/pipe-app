@@ -6,6 +6,21 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.29] — 2026-10-21
+
+### Alterado
+
+- Emails de partilha integrados no design padrão do PIPE, com assunto sem sufixo redundante, permissão em português e ligação para gerir convites.
+- A página de gestão apresenta «Leitura» e «Edição»; os testes de partilha bloqueiam envios pelo canal Zoho real.
+
+### Validação
+
+- `pytest tests/test_partilha.py tests/test_convites_email.py -q`: 35 testes aprovados; `git diff --check` sem erros. A suite completa não foi executada.
+
+### Notas de deploy
+
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
 ## [v1.8.28] — 2026-10-21
 
 ### Alterado

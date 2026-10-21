@@ -28,6 +28,8 @@ def _assunto(tipo, contexto):
         if amanha and hoje:
             return f'{amanha} evento(s) amanhã e {hoje} hoje — PIPE'
         return f'{amanha or hoje} evento(s) no Calendário — PIPE'
+    if tipo == 'partilha_recurso':
+        return 'Recebeste um recurso partilhado'
     raise ValueError(f'Template de email desconhecido: {tipo}')
 
 
@@ -56,6 +58,7 @@ def compor_email(tipo, contexto=None):
         'resultados_euromilhoes': 'Já podes consultar os resultados dos teus jogos.',
         'tarefas': 'Um resumo das tarefas com prazo hoje ou em atraso.',
         'eventos': 'Um resumo dos próximos eventos do Calendário.',
+        'partilha_recurso': 'Um utilizador partilhou um recurso contigo no PIPE.',
     }[tipo]
     contexto['assunto'] = _assunto(tipo, contexto)
     return (

@@ -1,4 +1,4 @@
-from flask import abort, current_app, jsonify, render_template, request
+from flask import abort, current_app, jsonify, render_template, request, url_for
 from flask_login import login_required, current_user
 
 from app import db
@@ -280,6 +280,17 @@ def criar_partilha(tipo_recurso, recurso_id):
                 'nivel': nivel,
             },
             force_channel='email',
+            email_template='partilha_recurso',
+            email_context={
+                'nome': utilizador_alvo.nome_apresentacao,
+                'quem_partilhou': current_user.nome_apresentacao,
+                'artigo_tipo': artigo_tipo,
+                'recurso': titulo_recurso,
+                'nivel': nivel,
+                'link_convites': url_for(
+                    'partilha.gerir_convites', _external=True,
+                ),
+            },
         )
         if resultado_notificacao.get('email') is not True:
             current_app.logger.warning(

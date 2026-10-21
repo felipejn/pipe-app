@@ -82,8 +82,12 @@ class NotificationService:
             if force_channel == 'email':
                 canal_email = self._canais.get('email')
                 if canal_email:
-                    resultados['email'] = canal_email.enviar(
-                        user, subject, body, data)
+                    if email_template:
+                        resultados['email'] = canal_email.enviar_template(
+                            user, email_template, email_context or data or {})
+                    else:
+                        resultados['email'] = canal_email.enviar(
+                            user, subject, body, data)
                 else:
                     resultados['email'] = None
                 self._registar_falhas(user, resultados)

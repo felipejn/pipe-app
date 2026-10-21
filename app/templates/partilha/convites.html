@@ -134,6 +134,11 @@ function apresentarErroLista(configuracao, erro) {
   document.getElementById(configuracao.contagemId).textContent = '—';
 }
 
+function rotuloNivel(nivel) {
+  const rotulos = {leitura: 'Leitura', edicao: 'Edição'};
+  return rotulos[nivel] || nivel;
+}
+
 const listasPartilha = [
   {
     url: '/partilha/pendentes',
@@ -182,7 +187,7 @@ function apresentarLista(id, itens, pendentes) {
     const detalhe = criarElemento('div', undefined, 'partilha-detalhe');
     detalhe.append(
       criarElemento('span', item.titulo || 'Sem título', 'partilha-recurso'),
-      criarElemento('span', `${tipoRecurso[item.tipo_recurso] || 'Recurso'} · ${item.dono_email}${item.nivel ? ` · ${item.nivel}` : ''}`, 'partilha-meta')
+      criarElemento('span', `${tipoRecurso[item.tipo_recurso] || 'Recurso'} · ${item.dono_email}${item.nivel ? ` · ${rotuloNivel(item.nivel)}` : ''}`, 'partilha-meta')
     );
     cartao.append(detalhe);
 
@@ -216,7 +221,7 @@ function apresentarCriadas(itens) {
     estado.dataset.estado = item.estado;
     detalhe.append(
       criarElemento('span', item.titulo || 'Sem título', 'partilha-recurso'),
-      criarElemento('span', `${tipoRecurso[item.tipo_recurso] || 'Recurso'} · ${item.utilizador_email} · ${item.nivel}`, 'partilha-meta'),
+      criarElemento('span', `${tipoRecurso[item.tipo_recurso] || 'Recurso'} · ${item.utilizador_email} · ${rotuloNivel(item.nivel)}`, 'partilha-meta'),
       estado
     );
     cartao.append(detalhe);

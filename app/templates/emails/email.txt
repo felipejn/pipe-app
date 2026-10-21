@@ -56,6 +56,11 @@ Hoje ({{ total_hoje }}):
 {% for e in eventos_hoje %}- {{ e.titulo }} — {{ e.quando }}{% if e.local %}, {{ e.local }}{% endif %}
 {% endfor %}{% endif %}
 Ver Calendário: {{ calendario_url }}
+{% elif tipo == 'partilha_recurso' %}Recebeste um recurso partilhado
+
+Olá {{ nome }}, {{ quem_partilhou }} partilhou contigo {{ artigo_tipo }} "{{ recurso }}".
+Permissão: {{ 'Edição' if nivel == 'edicao' else 'Leitura' if nivel == 'leitura' else nivel }}.
+Ver convite: {{ link_convites }}
 {% endif %}
 
 Mensagem automática do PIPE. Podes gerir as notificações nas definições da tua conta.
