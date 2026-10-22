@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.32
+# PIPE — Estado Actual do Projecto — v1.8.33
+
+## Versão v1.8.33 — 2026-10-22
+
+- Corrigida a centragem da janela de leitura das notas no PythonAnywhere: o CSS (`pipe.css`) era servido em cache com a versão antiga e o Service Worker mantinha o ficheiro anterior, deixando a janela sem as regras de centragem.
+- Alterado o cache-buster do CSS de `?v=7` para `?v=8` em `base.html` e a versão do Service Worker de `pipe-v3` para `pipe-v4` (`sw.js`), forçando a busca da nova versão nos clientes.
+- Validação: `tests/test_notas_visualizacao.py` — 6 testes aprovados; `git diff --check` sem erros.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, actualizar com `git pull` e executar Reload.
 
 ## Versão v1.8.32 — 2026-10-22
 

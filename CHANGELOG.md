@@ -6,6 +6,22 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.33] — 2026-10-22
+Corrigida a centragem da janela de leitura das notas no PythonAnywhere.
+
+**Corrigido**
+- A janela de leitura das notas não ficava centrada após o deploy (o CSS antigo estava em cache nos browsers e no Service Worker).
+
+**Alterado**
+- Cache-buster do CSS de `?v=7` para `?v=8` em `app/templates/base.html`.
+- Versão do Service Worker de `pipe-v3` para `pipe-v4` em `app/static/sw.js`, forçando a reinstalação e a limpeza do cache antigo nos clientes.
+
+**Validação**
+- `tests/test_notas_visualizacao.py` — 6 testes aprovados; `git diff --check` sem erros.
+
+**Notas de deploy**
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
 ## [v1.8.32] — 2026-10-22
 Notas passam a abrir numa janela optimizada para leitura.
 
