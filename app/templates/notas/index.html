@@ -128,6 +128,22 @@
 
         </div>{# fim notas-conteudo #}
     </div>{# fim notas-layout #}
+
+    <dialog class="nota-visualizar-dialog" id="notaVisualizar" aria-labelledby="notaVisualizarTitulo">
+        <div class="nota-visualizar-cabecalho">
+            <h2 id="notaVisualizarTitulo">Nota</h2>
+            <button type="button" class="nota-visualizar-fechar" id="notaVisualizarFechar"
+                    aria-label="Fechar nota">&times;</button>
+        </div>
+        <div class="nota-visualizar-conteudo" id="notaVisualizarConteudo">
+            <p class="nota-visualizar-estado" role="status">A carregar nota…</p>
+        </div>
+        <div class="nota-visualizar-acoes">
+            <p class="nota-visualizar-mensagem" id="notaVisualizarMensagem" role="status" aria-live="polite"></p>
+            <button type="button" class="btn btn-secundario" id="notaVisualizarEditar" hidden>Editar</button>
+            <button type="button" class="btn btn-secundario" id="notaVisualizarFecharRodape">Fechar</button>
+        </div>
+    </dialog>
 </div>
 
 <script>
@@ -326,16 +342,6 @@ document.addEventListener('click', function (e) {
     // Não navegar se o formulário de criação estiver aberto (deixar o guardar() actuar)
     const aberta = document.getElementById('notaCriarAberta');
     if (aberta && aberta.style.display !== 'none') return;
-    const cartao = e.target.closest('[data-href]');
-    if (cartao) location.href = cartao.dataset.href;
-});
-
-document.addEventListener('keydown', function (e) {
-    const cartao = e.target.closest('.nota-cartao[role="link"]');
-    if (cartao && (e.key === 'Enter' || e.key === ' ')) {
-        e.preventDefault();
-        window.location.href = cartao.dataset.href;
-    }
 });
 
 // ── Acções nos cartões (fixar, arquivar, apagar, cor) ──────────────────────
@@ -401,5 +407,166 @@ document.addEventListener('change', async function (e) {
     const label = chk.closest('.nota-checklist-item')?.querySelector('.item-texto');
     if (label) label.classList.toggle('item-feito', chk.checked);
 });
+</script>
+<script>
+(function () {
+    const dialog = document.getElementById('notaVisualizar');
+    if (!dialog) return;
+    const conteudo = document.getElementById('notaVisualizarConteudo');
+    const titulo = document.getElementById('notaVisualizarTitulo');
+    const mensagem = document.getElementById('notaVisualizarMensagem');
+    const editar = document.getElementById('notaVisualizarEditar');
+    let cartaoActual = null;
+    let pedidoActual = 0;
+
+    function progresso(lista, destino) {
+        const checks = [...lista.querySelectorAll('input[type="checkbox"]')];
+        destino.textContent = `${checks.filter(check => check.checked).length} de ${checks.length} itens concluídos`;
+    }
+
+    async function carregar(cartao) {
+        const pedido = ++pedidoActual;
+        cartaoActual = cartao;
+        titulo.textContent = 'A carregar nota…';
+        conteudo.replaceChildren();
+        const estado = document.createElement('p');
+        estado.className = 'nota-visualizar-estado';
+        estado.setAttribute('role', 'status');
+        estado.textContent = 'A carregar nota…';
+        conteudo.append(estado);
+        mensagem.textContent = '';
+        editar.hidden = true;
+        dialog.classList.remove('nota-com-cor');
+        dialog.style.backgroundColor = '';
+        dialog.dataset.notaId = '';
+        if (!dialog.open) dialog.showModal();
+
+        try {
+            const resposta = await fetch(cartao.dataset.notaDados, { headers: { Accept: 'application/json' } });
+            if (pedido !== pedidoActual || !dialog.open) return;
+            if (!resposta.ok) throw new Error('Falha ao carregar');
+            const nota = await resposta.json();
+            if (pedido !== pedidoActual || !dialog.open) return;
+            dialog.dataset.notaId = String(nota.id);
+            titulo.textContent = nota.titulo || 'Sem título';
+            if (nota.cor_css) {
+                dialog.classList.add('nota-com-cor');
+                dialog.style.backgroundColor = nota.cor_css;
+            }
+            conteudo.replaceChildren();
+            editar.hidden = !nota.editavel;
+
+            if (nota.tipo === 'checklist') {
+                const estadoLista = document.createElement('p');
+                estadoLista.className = 'nota-visualizar-progresso';
+                estadoLista.setAttribute('aria-live', 'polite');
+                const lista = document.createElement('ul');
+                lista.className = 'nota-visualizar-checklist';
+                nota.itens.forEach(item => {
+                    const linha = document.createElement('li');
+                    const rotulo = document.createElement('label');
+                    rotulo.className = 'nota-visualizar-item';
+                    if (!nota.editavel) rotulo.classList.add('somente-leitura');
+                    const check = document.createElement('input');
+                    check.type = 'checkbox';
+                    check.checked = item.feito;
+                    check.disabled = !nota.editavel;
+                    check.setAttribute('aria-label', item.texto);
+                    const texto = document.createElement('span');
+                    texto.className = `item-texto${item.feito ? ' item-feito' : ''}`;
+                    texto.textContent = item.texto;
+                    check.addEventListener('change', async () => {
+                        const anterior = !check.checked;
+                        check.disabled = true;
+                        mensagem.textContent = '';
+                        try {
+                            const actualizacao = await fetch(`/notas/${nota.id}/accao`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+                                body: JSON.stringify({ accao: 'toggle_item', item_id: item.id }),
+                            });
+                            if (!actualizacao.ok) throw new Error('Falha ao actualizar');
+                            item.feito = check.checked;
+                            texto.classList.toggle('item-feito', item.feito);
+                            const checkCartao = document.querySelector(
+                                `[data-nota-id="${nota.id}"] .nota-checklist-item input[data-item-id="${item.id}"]`
+                            );
+                            if (checkCartao) {
+                                checkCartao.checked = item.feito;
+                                checkCartao.closest('.nota-checklist-item')?.querySelector('.item-texto')
+                                    ?.classList.toggle('item-feito', item.feito);
+                            }
+                            progresso(lista, estadoLista);
+                        } catch (_) {
+                            check.checked = anterior;
+                            if (dialog.dataset.notaId === String(nota.id)) {
+                                mensagem.textContent = 'Não foi possível actualizar o item. Tenta novamente.';
+                            }
+                        } finally {
+                            check.disabled = !nota.editavel;
+                        }
+                    });
+                    rotulo.append(check, texto);
+                    linha.append(rotulo);
+                    lista.append(linha);
+                });
+                progresso(lista, estadoLista);
+                conteudo.append(estadoLista, lista);
+            } else {
+                const corpo = document.createElement('div');
+                corpo.className = 'nota-visualizar-corpo';
+                corpo.textContent = nota.corpo || 'Esta nota não tem conteúdo.';
+                conteudo.append(corpo);
+            }
+
+            if (nota.etiquetas.length) {
+                const etiquetas = document.createElement('div');
+                etiquetas.className = 'nota-etiquetas nota-visualizar-etiquetas';
+                nota.etiquetas.forEach(nome => {
+                    const etiqueta = document.createElement('span');
+                    etiqueta.className = 'nota-etiqueta';
+                    etiqueta.textContent = `# ${nome}`;
+                    etiquetas.append(etiqueta);
+                });
+                conteudo.append(etiquetas);
+            }
+        } catch (_) {
+            if (pedido !== pedidoActual || !dialog.open) return;
+            titulo.textContent = 'Não foi possível abrir a nota';
+            conteudo.replaceChildren();
+            const erro = document.createElement('p');
+            erro.className = 'nota-visualizar-estado';
+            erro.setAttribute('role', 'alert');
+            erro.textContent = 'Verifica a ligação e tenta novamente.';
+            const tentar = document.createElement('button');
+            tentar.type = 'button';
+            tentar.className = 'btn btn-secundario';
+            tentar.textContent = 'Tentar novamente';
+            tentar.addEventListener('click', () => carregar(cartao));
+            conteudo.append(erro, tentar);
+        }
+    }
+
+    document.querySelectorAll('[data-nota-dados]').forEach(cartao => {
+        cartao.addEventListener('click', evento => {
+            if (evento.target.closest('button, input, a, textarea, select, [data-nota-accao]')) return;
+            carregar(cartao);
+        });
+        cartao.addEventListener('keydown', evento => {
+            if (evento.target !== cartao || !['Enter', ' '].includes(evento.key)) return;
+            evento.preventDefault();
+            carregar(cartao);
+        });
+    });
+
+    document.getElementById('notaVisualizarFechar').addEventListener('click', () => dialog.close());
+    document.getElementById('notaVisualizarFecharRodape').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', evento => {
+        if (evento.target === dialog) dialog.close();
+    });
+    editar.addEventListener('click', () => {
+        if (cartaoActual) window.location.href = cartaoActual.dataset.notaEditar;
+    });
+})();
 </script>
 {% endblock %}

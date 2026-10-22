@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.31
+# PIPE — Estado Actual do Projecto — v1.8.32
+
+## Versão v1.8.32 — 2026-10-22
+
+- Na grelha de notas, clicar num cartão abre uma janela de leitura com o conteúdo completo, etiquetas e todos os itens da checklist; a edição fica numa acção explícita.
+- Checklists podem ser marcadas na janela por donos e utilizadores com permissão de edição. O acesso de leitura partilhado mantém-se sem escrita; os dados da nota são servidos sem cache.
+- Validação: `tests/test_notas_visualizacao.py` + `tests/test_partilha.py` — 26 testes aprovados; suite restante, excluindo `tests/test_assistente_combustiveis.py` e `tests/test_criar_admin.py` — 419 testes aprovados, 1 ignorado e 33 subtestes aprovados; sintaxe JavaScript, compilação Python e `git diff --check` sem erros. O primeiro teste da suite completa falha por não haver preços activos na fixture de Combustíveis; não houve validação visual interactiva por falta de navegador.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, actualizar com `git pull` e executar Reload.
 
 ## Versão v1.8.31 — 2026-10-21
 

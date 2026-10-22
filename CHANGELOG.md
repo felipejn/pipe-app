@@ -6,6 +6,24 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.32] — 2026-10-22
+Notas passam a abrir numa janela optimizada para leitura.
+
+**Alterado**
+- Clicar num cartão abre o detalhe completo da nota, com etiquetas e todos os itens da checklist; a edição fica numa acção explícita.
+- A janela permite marcar checklists conforme as permissões da partilha e actualiza também o cartão da grelha. Os dados da nota são servidos sem cache.
+- Sem alterações de base de dados ou dependências.
+
+**Validação**
+- `pytest tests/test_notas_visualizacao.py tests/test_partilha.py -q`: 26 testes aprovados.
+- Suite restante, excluindo `tests/test_assistente_combustiveis.py` e `tests/test_criar_admin.py`: 419 testes aprovados, 1 ignorado e 33 subtestes aprovados. A suite completa encontra uma falha conhecida em Combustíveis por ausência de preços activos na fixture.
+- Sintaxe JavaScript, compilação Python e `git diff --check` sem erros. Sem verificação visual interactiva por falta de navegador.
+
+**Notas de deploy**
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.31] — 2026-10-21
 Corrige a eliminação de utilizadores com partilhas associadas.
 

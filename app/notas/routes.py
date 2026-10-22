@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.notas import notas
 from app.notas.models import Nota, ItemChecklist, EtiquetaNota
-from app.partilha.utils import obter_recurso_ou_404
+from app.partilha.utils import obter_recurso_ou_404, pode_aceder_recurso
 from app.partilha.models import PartilhaRecurso
 
 
@@ -163,6 +163,29 @@ def editar(nota_id):
                            cores=Nota.CORES, e_dono=nota.user_id == current_user.id)
 
 
+@notas.route('/<int:nota_id>/dados')
+@login_required
+def dados_visualizacao(nota_id):
+    """Devolve o conteúdo completo de uma nota para a janela de leitura."""
+    nota = obter_recurso_ou_404('nota', nota_id, current_user.id, nivel_minimo='leitura')
+    resposta = jsonify({
+        'id': nota.id,
+        'titulo': nota.titulo or '',
+        'corpo': nota.corpo or '',
+        'tipo': nota.tipo,
+        'cor': nota.cor,
+        'cor_css': nota.cor_css(),
+        'etiquetas': [etiqueta.nome for etiqueta in nota.etiquetas],
+        'itens': [
+            {'id': item.id, 'texto': item.texto, 'feito': item.feito}
+            for item in nota.itens.all()
+        ] if nota.tipo == Nota.TIPO_CHECKLIST else [],
+        'editavel': pode_aceder_recurso('nota', nota.id, current_user.id, 'edicao'),
+    })
+    resposta.headers['Cache-Control'] = 'no-store'
+    return resposta
+
+
 # ---------------------------------------------------------------------------
 # Acções rápidas via AJAX
 # ---------------------------------------------------------------------------
@@ -170,9 +193,13 @@ def editar(nota_id):
 @notas.route('/<int:nota_id>/accao', methods=['POST'])
 @login_required
 def accao(nota_id):
-    nota = Nota.query.filter_by(id=nota_id, user_id=current_user.id).first_or_404()
     dados = request.get_json(silent=True) or {}
     accao = dados.get('accao')
+
+    if accao == 'toggle_item':
+        nota = obter_recurso_ou_404('nota', nota_id, current_user.id, nivel_minimo='edicao')
+    else:
+        nota = Nota.query.filter_by(id=nota_id, user_id=current_user.id).first_or_404()
 
     if accao == 'fixar':
         nota.fixada = not nota.fixada

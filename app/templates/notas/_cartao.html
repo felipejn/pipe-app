@@ -1,9 +1,10 @@
 {# _cartao.html — cartão de uma nota na grelha #}
 <div class="nota-cartao {% if nota.fixada %}nota-fixada{% endif %}{% if nota.cor_css() %} nota-com-cor{% endif %}"
      data-nota-id="{{ nota.id }}"
-     {% if nota_partilhada %}tabindex="0" role="link" aria-label="Abrir nota partilhada: {{ nota.titulo or 'Sem título' }}"{% endif %}
+     tabindex="0" role="group" aria-label="Nota: {{ nota.titulo or 'Sem título' }}. Prima Enter para ler."
      data-busca="{{ (nota.titulo or '') | lower }} {{ (nota.corpo or '') | lower }} {{ nota.etiquetas | map(attribute='nome') | join(' ') | lower }}"
-     data-href="{{ url_for('notas.editar', nota_id=nota.id) }}"
+     data-nota-dados="{{ url_for('notas.dados_visualizacao', nota_id=nota.id) }}"
+     data-nota-editar="{{ url_for('notas.editar', nota_id=nota.id) }}"
      {% if nota.cor_css() %}style="background:{{ nota.cor_css() }}"{% endif %}>
 
     {# Barra de acções (aparece no hover) #}
@@ -39,7 +40,7 @@
         {% endfor %}
     </div>{% endif %}
 
-    {# Conteúdo — clique no cartão navega via JS (data-href) #}
+    {# Conteúdo — o cartão abre a janela completa de leitura #}
     {% if nota.titulo %}
     <div class="nota-titulo">{{ nota.titulo }}</div>
     {% endif %}
