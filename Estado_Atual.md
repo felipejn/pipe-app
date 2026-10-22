@@ -1,4 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.8.33
+# PIPE — Estado Actual do Projecto — v1.8.34
+
+## Versão v1.8.34 — 2026-10-22
+
+- Corrigida a apresentação da janela de leitura das notas em ecrãs estreitos no PythonAnywhere: a media query mobile (`max-width: 520px`) não anulava a ancagem de centragem, deixando a janela centrada em vez de bottom-sheet.
+- Validação: `tests/test_notas_visualizacao.py` — 6 testes aprovados; `git diff --check` sem erros.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, actualizar com `git pull` e executar Reload.
 
 ## Versão v1.8.33 — 2026-10-22
 

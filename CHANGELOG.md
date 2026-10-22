@@ -6,6 +6,20 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.34] — 2026-10-22
+Corrigida a apresentação da janela de leitura das notas em ecrãs estreitos.
+
+**Corrigido**
+- Em ecrãs com largura até 520px, a janela de leitura mantinha a ancagem de centragem (`margin: auto`) e não era apresentada como bottom-sheet: faltava anular a ancagem vertical (`top: auto; bottom: 0`).
+
+**Validação**
+- `tests/test_notas_visualizacao.py` — 6 testes aprovados; `git diff --check` sem erros.
+
+**Notas de deploy**
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.33] — 2026-10-22
 Corrigida a centragem da janela de leitura das notas no PythonAnywhere.
 
