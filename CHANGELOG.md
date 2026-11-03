@@ -6,6 +6,22 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.35] — 2026-11-03
+O Resumo Diário corrige respostas rejeitadas por divergências numéricas antes de recorrer ao texto determinístico.
+
+**Alterado**
+- Até duas tentativas adicionais, com instrução dinâmica baseada no erro numérico e nos dados originais.
+- As tentativas partilham o orçamento de tempo configurado; falhas não numéricas mantêm o fallback imediato.
+
+**Validação**
+- Testes do Resumo Diário: 94 passaram. Suite completa: 439 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por falta de preços activos nas fixtures.
+- `git diff --check` limpo.
+
+**Notas de deploy**
+- Sem alterações de BD ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.34] — 2026-10-22
 Corrigida a apresentação da janela de leitura das notas em ecrãs estreitos.
 

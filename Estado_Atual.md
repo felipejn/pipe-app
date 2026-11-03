@@ -1,4 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.8.34
+# PIPE — Estado Actual do Projecto — v1.8.35
+
+## Versão v1.8.35 — 2026-11-03
+
+- O Resumo Diário tenta até duas correcções orientadas pelo erro quando a validação rejeita números inventados ou em falta. Cada tentativa é validada e partilha o orçamento de tempo original; outras falhas mantêm o fallback determinístico.
+- Validação: testes do Resumo Diário — 94 passaram; suite completa — 439 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas preexistentes em `tests/test_assistente_combustiveis.py` por falta de preços activos nas fixtures; `git diff --check` limpo.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, fazer `git pull` e Reload.
 
 ## Versão v1.8.34 — 2026-10-22
 
