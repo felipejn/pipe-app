@@ -142,6 +142,7 @@ def _meteorologia_por_data(user_id, datas):
     local = LocalizacaoMeteorologia.query.filter_by(user_id=user_id).first()
     latitude = local.latitude if local else BRAGA_LATITUDE
     longitude = local.longitude if local else BRAGA_LONGITUDE
+    localidade = local.nome if local else 'Braga'
     try:
         previsao = meteorologia_services.obter_previsao(latitude, longitude)
     except Exception as erro:
@@ -161,6 +162,7 @@ def _meteorologia_por_data(user_id, datas):
             continue
         resultado[dia.isoformat()] = {
             'data': dia.isoformat(),
+            'localidade': localidade,
             'temp_min': item.get('temp_min'),
             'temp_max': item.get('temp_max'),
             'probabilidade_precipitacao': item.get('prob_precipitacao'),
@@ -386,6 +388,9 @@ def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
         datas_meteo.extend([sabado, domingo])
     meteorologia = (_meteorologia_por_data(user_id, datas_meteo)
                     if opcoes['meteorologia'] else {})
+    localidade_meteorologica = next(
+        (item.get('localidade') for item in meteorologia.values()
+         if item.get('localidade')), None)
 
     if data.isoformat() in meteorologia:
         secoes['meteorologia'] = meteorologia[data.isoformat()]
@@ -425,8 +430,10 @@ def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
 
     blocos = {}
     if 'meteorologia' in secoes:
+        localidade = secoes['meteorologia'].get('localidade')
+        rotulo = f'Meteorologia em {localidade}:' if localidade else 'Meteorologia:'
         blocos['meteorologia'] = (
-            f"Meteorologia: {_linha_meteorologia(secoes['meteorologia'])}")
+            f"{rotulo} {_linha_meteorologia(secoes['meteorologia'])}")
     if 'eventos_hoje' in secoes:
         blocos['eventos_hoje'] = _renderizar_eventos('Hoje', secoes['eventos_hoje'])
     if 'tarefas_hoje' in secoes or 'tarefas_atrasadas' in secoes:
@@ -446,7 +453,11 @@ def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
                 continue
             linhas.append(titulo)
             if 'meteorologia' in dados_dia:
-                linhas.append(_linha_meteorologia(dados_dia['meteorologia']))
+                localidade = dados_dia['meteorologia'].get('localidade')
+                rotulo = (f'Meteorologia em {localidade}:'
+                          if localidade else 'Meteorologia:')
+                linhas.append(
+                    f"{rotulo} {_linha_meteorologia(dados_dia['meteorologia'])}")
             linhas.extend(evento['titulo'] for evento in dados_dia.get('eventos', []))
         blocos['fim_de_semana'] = '\n'.join(linhas)
 
@@ -454,6 +465,7 @@ def gerar_resumo_diario(user_id, data, opcoes=None, modo='task'):
     texto = _texto_limitado(blocos)
     texto_final, origem, motivo = redacao.redigir(
         texto, data, modo=modo, titulos=_titulos_das_secoes(secoes),
-        limite=LIMITE_CARACTERES, nome=utilizador.nome)
+        limite=LIMITE_CARACTERES, nome=utilizador.nome,
+        localidade_meteorologica=localidade_meteorologica)
     return {'data': data.isoformat(), 'secoes': secoes, 'texto': texto_final,
             'origem': origem, 'motivo': motivo}

@@ -1,8 +1,9 @@
-# PIPE — Estado Actual do Projecto — v1.8.35
+# PIPE — Estado Actual do Projecto — v1.8.36
 
-## Versão v1.8.35 — 2026-11-03
+## Versão v1.8.36 — 2026-11-04
 
-- O Resumo Diário tenta até duas correcções orientadas pelo erro quando a validação rejeita números inventados ou em falta. Cada tentativa é validada e partilha o orçamento de tempo original; outras falhas mantêm o fallback determinístico.
+- O Resumo Diário identifica a localidade meteorológica no texto e nos dados enviados ao modelo; respostas que atribuam o tempo a Lisboa quando a localização configurada é outra são rejeitadas.
+- Quando a validação detecta números inventados ou em falta, o Resumo Diário tenta até duas correcções orientadas pelo erro. Cada resposta é validada e as tentativas partilham o orçamento de tempo; outras falhas mantêm o fallback determinístico.
 - Validação: testes do Resumo Diário — 94 passaram; suite completa — 439 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas preexistentes em `tests/test_assistente_combustiveis.py` por falta de preços activos nas fixtures; `git diff --check` limpo.
 - Sem alterações de base de dados ou dependências. Em PythonAnywhere, fazer `git pull` e Reload.
 

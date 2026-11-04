@@ -6,10 +6,11 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
-## [v1.8.35] — 2026-11-03
-O Resumo Diário corrige respostas rejeitadas por divergências numéricas antes de recorrer ao texto determinístico.
+## [v1.8.36] — 2026-11-04
+O Resumo Diário identifica a localidade da previsão e tenta corrigir respostas rejeitadas por divergências numéricas antes de recorrer ao texto determinístico.
 
 **Alterado**
+- O nome da localidade meteorológica é incluído nos dados do resumo; respostas que atribuam o tempo a Lisboa quando a localização configurada é diferente são rejeitadas.
 - Até duas tentativas adicionais, com instrução dinâmica baseada no erro numérico e nos dados originais.
 - As tentativas partilham o orçamento de tempo configurado; falhas não numéricas mantêm o fallback imediato.
 

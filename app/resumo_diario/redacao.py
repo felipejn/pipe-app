@@ -11,6 +11,7 @@ configurável por modo (``RESUMO_LLM_ORCAMENTO_WEB`` /
 import logging
 import os
 import re
+import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -27,6 +28,7 @@ FUSO_HORARIO = ZoneInfo('Europe/Lisbon')
 
 ORCAMENTO_WEB_POR_OMISSAO = 10.0   # segundos — página interactiva
 ORCAMENTO_TASK_POR_OMISSAO = 30.0  # segundos — scheduled task e simulação
+MAX_TENTATIVAS_CORRECCAO_NUMERICA = 2
 
 _PADRAO_NUMERO = re.compile(r'\d+(?:[.,]\d+)?')
 _PADRAO_URL = re.compile(r'https?://|www\.', re.IGNORECASE)
@@ -45,7 +47,7 @@ MENSAGEM_SISTEMA = (
     'Escreves em português europeu (PT-PT), como um assistente pessoal que conhece o teu dia — tom natural e descontraído, como uma mensagem de manhã cedo.\n'
     'Regras:\n'
     '- Usa vocabulário, construções e ortografia de Portugal. Trata o utilizador por «tu» e usa formas como «tens», «podes» e «não te esqueças»; evita construções brasileiras como «E aí», «você», «legal» e «Vamos conseguir».\n'
-    '- Abre com uma saudação natural e variada em português europeu — não sigas sempre o mesmo formato. Usa a hora local de Lisboa indicada na mensagem para escolher uma saudação coerente («Bom dia», «Boa tarde» ou «Boa noite»). Usa o primeiro nome se estiver indicado. Evita «E aí» e outras fórmulas brasileiras. Podes ou não mencionar o dia da semana. Nunca inventes um dia diferente do indicado nos dados.\n'
+    '- Abre com uma saudação natural e variada em português europeu — não sigas sempre o mesmo formato. Usa a hora indicada na mensagem para escolher uma saudação coerente («Bom dia», «Boa tarde» ou «Boa noite»). Usa o primeiro nome se estiver indicado. Evita «E aí» e outras fórmulas brasileiras. Podes ou não mencionar o dia da semana. Nunca inventes um dia diferente do indicado nos dados.\n'
     '- Máximo {limite} caracteres. Usa linguagem simples e directa, de forma conversacional, como uma mensagem espontânea para alguém próximo.\n'
     '- Transições naturais entre tópicos; não usa rótulos de secção como "Meteorologia:".\n'
     '- Mantém um tom caloroso, leve e bem-disposto. Podes usar expressões coloquiais naturais de Portugal, como «bora» ou «dá para», e uma frase simpática de incentivo quando encaixar. Evita soar formal, robótico ou como um relatório; não forces entusiasmo nem intimidade.\n'
@@ -133,8 +135,8 @@ def _contexto_data(data):
     return (
         f'Hoje é {_DIAS_SEMANA[data.weekday()]}, '
         f'{data.strftime("%d/%m/%Y")}.\n'
-        f'Hora actual em Lisboa: {agora.strftime("%H:%M")} '
-        '(Europe/Lisbon).\n'
+        f'Hora actual em Portugal continental: {agora.strftime("%H:%M")}.'
+        '\n'
     )
 
 
@@ -191,7 +193,8 @@ def _tem_metalinguagem(texto, titulos):
     return False
 
 
-def validar_resposta(conteudo, dados, data, titulos, limite):
+def validar_resposta(conteudo, dados, data, titulos, limite,
+                     localidade_meteorologica=None):
     """Valida a resposta do LLM contra os dados de entrada.
 
     Args:
@@ -218,6 +221,16 @@ def validar_resposta(conteudo, dados, data, titulos, limite):
         return False, 'markdown'
     if _PADRAO_PT_BR.search(texto):
         return False, 'português não europeu'
+
+    if (localidade_meteorologica
+            and localidade_meteorologica.strip().casefold() != 'lisboa'):
+        associa_lisboa = re.search(
+            r'(?:\b(?:tempo|meteorologia|previs[aã]o)\b[^.!?\n]{0,60}'
+            r'\blisboa\b|\blisboa\b[^.!?\n]{0,60}'
+            r'\b(?:temperatura|chuva|precipita[cç][aã]o|nevoeiro|°c)\b)',
+            texto, re.IGNORECASE)
+        if associa_lisboa:
+            return False, 'localidade meteorológica errada'
 
     # Metalinguagem de ausência (v1.8.3): o LLM a falar dos dados/secções em
     # vez de redigir o dia («sem dados», «não fornecido», «secção»). Isenta
@@ -284,7 +297,7 @@ def _registar_origem(origem, motivo=None, modelo=None):
 
 
 def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900,
-            nome=None):
+            nome=None, localidade_meteorologica=None):
     """Redige o resumo com LLM; em qualquer falha devolve o determinístico.
 
     Args:
@@ -311,45 +324,79 @@ def redigir(texto_deterministico, data, modo='task', titulos=(), limite=900,
         _registar_origem('deterministico', 'desligado')
         return dados, 'deterministico', 'desligado'
 
-    try:
-        resposta = chamar_llm(
-            [
-                {'role': 'system',
-                 'content': MENSAGEM_SISTEMA.format(limite=limite)},
-                {'role': 'user',
-                 'content': (f'{_contexto_data(data)}' +
-                             (f'Nome próprio do utilizador: {nome}. '
-                              'Usa-o na saudação, com variações naturais.\n'
-                              if nome else '') +
-                             f'Dados do resumo:\n{dados}')},
-            ],
-            prazo_total=_orcamento(modo),
-        )
-    except PrazoExcedidoError:
-        _registar_origem('deterministico', 'timeout')
-        return dados, 'deterministico', 'timeout'
-    except Exception as erro:  # o LLM nunca pode partir o resumo
-        logger.warning('[Resumo Diário] LLM indisponível: %s', str(erro)[:200])
-        _registar_origem('deterministico', 'falha')
-        return dados, 'deterministico', 'falha'
-
-    modelo = resposta.get('model') if isinstance(resposta, dict) else None
-    try:
-        conteudo = resposta['choices'][0]['message']['content']
-    except (IndexError, KeyError, TypeError):
-        conteudo = None
-
     titulos_exigidos = [
         titulo for titulo in titulos
         if titulo and str(titulo).strip()
         and str(titulo).casefold() in dados.casefold()
     ]
-    valido, detalhe = validar_resposta(
-        conteudo, dados, data, titulos_exigidos, limite)
-    if not valido:
-        motivo = f'validação ({detalhe})'
-        _registar_origem('deterministico', motivo, modelo=modelo)
-        return dados, 'deterministico', motivo
+    mensagens_base = [
+        {'role': 'system',
+         'content': MENSAGEM_SISTEMA.format(limite=limite)},
+        {'role': 'user',
+         'content': (f'{_contexto_data(data)}' +
+                     (f'Nome próprio do utilizador: {nome}. '
+                      'Usa-o na saudação, com variações naturais.\n'
+                      if nome else '') +
+                     f'Dados do resumo:\n{dados}')},
+    ]
+    orcamento = _orcamento(modo)
+    prazo_fim = time.monotonic() + orcamento
+    mensagens = mensagens_base
+    modelo = None
+    conteudo = None
+    detalhe = None
 
-    _registar_origem('llm', modelo=modelo)
-    return conteudo.strip(), modelo or 'llm', None
+    for tentativa in range(MAX_TENTATIVAS_CORRECCAO_NUMERICA + 1):
+        prazo_restante = (orcamento if tentativa == 0 else
+                          prazo_fim - time.monotonic())
+        if prazo_restante <= 0:
+            _registar_origem('deterministico', 'timeout', modelo=modelo)
+            return dados, 'deterministico', 'timeout'
+        try:
+            resposta = chamar_llm(mensagens, prazo_total=prazo_restante)
+        except PrazoExcedidoError:
+            _registar_origem('deterministico', 'timeout', modelo=modelo)
+            return dados, 'deterministico', 'timeout'
+        except Exception as erro:  # o LLM nunca pode partir o resumo
+            logger.warning('[Resumo Diário] LLM indisponível: %s', str(erro)[:200])
+            _registar_origem('deterministico', 'falha', modelo=modelo)
+            return dados, 'deterministico', 'falha'
+
+        modelo = resposta.get('model') if isinstance(resposta, dict) else None
+        try:
+            conteudo = resposta['choices'][0]['message']['content']
+        except (IndexError, KeyError, TypeError):
+            conteudo = None
+
+        valido, detalhe = validar_resposta(
+            conteudo, dados, data, titulos_exigidos, limite,
+            localidade_meteorologica=localidade_meteorologica)
+        if valido:
+            _registar_origem('llm', modelo=modelo)
+            return conteudo.strip(), modelo or 'llm', None
+
+        erro_numerico = detalhe.startswith((
+            'número inventado (', 'número em falta ('))
+        if (not erro_numerico
+                or tentativa >= MAX_TENTATIVAS_CORRECCAO_NUMERICA):
+            break
+
+        logger.info(
+            '[Resumo Diário] Resposta rejeitada (%s); tentativa de '
+            'correcção numérica %d/%d (modelo=%s).',
+            detalhe, tentativa + 1, MAX_TENTATIVAS_CORRECCAO_NUMERICA,
+            modelo or 'desconhecido')
+        mensagens = mensagens_base + [
+            {'role': 'assistant', 'content': conteudo},
+            {'role': 'user', 'content': (
+                f'A resposta anterior foi rejeitada na validação: {detalhe}. '
+                'Corrige especificamente esse problema com base nos dados '
+                'originais. Se há um número inventado, remove-o sem acrescentar '
+                'factos; se falta um número, inclui-o no contexto correcto. '
+                'Preserva os tópicos e valores dos dados. Responde apenas com '
+                f'o resumo corrigido. Dados originais:\n{dados}')},
+        ]
+
+    motivo = f'validação ({detalhe})'
+    _registar_origem('deterministico', motivo, modelo=modelo)
+    return dados, 'deterministico', motivo

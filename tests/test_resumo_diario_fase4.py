@@ -5,6 +5,7 @@ explicitamente (o conftest desliga-o por omissão para toda a suíte).
 """
 import logging
 import os
+import time
 from datetime import date, datetime
 from unittest.mock import patch
 
@@ -190,8 +191,47 @@ def test_data_do_resumo_usa_a_data_passada_nao_a_de_hoje():
     conteudo = llm.call_args.args[0][1]['content']
     assert 'segunda-feira' in conteudo
     assert '12/10/2026' in conteudo
-    assert 'Hora actual em Lisboa:' in conteudo
-    assert '(Europe/Lisbon).' in conteudo
+    assert 'Hora actual em Portugal continental:' in conteudo
+    assert 'Hora actual em Lisboa:' not in conteudo
+    assert 'Europe/Lisbon' not in conteudo
+
+
+def test_localidade_meteorologica_errada_rejeita_resposta_llm():
+    dados = 'Meteorologia em Vila Verde: 8–17 °C, precipitação 100%.'
+    resposta = 'Bom dia! O tempo em Lisboa vai de 8 a 17 °C, com 100% de precipitação.'
+
+    valido, motivo = redacao.validar_resposta(
+        resposta, dados, HOJE, [], 900,
+        localidade_meteorologica='Vila Verde')
+
+    assert valido is False
+    assert motivo == 'localidade meteorológica errada'
+
+
+def test_lisboa_e_aceite_quando_e_a_localidade_meteorologica():
+    dados = 'Meteorologia em Lisboa: 8–17 °C, precipitação 100%.'
+    resposta = 'Bom dia! Em Lisboa, a temperatura vai de 8 a 17 °C, com 100% de precipitação.'
+
+    valido, motivo = redacao.validar_resposta(
+        resposta, dados, HOJE, [], 900,
+        localidade_meteorologica='Lisboa')
+
+    assert valido is True
+    assert motivo is None
+
+
+def test_redigir_resposta_meteorologica_errada_cai_no_deterministico():
+    dados = 'Meteorologia em Vila Verde: 8–17 °C, precipitação 100%.'
+    resposta = 'Bom dia! O tempo em Lisboa vai de 8 a 17 °C, com 100% de precipitação.'
+    with patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+            patch.object(redacao, 'chamar_llm',
+                         return_value=_resposta_llm(resposta)):
+        texto, origem, motivo = redacao.redigir(
+            dados, HOJE, localidade_meteorologica='Vila Verde')
+
+    assert texto == dados
+    assert origem == 'deterministico'
+    assert motivo == 'validação (localidade meteorológica errada)'
 
 
 def test_prompt_incentiva_saudacao_variada(contexto):
@@ -287,6 +327,68 @@ def test_numero_inventado_cai_no_deterministico(contexto):
     assert resultado['texto'] == dados
     assert resultado['origem'] == 'deterministico'
     assert resultado['motivo'] == 'validação (número inventado (42))'
+
+
+def test_falha_numerica_tenta_correcao_e_usa_resposta_validada(monkeypatch):
+    dados = 'Meteorologia: 10–20 °C.'
+    respostas = [
+        _resposta_llm('Bom dia! Hoje chegam aos 7 °C.'),
+        _resposta_llm('Bom dia! Hoje ficam entre 10 e 20 °C.'),
+    ]
+    chamadas = []
+
+    def chamar(mensagens, **kwargs):
+        chamadas.append((mensagens, kwargs))
+        return respostas.pop(0)
+
+    monkeypatch.setenv('RESUMO_LLM_ATIVO', '1')
+    monkeypatch.setattr(redacao, 'chamar_llm', chamar)
+    instantes = iter((100.0, 101.0))
+    monkeypatch.setattr(time, 'monotonic', lambda: next(instantes))
+
+    texto, origem, motivo = redacao.redigir(dados, date(2026, 10, 12))
+
+    assert texto == 'Bom dia! Hoje ficam entre 10 e 20 °C.'
+    assert origem == 'modelo-teste'
+    assert motivo is None
+    assert len(chamadas) == 2
+    assert chamadas[0][1]['prazo_total'] == redacao.ORCAMENTO_TASK_POR_OMISSAO
+    assert chamadas[1][1]['prazo_total'] == 29.0
+    mensagens_correcao = chamadas[1][0]
+    assert mensagens_correcao[-1]['role'] == 'user'
+    assert 'número inventado (7)' in mensagens_correcao[-1]['content']
+    assert dados in mensagens_correcao[-1]['content']
+
+
+def test_falha_de_validacao_nao_numerica_nao_repete():
+    resposta = 'E aí! Bom dia! 10–20 °C.'
+    with patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+            patch.object(redacao, 'chamar_llm',
+                         return_value=_resposta_llm(resposta)) as llm:
+        texto, origem, motivo = redacao.redigir(
+            'Meteorologia: 10–20 °C.', date(2026, 10, 12))
+
+    assert texto == 'Meteorologia: 10–20 °C.'
+    assert origem == 'deterministico'
+    assert motivo == 'validação (português não europeu)'
+    llm.assert_called_once()
+
+
+def test_duas_correcções_numericas_falhadas_usam_fallback():
+    dados = 'Meteorologia: 10–20 °C.'
+    respostas = [
+        _resposta_llm('Hoje faz 7 °C.'),
+        _resposta_llm('Hoje faz 8 °C.'),
+        _resposta_llm('Hoje faz 9 °C.'),
+    ]
+    with patch.dict(os.environ, {'RESUMO_LLM_ATIVO': '1'}), \
+            patch.object(redacao, 'chamar_llm', side_effect=respostas) as llm:
+        texto, origem, motivo = redacao.redigir(dados, date(2026, 10, 12))
+
+    assert texto == dados
+    assert origem == 'deterministico'
+    assert motivo == 'validação (número inventado (9))'
+    assert llm.call_count == 3
 
 
 def test_resposta_demasiado_longa_cai_no_deterministico(contexto):

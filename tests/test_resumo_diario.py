@@ -184,18 +184,36 @@ def test_limite_remove_secção_inteira_sem_cortar_linhas(contexto):
         resultado = gerar_resumo_diario(user_id, sexta)
     assert len(resultado['texto']) <= 900
     assert 'X' * 1000 not in resultado['texto']
-    assert resultado['texto'].startswith('Meteorologia:')
+    assert resultado['texto'].startswith('Meteorologia em Braga:')
 
 
 def test_localizacao_padrao_e_data_local(contexto):
     user_id, _, _, _ = contexto
     with patch('app.resumo_diario.services.meteorologia_services.obter_previsao',
                return_value=_previsao([date(2026, 10, 7)])) as previsao:
-        gerar_resumo_diario(user_id, date(2026, 10, 7))
+        resultado = gerar_resumo_diario(user_id, date(2026, 10, 7))
     previsao.assert_called_once_with(41.545448, -8.426507)
+    assert resultado['secoes']['meteorologia']['localidade'] == 'Braga'
+    assert 'Meteorologia em Braga:' in resultado['texto']
     from app.resumo_diario.services import FUSO_HORARIO
     assert FUSO_HORARIO.key == 'Europe/Lisbon'
     assert isinstance(obter_data_local(), date)
+
+
+def test_localidade_guardada_identifica_a_previsao_no_resumo(contexto):
+    user_id, _, _, _ = contexto
+    dia = date(2026, 10, 7)
+    db.session.add(LocalizacaoMeteorologia(
+        user_id=user_id, nome='Vila Verde', latitude=41.64729,
+        longitude=-8.43715, pais='Portugal'))
+    db.session.commit()
+
+    with patch('app.resumo_diario.services.meteorologia_services.obter_previsao',
+               return_value=_previsao([dia])):
+        resultado = gerar_resumo_diario(user_id, dia)
+
+    assert resultado['secoes']['meteorologia']['localidade'] == 'Vila Verde'
+    assert 'Meteorologia em Vila Verde:' in resultado['texto']
 
 
 def test_open_meteo_usa_weather_code_documentado_e_mantem_formato_normalizado():
