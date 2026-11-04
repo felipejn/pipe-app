@@ -6,6 +6,22 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.37] — 2026-11-04
+Criado o módulo Poupa Mais para estimar os benefícios dos abastecimentos BP e Pingo Doce.
+
+**Alterado**
+- A Loja de Módulos passa a disponibilizar Poupa Mais, que reutiliza as preferências e preços recentes de Combustíveis e permite preço manual quando não existe registo.
+- O simulador calcula benefícios BP e saldo futuro Pingo Doce sem guardar as simulações; mantém a escolha do posto na sessão e mostra o custo efectivo após desconto.
+
+**Validação**
+- `tests/test_poupa_mais.py`: 21 testes aprovados. Suite restante, excluindo `tests/test_assistente_combustiveis.py`: 454 testes aprovados, 1 ignorado e 33 subtestes aprovados. O ficheiro excluído mantém 25 falhas conhecidas por falta de preços activos nas fixtures.
+- `git diff --check` limpo.
+
+**Notas de deploy**
+- Sem alterações de BD ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.36] — 2026-11-04
 O Resumo Diário identifica a localidade da previsão e tenta corrigir respostas rejeitadas por divergências numéricas antes de recorrer ao texto determinístico.
 

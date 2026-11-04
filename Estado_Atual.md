@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.36
+# PIPE — Estado Actual do Projecto — v1.8.37
+
+## Versão v1.8.37 — 2026-11-04
+
+- Criado o módulo Poupa Mais, com postos BP/Pingo Doce filtrados pelas preferências de Combustíveis, preço actualizado ou manual e simulação dos benefícios sem guardar histórico.
+- O formulário mantém o posto seleccionado na sessão; apresenta litros estimados, montante após desconto BP e preço efectivo por litro, separando o saldo futuro Pingo Doce.
+- Validação: `tests/test_poupa_mais.py` — 21 passaram; suite restante, excluindo `tests/test_assistente_combustiveis.py` — 454 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas nesse ficheiro por falta de preços activos nas fixtures; `git diff --check` limpo.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
 
 ## Versão v1.8.36 — 2026-11-04
 

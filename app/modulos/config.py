@@ -1,5 +1,6 @@
 # MODULOS_DISPONIVEIS dictionary
 MODULOS_DISPONIVEIS = {
+    'poupa_mais': {'nome': 'Poupa Mais', 'icone': '🎁', 'url_endpoint': 'poupa_mais.index', 'descricao': 'Estima os benefícios dos abastecimentos BP e Pingo Doce.'},
     'euromilhoes': {'nome': 'Euromilhões', 'icone': '🎯', 'url_endpoint': 'euromilhoes.index', 'descricao': 'Regista combinações e acompanha resultados do Euromilhões.'},
     'tarefas': {'nome': 'Tarefas', 'icone': '✅', 'url_endpoint': 'tarefas.index', 'descricao': 'Listas de tarefas com prazos, prioridades e notificações.'},
     'notas': {'nome': 'Notas', 'icone': '📝', 'url_endpoint': 'notas.index', 'descricao': 'Notas rápidas, checklists e etiquetas.'},

@@ -107,6 +107,9 @@ def create_app(config_name='default'):
     from app.combustiveis import bp as combustiveis_bp
     app.register_blueprint(combustiveis_bp)
 
+    from app.poupa_mais import bp as poupa_mais_bp
+    app.register_blueprint(poupa_mais_bp)
+
     from app.meteorologia import bp as meteorologia_bp
     app.register_blueprint(meteorologia_bp)
 

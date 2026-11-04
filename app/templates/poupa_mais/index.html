@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block titulo %}Poupa Mais — PIPE{% endblock %}
+{% block conteudo %}
+<div class="pagina-conteudo poupa-mais">
+  <div class="cabecalho-pagina">
+    <h1>🎁 Poupa Mais</h1>
+    <p class="subtitulo">Estima os benefícios do teu abastecimento BP / Pingo Doce.</p>
+  </div>
+  {% if not concelhos or not tipos %}
+  <section class="cartao poupa-aviso"><h2>Configura primeiro os Combustíveis</h2>
+    <p>Escolhe os concelhos e combustíveis que queres acompanhar para veres os postos disponíveis.</p>
+    <a class="btn btn-primario" href="{{ url_for('combustiveis.definicoes') }}">Abrir definições</a></section>
+  {% elif not opcoes %}
+  <section class="cartao poupa-aviso"><h2>Sem postos elegíveis</h2>
+    <p>Não foram encontrados postos BP ou Pingo Doce nos concelhos configurados.</p></section>
+  {% else %}
+  <div class="poupa-layout">
+    <form class="cartao poupa-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>Dados do abastecimento</h2>
+      <label for="posto_combustivel">Posto e combustível</label>
+      <select class="campo-texto" id="posto_combustivel" name="posto_combustivel" required>
+        {% for opcao in opcoes %}<option value="{{ opcao.chave }}" {% if selecionada and opcao.chave == selecionada.chave %}selected{% endif %} data-preco="{{ opcao.preco if opcao.preco is not none else '' }}" data-data="{{ opcao.data or '' }}">
+          {{ opcao.posto.nome }} · {{ opcao.tipo }} · {{ opcao.posto.concelho }}</option>{% endfor %}
+      </select>
+      <p class="poupa-preco" id="poupa-preco" aria-live="polite">
+        {% if selecionada.preco is not none %}Preço: {{ '%.3f'|format(selecionada.preco) }} €/L · actualizado em {{ selecionada.data or 'data desconhecida' }}
+        {% else %}Sem preço disponível.{% endif %}
+      </p>
+      <div class="poupa-dois-campos">
+        <div><label for="modo">Quero indicar</label><select class="campo-texto" id="modo" name="modo">
+          <option value="euros" {% if request.form.get('modo', 'euros') == 'euros' %}selected{% endif %}>Euros</option>
+          <option value="litros" {% if request.form.get('modo') == 'litros' %}selected{% endif %}>Litros</option></select></div>
+        <div><label for="quantidade" id="rotulo-quantidade">Valor (€)</label>
+          <input class="campo-texto" id="quantidade" name="quantidade" type="number" min="0.01" step="0.01" value="{{ request.form.get('quantidade', '') }}" required></div>
+      </div>
+      {% if resultado %}<p class="poupa-litros-estimados">Litros estimados: <strong>{{ '%.2f'|format(resultado.litros) }} L</strong></p>{% endif %}
+      <div id="manual-wrap" class="poupa-manual" hidden><label for="preco_manual">Preço manual (€/L)</label>
+        <input class="campo-texto" id="preco_manual" name="preco_manual" type="number" min="0.001" step="0.001" value="{{ request.form.get('preco_manual', '') }}">
+        <small>Não há um preço guardado para este posto e combustível.</small></div>
+      {% if erro %}<p class="poupa-erro" role="alert">{{ erro }}</p>{% endif %}
+      <button class="btn btn-primario" type="submit">Calcular benefícios</button>
+    </form>
+    {% if resultado %}<section class="cartao poupa-resultado" aria-live="polite">
+      <p class="poupa-etiqueta">Estimativa de benefícios</p>
+      <h2>{{ resultado.posto }} <span>· {{ resultado.combustivel }}</span></h2>
+      {% if resultado.fora_tabela %}<p class="poupa-fora">Este abastecimento ultrapassa os 100 L abrangidos pela tabela.</p>
+      {% elif not resultado.elegivel %}<p class="poupa-fora">A oferta exige um abastecimento superior a 16 L.</p>{% endif %}
+      <div class="poupa-valores"><div><span>Desconto imediato BP</span><strong>{{ '%.2f'|format(resultado.bp) }} €</strong></div>
+        <div><span>Saldo futuro Pingo Doce</span><strong>{{ '%.2f'|format(resultado.saldo) }} €</strong></div>
+        <div class="poupa-total"><span>Total dos benefícios</span><strong>{{ '%.2f'|format(resultado.total) }} €</strong></div></div>
+      <div class="poupa-custo" aria-label="Custo estimado do abastecimento">
+        <h3>Quanto pagas agora</h3>
+        <div><span>Valor antes do desconto</span><strong>{{ '%.2f'|format(resultado.valor_abastecimento) }} €</strong></div>
+        <div class="poupa-custo-final"><span>Após desconto BP</span><strong>{{ '%.2f'|format(resultado.valor_apos_desconto) }} €</strong></div>
+        <div><span>Preço efectivo por litro</span><strong>{{ '%.3f'|format(resultado.preco_efectivo) }} €/L</strong></div>
+        <p>O saldo Pingo Doce é futuro e não reduz o valor pago neste abastecimento.</p>
+      </div>
+    </section>{% endif %}
+  </div>{% endif %}
+</div>
+{% endblock %}
+{% block estilos_extra %}<style>
+.poupa-layout{display:grid;grid-template-columns:minmax(280px,.9fr) minmax(300px,1.1fr);gap:1rem;align-items:start}
+.poupa-form,.poupa-resultado,.poupa-aviso{padding:1.25rem}.poupa-form h2,.poupa-resultado h2,.poupa-aviso h2{margin:0 0 1rem}
+.poupa-form label{display:block;font-weight:600;margin:.9rem 0 .35rem}.poupa-form .btn{margin-top:1rem;width:100%}
+.poupa-preco,.poupa-nota,.poupa-manual small{color:var(--cor-texto-suave);font-size:.9rem}.poupa-preco{min-height:1.35rem;margin:.4rem 0}
+.poupa-litros-estimados{margin:.65rem 0 0;color:var(--cor-texto-suave);font-size:.9rem}.poupa-litros-estimados strong{color:var(--cor-texto)}
+.poupa-dois-campos{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}.poupa-manual{margin-top:.75rem}.poupa-manual[hidden]{display:none}
+.poupa-erro,.poupa-fora{color:var(--cor-erro)}.poupa-etiqueta{color:var(--cor-primaria);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:.78rem}
+.poupa-resultado h2 span{font-size:.9rem;color:var(--cor-texto-suave);font-weight:500}.poupa-valores{display:grid;gap:.65rem;margin-top:1.2rem}
+.poupa-valores>div{display:flex;justify-content:space-between;gap:1rem;padding:.75rem;border-radius:.6rem;background:rgba(127,127,127,.09)}
+.poupa-valores strong{white-space:nowrap}.poupa-valores .poupa-total{background:color-mix(in srgb,var(--cor-primaria) 16%,transparent);font-size:1.05rem}
+.poupa-custo{display:grid;gap:.55rem;margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(127,127,127,.24)}
+.poupa-custo h3{font-size:1rem;margin:0 0 .15rem}.poupa-custo>div{display:flex;justify-content:space-between;gap:1rem}.poupa-custo strong{white-space:nowrap}
+.poupa-custo-final{font-size:1.08rem;color:var(--cor-primaria)}.poupa-custo p{margin:.2rem 0 0;color:var(--cor-texto-suave);font-size:.82rem}
+@media(max-width:700px){.poupa-layout{grid-template-columns:1fr}}
+</style>{% endblock %}
+{% block scripts_extra %}<script>
+(() => {const posto=document.getElementById('posto_combustivel');if(!posto)return;
+const precoInfo=document.getElementById('poupa-preco'),wrap=document.getElementById('manual-wrap'),manual=document.getElementById('preco_manual'),modo=document.getElementById('modo'),rotulo=document.getElementById('rotulo-quantidade');
+const actualizar=()=>{const o=posto.selectedOptions[0],p=o.dataset.preco;precoInfo.textContent=p?`Preço: ${Number(p).toFixed(3)} €/L · actualizado em ${o.dataset.data||'data desconhecida'}`:'Sem preço disponível.';wrap.hidden=Boolean(p);manual.required=!p};
+posto.addEventListener('change',actualizar);modo.addEventListener('change',()=>rotulo.textContent=modo.value==='euros'?'Valor (€)':'Quantidade (L)');actualizar();modo.dispatchEvent(new Event('change'))})();
+</script>{% endblock %}
