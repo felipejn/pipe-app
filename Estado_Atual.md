@@ -1,4 +1,10 @@
-# PIPE — Estado Actual do Projecto — v1.8.37
+# PIPE — Estado Actual do Projecto — v1.8.38
+
+## Versão v1.8.38 — 2026-11-12
+
+- Corrigida a vista mensal do Calendário para representar eventos multidiários em todos os dias abrangidos, com segmentos de início, continuação e fim; a altura mínima mantém visíveis os segmentos sem título.
+- Validação: `tests/test_calendario_js.py` — 1 teste passou; suite completa — 461 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por falta de preços activos nas fixtures; `git diff --check` limpo.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
 
 ## Versão v1.8.37 — 2026-11-04
 

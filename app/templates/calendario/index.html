@@ -238,10 +238,13 @@
 .cal-dia-eventos { display: flex; flex-direction: column; gap: 2px; }
 
 .cal-pilula {
-  font-size: 0.7rem; padding: 1px 4px; border-radius: 3px;
+  font-size: 0.7rem; min-height: 1.2rem; padding: 1px 4px; border-radius: 3px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   cursor: pointer;
 }
+.cal-pilula--inicio { border-radius: 3px 0 0 3px; margin-right: -0.25rem; }
+.cal-pilula--continuacao { border-radius: 0; margin-inline: -0.25rem; }
+.cal-pilula--fim { border-radius: 0 3px 3px 0; margin-left: -0.25rem; }
 .cal-mais { font-size: 0.65rem; color: #888; padding-left: 2px; }
 
 /* ── Modal ── */
@@ -501,14 +504,18 @@ function construirGrelha(eventos) {
     cel.onclick = () => abrirModalCriarData(dataStr);
 
     // Eventos deste dia
-    const evsDia = eventos.filter(e => e.data_inicio.slice(0,10) === dataStr);
+    const evsDia = eventos.filter(e => segmentoEventoNoDia(e, dataStr) !== null);
     const contentor = cel.querySelector('.cal-dia-eventos');
     const max = 2;
     evsDia.slice(0, max).forEach(e => {
+      const segmento = segmentoEventoNoDia(e, dataStr);
       const p = document.createElement('div');
-      p.className = `cal-pilula evento-${e.cor}`;
-      p.textContent = `${e.partilhado ? '↗ ' : ''}${e.titulo}`;
-      if (e.partilhado) p.title = 'Partilhado contigo';
+      p.className = `cal-pilula cal-pilula--${segmento.tipo} evento-${e.cor}`;
+      p.textContent = segmento.titulo
+        ? `${e.partilhado ? '↗ ' : ''}${segmento.titulo}`
+        : '';
+      p.title = e.partilhado ? `Partilhado contigo: ${e.titulo}` : e.titulo;
+      p.setAttribute('aria-label', e.titulo);
       p.onclick = (ev) => { ev.stopPropagation(); abrirDetalhe(e.id, e); };
       contentor.appendChild(p);
     });
@@ -521,6 +528,17 @@ function construirGrelha(eventos) {
 
     grelha.appendChild(cel);
   }
+}
+
+function segmentoEventoNoDia(evento, dataStr) {
+  const inicio = evento.data_inicio.slice(0, 10);
+  const fim = evento.data_fim.slice(0, 10);
+  if (dataStr < inicio || dataStr > fim) return null;
+
+  if (inicio === fim) return { tipo: 'unico', titulo: evento.titulo };
+  if (dataStr === inicio) return { tipo: 'inicio', titulo: evento.titulo };
+  if (dataStr === fim) return { tipo: 'fim', titulo: '' };
+  return { tipo: 'continuacao', titulo: '' };
 }
 
 function navegarMes(delta) {

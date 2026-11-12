@@ -6,6 +6,21 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.38] — 2026-11-12
+Corrigida a extensão visual dos eventos multidiários na vista mensal do Calendário.
+
+**Corrigido**
+- Eventos que atravessam vários dias passam a surgir em cada dia abrangido, com segmentos visuais de início, continuação e fim; os segmentos sem título mantêm a altura das restantes pílulas.
+
+**Validação**
+- `tests/test_calendario_js.py`: 1 teste passou. Suite completa: 461 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por falta de preços activos nas fixtures.
+- `git diff --check` limpo.
+
+**Notas de deploy**
+- Sem alterações de BD ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.37] — 2026-11-04
 Criado o módulo Poupa Mais para estimar os benefícios dos abastecimentos BP e Pingo Doce.
 
