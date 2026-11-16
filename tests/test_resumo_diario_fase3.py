@@ -59,6 +59,138 @@ def test_elegibilidade_cada_condicao_falhada_isoladamente(contexto):
         assert not services.utilizador_elegivel_para_resumo(user)
 
 
+def test_elegibilidade_aceita_email_activo_sem_telegram(contexto):
+    app, (user_id, _) = contexto
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.notificacao_prefs.telegram_chat_id = None
+        user.notificacao_prefs.telegram_activo = False
+        user.notificacao_prefs.email_activo = True
+        assert services.utilizador_elegivel_para_resumo(user)
+
+        user.notificacao_prefs.email_activo = False
+        assert not services.utilizador_elegivel_para_resumo(user)
+
+
+def test_envio_email_sem_telegram_regista_data(contexto):
+    app, (user_id, outro_id) = contexto
+    hoje = date(2026, 10, 9)
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.notificacao_prefs.telegram_chat_id = None
+        user.notificacao_prefs.telegram_activo = False
+        user.notificacao_prefs.email_activo = True
+        db.session.get(User, outro_id).notificacao_prefs.telegram_activo = False
+        db.session.get(User, outro_id).notificacao_prefs.email_activo = False
+        db.session.commit()
+
+    with app.app_context(), patch.object(services, 'gerar_resumo_diario', side_effect=_resumo), \
+            patch.object(services.notification_service, 'send',
+                         return_value={'email': True, 'telegram': None}) as enviar:
+        assert services.enviar_resumos_diarios(hoje) == {user_id}
+        assert ConfiguracaoResumoDiario.query.filter_by(user_id=user_id).one().ultimo_envio == hoje
+
+    assert enviar.call_count == 1
+    assert enviar.call_args.kwargs['force_channel'] == 'email'
+    assert enviar.call_args.kwargs['email_template'] == 'resumo_diario'
+    assert enviar.call_args.kwargs['email_context'] == {
+        'nome': 'automatico-a', 'data': '2026-10-09', 'texto': 'Resumo de teste'}
+
+
+def test_falha_telegram_recorre_ao_email_sem_duplicar(contexto):
+    app, (user_id, outro_id) = contexto
+    hoje = date(2026, 10, 9)
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.notificacao_prefs.email_activo = True
+        db.session.get(User, outro_id).notificacao_prefs.telegram_activo = False
+        db.session.get(User, outro_id).notificacao_prefs.email_activo = False
+        db.session.commit()
+
+    with app.app_context(), patch.object(services, 'gerar_resumo_diario', side_effect=_resumo), \
+            patch.object(services.notification_service, 'send',
+                         side_effect=[{'telegram': False, 'email': None},
+                                      {'email': True, 'telegram': None}]) as enviar:
+        assert services.enviar_resumos_diarios(hoje) == {user_id}
+        assert ConfiguracaoResumoDiario.query.filter_by(user_id=user_id).one().ultimo_envio == hoje
+
+    assert enviar.call_count == 2
+    assert enviar.call_args_list[0].kwargs['force_channel'] == 'telegram'
+    assert enviar.call_args_list[1].kwargs['force_channel'] == 'email'
+    assert enviar.call_args_list[1].kwargs['email_template'] == 'resumo_diario'
+
+
+def test_sucesso_telegram_nao_duplica_email(contexto):
+    app, (user_id, outro_id) = contexto
+    hoje = date(2026, 10, 9)
+    with app.app_context():
+        db.session.get(User, user_id).notificacao_prefs.email_activo = True
+        db.session.get(User, outro_id).notificacao_prefs.telegram_activo = False
+        db.session.get(User, outro_id).notificacao_prefs.email_activo = False
+        db.session.commit()
+
+    with app.app_context(), patch.object(services, 'gerar_resumo_diario', side_effect=_resumo), \
+            patch.object(services.notification_service, 'send',
+                         return_value={'telegram': True, 'email': None}) as enviar:
+        assert services.enviar_resumos_diarios(hoje) == {user_id}
+
+    assert enviar.call_count == 1
+    assert enviar.call_args.kwargs['force_channel'] == 'telegram'
+
+
+def test_falha_nos_dois_canais_nao_regista_data(contexto):
+    app, (user_id, outro_id) = contexto
+    hoje = date(2026, 10, 9)
+    with app.app_context():
+        db.session.get(User, user_id).notificacao_prefs.email_activo = True
+        db.session.get(User, outro_id).notificacao_prefs.telegram_activo = False
+        db.session.get(User, outro_id).notificacao_prefs.email_activo = False
+        db.session.commit()
+
+    with app.app_context(), patch.object(services, 'gerar_resumo_diario', side_effect=_resumo), \
+            patch.object(services.notification_service, 'send',
+                         side_effect=[{'telegram': False, 'email': None},
+                                      {'email': False, 'telegram': None}]) as enviar:
+        assert services.enviar_resumos_diarios(hoje) == set()
+        assert enviar.call_count == 2
+        assert ConfiguracaoResumoDiario.query.filter_by(user_id=user_id).first() is None
+
+
+def test_excecao_telegram_com_falha_email_nao_e_classificada_como_canal_em_falta(contexto, caplog):
+    app, (user_id, outro_id) = contexto
+    with app.app_context():
+        db.session.get(User, user_id).notificacao_prefs.email_activo = True
+        db.session.get(User, outro_id).notificacao_prefs.telegram_activo = False
+        db.session.get(User, outro_id).notificacao_prefs.email_activo = False
+        db.session.commit()
+
+    with app.app_context(), patch.object(services, 'gerar_resumo_diario', side_effect=_resumo), \
+            patch.object(services.notification_service, 'send',
+                         side_effect=[RuntimeError('falha inesperada'),
+                                      {'email': False, 'telegram': None}]):
+        assert services.enviar_resumos_diarios(date(2026, 10, 9)) == set()
+
+    assert 'Excepção no Telegram' in caplog.text
+    assert 'Telegram não configurado' not in caplog.text
+
+
+def test_email_inactivo_fica_distinto_de_falha_no_log(contexto, caplog):
+    app, (user_id, outro_id) = contexto
+    with app.app_context():
+        db.session.get(User, outro_id).notificacao_prefs.telegram_activo = False
+        db.session.get(User, outro_id).notificacao_prefs.email_activo = False
+        db.session.commit()
+
+    with app.app_context(), patch.object(services, 'gerar_resumo_diario', side_effect=_resumo), \
+            patch.object(services.notification_service, 'send',
+                         return_value={'telegram': False, 'email': None}), \
+            patch.object(services.notification_service, 'ultimo_erro',
+                         return_value='Erro de rede: timeout'):
+        assert services.enviar_resumos_diarios(date(2026, 10, 9)) == set()
+
+    assert 'telegram=False email=None' in caplog.text
+
+
 def test_envio_regista_data_e_nao_repete_no_mesmo_dia(contexto):
     app, ids = contexto
     user_id = ids[0]

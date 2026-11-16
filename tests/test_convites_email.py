@@ -306,3 +306,22 @@ def test_email_de_teste_nao_inclui_link_ou_botao_do_euromilhoes(app):
     assert 'euromilhoes_url' not in html
     assert 'Ver resultados' not in html
     assert 'euromilhoes/resultados' not in texto
+
+
+def test_email_resumo_diario_usa_template_proprio_com_texto_escapado(app):
+    from app.notifications.email_templates import compor_email
+
+    with app.app_context():
+        assunto, texto, html = compor_email('resumo_diario', {
+            'nome': 'Ana', 'data': '2026-11-16',
+            'texto': 'Hoje: tarefa <rever> & café.',
+        })
+
+    assert assunto == 'O teu Resumo Diário — 2026-11-16'
+    assert 'Olá Ana' in texto
+    assert 'Hoje: tarefa <rever> & café.' in texto
+    assert 'Hoje: tarefa &lt;rever&gt; &amp; café.' in html
+    assert '2026-11-16' in html
+    assert 'Abrir o PIPE: https://felipejn.pythonanywhere.com/' in texto
+    assert 'Abrir o PIPE' in html
+    assert 'resumo-diario/definicoes' not in texto

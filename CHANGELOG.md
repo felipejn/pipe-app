@@ -6,6 +6,23 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.39] — 2026-11-16
+Adicionado fallback por email para o Resumo Diário e teste de envio por email na página do módulo.
+
+**Alterado**
+- O Telegram continua a ser tentado primeiro. Quando está inactivo, sem chat_id ou falha, o email recebe o resumo se estiver activo; um envio Telegram bem-sucedido não gera duplicado.
+- Criado template próprio de email do Resumo Diário, em HTML e texto simples. A página do módulo permite testar o envio por email; os botões identificam os respectivos canais e o email abre a página inicial do PIPE.
+
+**Validação**
+- Suite focada de emails e Resumo Diário: 124 passaram; após os ajustes finais de rótulo e ligação, 2 testes directamente afectados passaram.
+- Suite completa: 473 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por fixtures de preços activos.
+- `git diff --check` e compilação Python limpos.
+
+**Notas de deploy**
+- Sem alterações de BD ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.38] — 2026-11-12
 Corrigida a extensão visual dos eventos multidiários na vista mensal do Calendário.
 

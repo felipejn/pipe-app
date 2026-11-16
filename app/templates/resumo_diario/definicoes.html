@@ -28,7 +28,8 @@
     <div class="definicoes-acoes" style="display:flex;gap:.75rem;flex-wrap:wrap;">
       <button type="submit" class="btn btn-primario">Guardar</button>
       <button type="button" id="btn-previsualizar" class="btn btn-secundario">Pré-visualizar</button>
-      <button type="button" id="btn-enviar" class="btn btn-secundario">Enviar agora</button>
+      <button type="button" id="btn-enviar" class="btn btn-secundario">Testar envio por Telegram</button>
+      <button type="button" id="btn-testar-email" class="btn btn-secundario">Testar envio por email</button>
     </div>
   </form>
 
@@ -83,6 +84,9 @@
   });
   document.getElementById('btn-enviar').addEventListener('click', function () {
     pedir('{{ url_for("resumo_diario.enviar") }}', this);
+  });
+  document.getElementById('btn-testar-email').addEventListener('click', function () {
+    pedir('{{ url_for("resumo_diario.testar_email") }}', this);
   });
 })();
 </script>

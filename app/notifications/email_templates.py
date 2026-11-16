@@ -28,6 +28,8 @@ def _assunto(tipo, contexto):
         if amanha and hoje:
             return f'{amanha} evento(s) amanhã e {hoje} hoje — PIPE'
         return f'{amanha or hoje} evento(s) no Calendário — PIPE'
+    if tipo == 'resumo_diario':
+        return f'O teu Resumo Diário — {contexto.get("data", "hoje")}'
     if tipo == 'partilha_recurso':
         return 'Recebeste um recurso partilhado'
     raise ValueError(f'Template de email desconhecido: {tipo}')
@@ -46,10 +48,12 @@ def compor_email(tipo, contexto=None):
         contexto.setdefault('tarefas_url', url_for('tarefas.index', _external=True))
         contexto.setdefault('calendario_url', url_for('calendario.index', _external=True))
         contexto.setdefault('euromilhoes_url', url_for('euromilhoes.index', _external=True))
+        contexto.setdefault('resumo_diario_url', url_for('dashboard', _external=True))
     else:
         contexto.setdefault('tarefas_url', f'{url_base}/tarefas/')
         contexto.setdefault('calendario_url', f'{url_base}/calendario/')
         contexto.setdefault('euromilhoes_url', f'{url_base}/euromilhoes/resultados')
+        contexto.setdefault('resumo_diario_url', url_app)
     contexto['preheader'] = {
         'codigo_2fa': 'O teu código de verificação, válido durante 10 minutos.',
         'convite': 'Foste convidado a criar uma conta no PIPE.',
@@ -58,6 +62,7 @@ def compor_email(tipo, contexto=None):
         'resultados_euromilhoes': 'Já podes consultar os resultados dos teus jogos.',
         'tarefas': 'Um resumo das tarefas com prazo hoje ou em atraso.',
         'eventos': 'Um resumo dos próximos eventos do Calendário.',
+        'resumo_diario': 'O teu plano para hoje, com o resumo pessoal do PIPE.',
         'partilha_recurso': 'Um utilizador partilhou um recurso contigo no PIPE.',
     }[tipo]
     contexto['assunto'] = _assunto(tipo, contexto)

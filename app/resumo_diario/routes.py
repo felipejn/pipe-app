@@ -79,3 +79,42 @@ def enviar():
             'mensagem': 'Não foi possível enviar o resumo pelo Telegram. Confirma o chat_id e tenta novamente.',
         }), 502
     return jsonify({'ok': True, 'mensagem': 'Resumo enviado por Telegram.'})
+
+
+@bp.route('/api/testar-email', methods=['POST'])
+@login_required
+@limiter.limit('5/hour')
+def testar_email():
+    email = (current_user.email or '').strip()
+    if not email:
+        return jsonify({
+            'ok': False,
+            'mensagem': 'Configura primeiro um endereço de email na tua conta.',
+        }), 400
+
+    resumo = gerar_resumo_diario(current_user.id, obter_data_local(), modo='web')
+    corpo = resumo['texto'] or 'Não há novidades para hoje.'
+    resultado = notification_service.send(
+        user=current_user,
+        type='resumo_diario',
+        subject='Resumo Diário',
+        body=corpo,
+        force_channel='email',
+        email_template='resumo_diario',
+        email_context={
+            'nome': current_user.nome_apresentacao,
+            'data': resumo['data'],
+            'texto': corpo,
+        },
+    )
+    if resultado.get('email') is None:
+        return jsonify({
+            'ok': False,
+            'mensagem': 'O envio por email não está configurado no servidor. Tenta mais tarde.',
+        }), 503
+    if not resultado.get('email'):
+        return jsonify({
+            'ok': False,
+            'mensagem': 'Não foi possível enviar o resumo por email. Tenta novamente mais tarde.',
+        }), 502
+    return jsonify({'ok': True, 'mensagem': 'Resumo enviado por email.'})

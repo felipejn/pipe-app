@@ -147,6 +147,64 @@ def test_envio_forca_telegram_com_chat_id_mesmo_com_canal_desligado(contexto):
     assert enviar.call_args.kwargs['telegram_include_subject'] is False
 
 
+def test_envio_email_manual_usa_template_do_resumo(contexto):
+    app, cliente, (user_id, _) = contexto
+    with app.app_context():
+        utilizador = db.session.get(User, user_id)
+        utilizador.nome = 'Ana'
+        db.session.commit()
+
+    with patch('app.resumo_diario.routes.gerar_resumo_diario',
+               return_value={'data': '2026-10-08', 'texto': 'Resumo por email'}) as gerar, \
+            patch('app.resumo_diario.routes.notification_service.send',
+                  return_value={'email': True, 'telegram': None}) as enviar:
+        resposta = cliente.post('/resumo-diario/api/testar-email', json={})
+
+    assert resposta.status_code == 200
+    assert resposta.get_json() == {'ok': True, 'mensagem': 'Resumo enviado por email.'}
+    gerar.assert_called_once()
+    assert enviar.call_args.kwargs['force_channel'] == 'email'
+    assert enviar.call_args.kwargs['email_template'] == 'resumo_diario'
+    assert enviar.call_args.kwargs['email_context'] == {
+        'nome': 'Ana', 'data': '2026-10-08', 'texto': 'Resumo por email'}
+
+
+def test_envio_email_manual_sem_endereco_nao_chama_servico(contexto):
+    app, cliente, (user_id, _) = contexto
+    with app.app_context():
+        db.session.get(User, user_id).email = ''
+        db.session.commit()
+
+    with patch('app.resumo_diario.routes.notification_service.send') as enviar:
+        resposta = cliente.post('/resumo-diario/api/testar-email', json={})
+
+    assert resposta.status_code == 400
+    assert 'endereço de email' in resposta.get_json()['mensagem']
+    enviar.assert_not_called()
+
+
+@pytest.mark.parametrize('resultado,codigo', [({'email': None}, 503), ({'email': False}, 502)])
+def test_envio_email_manual_reporta_canal_indisponivel_ou_falha(contexto, resultado, codigo):
+    _, cliente, _ = contexto
+    with patch('app.resumo_diario.routes.gerar_resumo_diario',
+               return_value={'data': '2026-10-08', 'texto': 'Resumo'}), \
+            patch('app.resumo_diario.routes.notification_service.send',
+                  return_value=resultado):
+        resposta = cliente.post('/resumo-diario/api/testar-email', json={})
+
+    assert resposta.status_code == codigo
+    assert resposta.get_json()['ok'] is False
+
+
+def test_pagina_resumo_disponibiliza_teste_de_email(contexto):
+    _, cliente, _ = contexto
+    resposta = cliente.get('/resumo-diario/definicoes')
+    assert resposta.status_code == 200
+    assert 'Testar envio por Telegram'.encode('utf-8') in resposta.data
+    assert 'Testar envio por email'.encode('utf-8') in resposta.data
+    assert b'/resumo-diario/api/testar-email' in resposta.data
+
+
 def test_servico_forcado_usa_so_telegram_sem_exigir_canal_activo(contexto):
     from app.notifications.service import NotificationService
 

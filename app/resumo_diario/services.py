@@ -45,12 +45,15 @@ def obter_data_local():
 
 
 def utilizador_elegivel_para_resumo(user):
-    """Verifica as três condições necessárias para o envio automático."""
+    """Verifica se o utilizador tem módulo activo e pelo menos um canal útil."""
     prefs = getattr(user, 'notificacao_prefs', None)
+    telegram_activo = bool(
+        prefs and prefs.telegram_activo and (prefs.telegram_chat_id or '').strip())
+    email_activo = bool(prefs and prefs.email_activo and getattr(user, 'email', None))
     return bool(
         user and user.activo
         and UserModulo.query.filter_by(user_id=user.id, modulo_slug='resumo_diario', ativo=True).first()
-        and prefs and (prefs.telegram_chat_id or '').strip() and prefs.telegram_activo
+        and (telegram_activo or email_activo)
     )
 
 
@@ -66,9 +69,6 @@ def enviar_resumos_diarios(data=None, simular=False):
                 recebidos.add(user.id)
                 continue
             prefs = getattr(user, 'notificacao_prefs', None)
-            if not prefs or not (prefs.telegram_chat_id or '').strip():
-                logging.warning('[Resumo Diário] %s sem chat_id de Telegram.', user.username)
-                continue
             if not utilizador_elegivel_para_resumo(user):
                 continue
             resumo = gerar_resumo_diario(user.id, data)
@@ -77,29 +77,61 @@ def enviar_resumos_diarios(data=None, simular=False):
                 print(f'[{user.username}] (origem: {origem})\n'
                       f'{resumo["texto"] or "Não há novidades para hoje."}')
                 continue
-            resultado = notification_service.send(
-                user=user, type='resumo_diario', subject='Resumo Diário',
-                body=resumo['texto'] or 'Não há novidades para hoje.',
-                force_channel='telegram', telegram_parse_mode='HTML',
-                telegram_include_subject=False)
-            if resultado.get('telegram'):
+
+            corpo = resumo['texto'] or 'Não há novidades para hoje.'
+            telegram_ok = False
+            telegram_estado = None
+            telegram_excecao = False
+            chat_id = (prefs.telegram_chat_id or '').strip() if prefs else ''
+            if prefs and prefs.telegram_activo and chat_id:
+                try:
+                    resultado_telegram = notification_service.send(
+                        user=user, type='resumo_diario', subject='Resumo Diário',
+                        body=corpo, force_channel='telegram', telegram_parse_mode='HTML',
+                        telegram_include_subject=False)
+                    telegram_estado = resultado_telegram.get('telegram')
+                    telegram_ok = bool(telegram_estado)
+                except Exception:
+                    telegram_excecao = True
+                    logging.exception('[Resumo Diário] Excepção no Telegram para %s',
+                                      user.username)
+
+            email_ok = False
+            email_estado = None
+            if not telegram_ok and prefs and prefs.email_activo:
+                contexto_email = {
+                    'nome': user.nome_apresentacao,
+                    'data': resumo['data'],
+                    'texto': corpo,
+                }
+                resultado_email = notification_service.send(
+                    user=user, type='resumo_diario', subject='Resumo Diário',
+                    body=corpo, force_channel='email',
+                    email_template='resumo_diario', email_context=contexto_email)
+                email_estado = resultado_email.get('email')
+                email_ok = bool(email_estado)
+
+            if telegram_ok or email_ok:
                 configuracao = configuracao or obter_ou_criar_configuracao(user.id)
                 configuracao.ultimo_envio = data
                 db.session.commit()
                 recebidos.add(user.id)
             else:
                 db.session.rollback()
-                estado = resultado.get('telegram')
-                if estado is None:
-                    # Canal não inicializado ou utilizador sem chat_id — o
-                    # serviço não chegou a chamar a API do Telegram.
-                    motivo = 'Telegram não configurado (canal ou chat_id em falta)'
+                if telegram_excecao:
+                    motivo = 'Excepção no Telegram; envio por email indisponível ou falhado'
+                elif telegram_estado is None and not chat_id:
+                    motivo = 'Telegram sem chat_id; envio por email indisponível ou falhado'
+                elif telegram_estado is None and not (prefs and prefs.telegram_activo):
+                    motivo = 'Telegram inactivo; envio por email indisponível ou falhado'
+                elif telegram_estado is None:
+                    motivo = 'Telegram não configurado; envio por email indisponível ou falhado'
                 else:
                     motivo = (notification_service.ultimo_erro('telegram')
-                              or 'motivo não detalhado')
-                print(f'[Resumo Diário] {user.username}: envio Telegram falhou ({estado}) — {motivo}')
-                logging.error('[Resumo Diário] Falha de envio para %s: telegram=%r (%s)',
-                              user.username, estado, motivo)
+                              or 'motivo não detalhado; envio por email indisponível ou falhado')
+                print(f'[Resumo Diário] {user.username}: sem entrega ({motivo})')
+                logging.error('[Resumo Diário] Falha de envio para %s: telegram=%r email=%r (%s)',
+                              user.username, telegram_estado, email_estado, motivo)
         except Exception as erro:
             db.session.rollback()
             print(f'[Resumo Diário] Erro para utilizador {getattr(user, "username", user.id)}: {erro}')
