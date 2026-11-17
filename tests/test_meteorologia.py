@@ -288,6 +288,7 @@ def _forecast_valido(hora_atual='2026-10-07T14:00'):
             'temperature_2m': [10.0 + i * 0.1 for i in range(168)],
             'weathercode': [2] * 168,
             'precipitation_probability': probs,
+            'precipitation': [0.0] * 168,
         },
         'daily': {
             'time': ['2026-10-07', '2026-10-08', '2026-10-09',
@@ -353,9 +354,11 @@ class TestObterPrevisao:
         assert previsao['timezone'] == 'Europe/Lisbon'
         assert previsao['fonte'] == 'Open-Meteo'
         assert captar.get('forecast_days') == 7
+        assert 'precipitation' in captar.get('hourly', '')
         assert len(previsao['horaria']) == 24
         assert previsao['horaria'][0]['hora'] == '2026-10-07T14:00'
         assert previsao['horaria'][0]['prob_precipitacao'] == 42
+        assert previsao['horaria'][0]['precipitacao'] == 0.0
         assert len(previsao['diaria']) == 7
         assert previsao['diaria'][0]['temp_max'] == 24.0
         assert previsao['diaria'][0]['temp_min'] == 14.0
@@ -486,7 +489,9 @@ class TestPaginaPrevisao:
 
     def test_com_local_mostra_previsao(
             self, authenticated_client, monkeypatch):
-        _mock_forecast(monkeypatch)
+        dados = _forecast_valido()
+        dados['hourly']['precipitation'][14] = 0.4
+        _mock_forecast(monkeypatch, dados=dados)
         r = authenticated_client.post('/meteorologia/api/localizacao', json={
             'nome': 'Vila Verde', 'latitude': 41.65,
             'longitude': -8.43, 'pais': 'Portugal',
@@ -497,7 +502,28 @@ class TestPaginaPrevisao:
         corpo = resposta.data.decode('utf-8')
         assert 'Vila Verde' in corpo
         assert '21,5' in corpo or '21.5' in corpo
+        assert '0,4 mm' in corpo or '0.4 mm' in corpo
         assert 'Mudar' in corpo
+
+    def test_cache_antiga_sem_volume_horario_mostra_traco(
+            self, authenticated_client, monkeypatch):
+        from app.meteorologia import services as servicos
+        _mock_forecast(monkeypatch)
+        r = authenticated_client.post('/meteorologia/api/localizacao', json={
+            'nome': 'Vila Verde', 'latitude': 41.65,
+            'longitude': -8.43, 'pais': 'Portugal'})
+        assert r.status_code == 200
+
+        payload_antigo = servicos.obter_previsao(41.65, -8.43)
+        for hora in payload_antigo['horaria']:
+            hora.pop('precipitacao', None)
+        payload_antigo['de_cache'] = True
+        monkeypatch.setattr(
+            servicos, 'obter_previsao', lambda *_: payload_antigo)
+
+        resposta = authenticated_client.get('/meteorologia/')
+        assert resposta.status_code == 200
+        assert 'Horas guardadas' in resposta.get_data(as_text=True)
 
     def test_com_local_e_api_em_baixo_mostra_erro(
             self, authenticated_client, monkeypatch):

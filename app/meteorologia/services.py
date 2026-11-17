@@ -201,7 +201,8 @@ PARAMS_FORECAST = {
     'current': ('temperature_2m,relative_humidity_2m,apparent_temperature,'
                 'precipitation,weather_code,wind_speed_10m,'
                 'wind_direction_10m,uv_index'),
-    'hourly': 'temperature_2m,weather_code,precipitation_probability',
+    'hourly': ('temperature_2m,weather_code,precipitation_probability,'
+               'precipitation'),
     'daily': ('weather_code,temperature_2m_max,temperature_2m_min,'
               'precipitation_probability_max'),
     'timezone': 'auto',
@@ -288,6 +289,7 @@ def obter_previsao(lat, lon):
         diaria_api = dados.get('daily') or {}
         horas = horaria_api.get('time') or []
         probs = horaria_api.get('precipitation_probability') or []
+        precips = horaria_api.get('precipitation') or []
         temps_h = horaria_api.get('temperature_2m') or []
         wmos_h = _campo_compat(horaria_api, 'weather_code', 'weathercode') or []
         idx = _indice_hora_atual(atual_api.get('time'), horas)
@@ -331,6 +333,7 @@ def obter_previsao(lat, lon):
                 'descricao_pt': descrever_wmo(cod_h)[0],
                 'emoji': descrever_wmo(cod_h)[1],
                 'prob_precipitacao': _num(probs[i]) if i < len(probs) else None,
+                'precipitacao': _num(precips[i]) if i < len(precips) else None,
             })
         diaria = []
         dias = diaria_api.get('time') or []

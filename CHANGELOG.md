@@ -6,6 +6,21 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.40] — 2026-11-17
+Os cartões meteorológicos horários apresentam o volume previsto de precipitação.
+
+**Alterado**
+- A previsão inclui precipitação horária em milímetros e os cartões das próximas 24 horas mostram o respectivo valor; cache antiga sem este campo apresenta um traço.
+
+**Validação**
+- `tests/test_meteorologia.py`: 43 passaram. Suite completa: 475 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por falta de preços nas fixtures.
+- `git diff --check` limpo.
+
+**Notas de deploy**
+- Sem alterações de BD ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.39] — 2026-11-16
 Adicionado fallback por email para o Resumo Diário e teste de envio por email na página do módulo.
 

@@ -62,6 +62,7 @@
         <div style="font-size:1.2rem;">{{ h.emoji }}</div>
         <div><strong>{{ '—' if h.temperatura is none else '%.0f'|format(h.temperatura) }}°</strong></div>
         <div class="texto-subtil" style="font-size:.8rem;">{{ '—' if h.prob_precipitacao is none else h.prob_precipitacao|int }}%</div>
+        <div class="texto-subtil" style="font-size:.8rem;">{{ '—' if h.precipitacao is not defined or h.precipitacao is none else '%.1f mm'|format(h.precipitacao) }}</div>
       </div>
       {% endfor %}
     </div>
