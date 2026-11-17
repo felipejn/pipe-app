@@ -300,6 +300,7 @@ def _forecast_valido(hora_atual='2026-10-07T14:00'):
             'temperature_2m_min': [14.0, 13.5, 13.0, 12.5, 12.0,
                                    11.5, 11.0],
             'precipitation_probability_max': [10, 20, 30, 0, 5, 60, 80],
+            'precipitation_sum': [0, 1.2, 0, 3.4, 0, 2.1, 0],
         },
     }
 
@@ -355,6 +356,7 @@ class TestObterPrevisao:
         assert previsao['fonte'] == 'Open-Meteo'
         assert captar.get('forecast_days') == 7
         assert 'precipitation' in captar.get('hourly', '')
+        assert 'precipitation_sum' in captar.get('daily', '')
         assert len(previsao['horaria']) == 24
         assert previsao['horaria'][0]['hora'] == '2026-10-07T14:00'
         assert previsao['horaria'][0]['prob_precipitacao'] == 42
@@ -363,6 +365,7 @@ class TestObterPrevisao:
         assert previsao['diaria'][0]['temp_max'] == 24.0
         assert previsao['diaria'][0]['temp_min'] == 14.0
         assert previsao['diaria'][2]['codigo_wmo'] == 61
+        assert previsao['diaria'][1]['precipitacao'] == 1.2
 
     def test_lat_lon_invalidos_devolve_none(self):
         from app.meteorologia import services as servicos

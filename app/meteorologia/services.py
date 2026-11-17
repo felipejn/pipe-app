@@ -204,7 +204,7 @@ PARAMS_FORECAST = {
     'hourly': ('temperature_2m,weather_code,precipitation_probability,'
                'precipitation'),
     'daily': ('weather_code,temperature_2m_max,temperature_2m_min,'
-              'precipitation_probability_max'),
+              'precipitation_probability_max,precipitation_sum'),
     'timezone': 'auto',
     'forecast_days': 7,
 }
@@ -341,6 +341,7 @@ def obter_previsao(lat, lon):
         maxs = diaria_api.get('temperature_2m_max') or []
         mins = diaria_api.get('temperature_2m_min') or []
         probs_d = diaria_api.get('precipitation_probability_max') or []
+        precips_d = diaria_api.get('precipitation_sum') or []
         for i in range(min(7, len(dias))):
             cod_d = _wmo_seguro(wmos_d, i)
             diaria.append({
@@ -351,6 +352,7 @@ def obter_previsao(lat, lon):
                 'temp_max': _num(maxs[i]) if i < len(maxs) else None,
                 'temp_min': _num(mins[i]) if i < len(mins) else None,
                 'prob_precipitacao': _num(probs_d[i]) if i < len(probs_d) else None,
+                'precipitacao': _num(precips_d[i]) if i < len(precips_d) else None,
             })
         payload = {
             'atual': atual,

@@ -6,6 +6,21 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.41] — 2026-11-17
+Os cartões meteorológicos diários apresentam o volume previsto de precipitação acumulado.
+
+**Alterado**
+- A previsão pede e normaliza a precipitação acumulada diária da Open-Meteo; os cartões dos próximos 7 dias mostram o valor em milímetros, com uma casa decimal. Cache antiga sem este campo apresenta um traço.
+
+**Validação**
+- `tests/test_meteorologia.py` passou. Suite completa: 475 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por falta de preços nas fixtures.
+- `git diff --check` limpo.
+
+**Notas de deploy**
+- Sem alterações de BD ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+---
+
 ## [v1.8.40] — 2026-11-17
 Os cartões meteorológicos horários apresentam o volume previsto de precipitação.
 

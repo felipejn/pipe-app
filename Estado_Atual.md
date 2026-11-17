@@ -1,4 +1,12 @@
-# PIPE — Estado Actual do Projecto — v1.8.40
+# PIPE — Estado Actual do Projecto — v1.8.41
+
+## Versão v1.8.41 — 2026-11-17
+
+- Os cartões dos próximos 7 dias apresentam também o volume previsto de precipitação acumulado por dia, em milímetros; previsões antigas em cache sem este campo mostram um traço.
+- Validação: `tests/test_meteorologia.py` passou; suite completa — 475 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por falta de preços nas fixtures; `git diff --check` limpo.
+- Sem alterações de base de dados ou dependências. Em PythonAnywhere, executar `git pull` e Reload.
+
+## Versão v1.8.40 — 2026-11-17
 
 ## Versão v1.8.40 — 2026-11-17
 

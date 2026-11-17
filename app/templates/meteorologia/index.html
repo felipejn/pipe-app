@@ -78,6 +78,7 @@
         <div class="texto-subtil" style="font-size:.8rem;">{{ d.descricao_pt }}</div>
         <div><strong>{{ '—' if d.temp_max is none else '%.0f'|format(d.temp_max) }}°</strong> / {{ '—' if d.temp_min is none else '%.0f'|format(d.temp_min) }}°</div>
         <div class="texto-subtil" style="font-size:.8rem;">{{ '—' if d.prob_precipitacao is none else d.prob_precipitacao|int }}%</div>
+        <div class="texto-subtil" style="font-size:.8rem;">{{ '—' if d.precipitacao is not defined or d.precipitacao is none else '%.1f mm'|format(d.precipitacao) }}</div>
       </div>
       {% endfor %}
     </div>
