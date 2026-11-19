@@ -1,13 +1,13 @@
 """Testes unitários da ferramenta get_meteorologia do Assistente IA.
 
 Cobrem o registo da ferramenta, o erro quando não há localização guardada,
-a previsão quando a Open-Meteo responde e quando falha, o payload compacto e
+a previsão quando a OpenWeather responde e quando falha, o payload compacto e
 detalhado (incluindo a inexistência de 'diaria' no detalhado), o tamanho do
 JSON SERIALIZADO (<= 2000 chars) em compacto, detalhado e pior-caso, o
 isolamento por utilizador e a frescura (meta com fonte e data).
 
 Usam SQLite em memória (create_app('testing')), sem tocar na BD real nem na
-API da Open-Meteo: a chamada HTTP é mockada com unittest.mock.patch.
+API da OpenWeather: as chamadas HTTP são mockadas com unittest.mock.patch.
 """
 
 from unittest import TestCase
@@ -27,53 +27,44 @@ from app.assistente.ferramentas import (
 from app.auth.models import User
 
 
-# ── Fixture de previsao realista da Open-Meteo (alinhado a
+# ── Fixture de previsão realista da OpenWeather (alinhada a
 #    tests/test_meteorologia.py) ────────────────────────────────────────────
 
 
-def _horas_7dias():
-    from datetime import datetime as _dt, timedelta as _td
-
-    base = _dt(2026, 10, 7, 0, 0)
-    return [(base + _td(hours=i)).strftime('%Y-%m-%dT%H:00') for i in range(168)]
+def _tempo_atual_valido():
+    from calendar import timegm
+    from datetime import datetime, timezone
+    return {
+        'dt': timegm(datetime(2026, 10, 7, 13, tzinfo=timezone.utc).timetuple()),
+        'timezone': 3600,
+        'main': {'temp': 21.5, 'feels_like': 22.3, 'humidity': 60,
+                 'temp_max': 24.0, 'temp_min': 14.0},
+        'weather': [{'id': 802, 'description': 'scattered clouds'}],
+        'wind': {'speed': 3.47, 'deg': 90},
+        'rain': {'1h': 0.0},
+    }
 
 
 def _forecast_valido():
-    horas = _horas_7dias()
-    probs = [5] * 168
-    probs[14] = 42
-    return {
-        'latitude': 41.65,
-        'longitude': -8.43,
-        'timezone': 'Europe/Lisbon',
-        'current': {
-            'time': '2026-10-07T14:00',
-            'temperature_2m': 21.5,
-            'relative_humidity_2m': 60,
-            'apparent_temperature': 22.3,
-            'precipitation': 0.0,
-            'weathercode': 2,
-            'wind_speed_10m': 12.5,
-            'wind_direction_10m': 90,
-            'uv_index': 3.5,
-        },
-        'hourly': {
-            'time': horas,
-            'temperature_2m': [10.0 + i * 0.1 for i in range(168)],
-            'weathercode': [2] * 168,
-            'precipitation_probability': probs,
-        },
-        'daily': {
-            'time': ['2026-10-07', '2026-10-08', '2026-10-09',
-                     '2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13'],
-            'weathercode': [2, 3, 61, 0, 1, 80, 95],
-            'temperature_2m_max': [24.0, 23.5, 22.0, 21.0, 20.5,
-                                   19.0, 18.5],
-            'temperature_2m_min': [14.0, 13.5, 13.0, 12.5, 12.0,
-                                   11.5, 11.0],
-            'precipitation_probability_max': [10, 20, 30, 0, 5, 60, 80],
-        },
-    }
+    from calendar import timegm
+    from datetime import datetime, timedelta, timezone
+    offset = 3600
+    inicio = datetime(2026, 10, 7)
+    lista = []
+    codigos = [802, 804, 500, 800, 211]
+    for i in range(40):
+        local = inicio + timedelta(hours=3 * i)
+        utc = local - timedelta(seconds=offset)
+        lista.append({
+            'dt': timegm(utc.replace(tzinfo=timezone.utc).timetuple()),
+            'dt_txt': local.strftime('%Y-%m-%d %H:%M:%S'),
+            'main': {'temp': 10.0 + i * 0.1},
+            'weather': [{'id': codigos[i // 8], 'description': 'condição'}],
+            'pop': 0.42 if i == 5 else 0.05,
+            'rain': {'3h': 1.2 if i == 8 else 0.0},
+            'wind': {'speed': 3.0, 'deg': 90},
+        })
+    return {'city': {'timezone': offset}, 'list': lista}
 
 
 class _RespostaFalsa:
@@ -89,11 +80,19 @@ class _RespostaFalsa:
         return self._dados
 
 
+def _mock_request(url, params=None, **kwargs):
+    from app.meteorologia.services import WEATHER_URL
+    dados = (_tempo_atual_valido() if url == WEATHER_URL
+             else _forecast_valido())
+    return _RespostaFalsa(dados)
+
+
 class _BaseMeteo(TestCase):
-    """App isolada com SQLite em memória; a HTTP para Open-Meteo é mockada."""
+    """App isolada com SQLite em memória; as chamadas OpenWeather são mockadas."""
 
     def setUp(self):
         self.app = create_app('testing')
+        self.app.config['OPENWEATHER_API_KEY'] = 'test-chave-testes'
         self.ctx = self.app.app_context()
         self.ctx.push()
         db.create_all()
@@ -151,7 +150,7 @@ class RegistoFerramentaTests(_BaseMeteo):
     def test_despachante_aceita_o_filtro(self):
         with unittest.mock.patch(
                 'app.meteorologia.services.requests.get',
-                return_value=_RespostaFalsa(_forecast_valido())):
+                side_effect=_mock_request):
             resultado = executar_ferramenta(
                 'get_meteorologia', {'detalhado': True},
                 self.user_id, modo='leitura')
@@ -172,11 +171,10 @@ class SemLocalizacaoTests(_BaseMeteo):
 
 
 class PrevisaoTests(_BaseMeteo):
-    """Previsao a partir do payload mockado da Open-Meteo."""
+    """Previsão a partir dos payloads mockados da OpenWeather."""
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     def test_previsao_retorna_payload_compacto_com_todos_os_campos(self, _):
         resultado = get_meteorologia(self.user_id)
@@ -203,7 +201,7 @@ class PrevisaoTests(_BaseMeteo):
         self.assertIn('precipitacao', atual)
 
         diaria = resultado['diaria']
-        self.assertEqual(len(diaria), 7)
+        self.assertEqual(len(diaria), 5)
         d0 = diaria[0]
         self.assertEqual(d0['data'], '2026-10-07')
         self.assertIn('condicao', d0)
@@ -215,11 +213,10 @@ class PrevisaoTests(_BaseMeteo):
         meta = resultado['meta']
         self.assertIn('atualizada_em', meta)
         self.assertIn('fonte', meta)
-        self.assertEqual(meta['fonte'], 'Open-Meteo')
+        self.assertEqual(meta['fonte'], 'OpenWeather')
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     def test_payload_enxuto_sem_campos_excessivos(self, _):
         resultado = get_meteorologia(self.user_id)
@@ -251,8 +248,7 @@ class DetalhadoTests(_BaseMeteo):
     """Payload detalhado: horaria reduzida e SEM diaria."""
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     def test_payload_detalhado_inclui_horaria_reduzida(self, _):
         resultado = get_meteorologia(self.user_id, detalhado=True)
@@ -269,8 +265,7 @@ class DetalhadoTests(_BaseMeteo):
         self.assertIn('prob_precipitacao', h0)
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     def test_diaria_ausente_no_detalhado(self, _):
         resultado = get_meteorologia(self.user_id, detalhado=True)
@@ -283,8 +278,7 @@ class TamanhoTests(_BaseMeteo):
     """O JSON SERIALIZADO (como o modelo recebe) tem de caber em 2000 chars."""
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     def test_payload_compacto_cabe_no_tecto(self, _):
         resultado = get_meteorologia(self.user_id)
@@ -295,8 +289,7 @@ class TamanhoTests(_BaseMeteo):
         self.assertNotIn('aviso', resultado)
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     def test_payload_detalhado_cabe_no_tecto(self, _):
         resultado = get_meteorologia(self.user_id, detalhado=True)
@@ -306,8 +299,7 @@ class TamanhoTests(_BaseMeteo):
         self.assertNotIn('aviso', resultado)
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     @unittest.mock.patch('app.meteorologia.services.descrever_wmo',
                          return_value=('Condição meteorológica extremamente longa e descritiva', '⚡'))
@@ -350,8 +342,7 @@ class IsolamentoTests(_BaseMeteo):
     """Isolamento rigoroso por utilizador."""
 
     @unittest.mock.patch(
-        'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        'app.meteorologia.services.requests.get', side_effect=_mock_request,
     )
     def test_isolamento_utilizador_outro_user_sem_localizacao(self, _):
         # Outro utilizador nao tem localizacao guardada -> erro orientador.
@@ -366,14 +357,14 @@ class FrescuraTests(_BaseMeteo):
 
     @unittest.mock.patch(
         'app.meteorologia.services.requests.get',
-        return_value=_RespostaFalsa(_forecast_valido()),
+        side_effect=_mock_request,
     )
     def test_meta_inclui_fonte_e_data(self, _):
         resultado = get_meteorologia(self.user_id)
         self.assertNotIn('erro', resultado)
         meta = resultado['meta']
         self.assertIn('fonte', meta)
-        self.assertEqual(meta['fonte'], 'Open-Meteo')
+        self.assertEqual(meta['fonte'], 'OpenWeather')
         self.assertIn('atualizada_em', meta)
         # Formato ISO: AAAA-MM-DDTHH:MM
         self.assertRegex(meta['atualizada_em'], r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$')

@@ -1,4 +1,11 @@
-# PIPE — Estado Actual do Projecto — v1.8.41
+# PIPE — Estado Actual do Projecto — v1.8.42
+
+## Versão v1.8.42 — 2026-11-19
+
+- Migrada a Meteorologia para OpenWeather: pesquisa geográfica, condições actuais e previsão gratuita de cinco dias em intervalos de três horas; a previsão diária agrega temperaturas, probabilidade e precipitação. Assistente e Resumo Diário mantêm o payload normalizado; os cartões indicam até cinco dias.
+- As temperaturas do cartão actual e a velocidade do vento são apresentadas como inteiros; mínima diária surge antes da máxima.
+- Validação focada: Meteorologia, Assistente, prompts e Resumo Diário — 75 passaram e 8 subtestes passaram. Suite completa — 478 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por ausência de preços nas fixtures. `compileall` e `git diff --check` limpos.
+- Sem alterações de base de dados ou dependências. No PythonAnywhere, configurar `OPENWEATHER_API_KEY` no ambiente da aplicação e executar `git pull` e Reload.
 
 ## Versão v1.8.41 — 2026-11-17
 

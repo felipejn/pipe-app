@@ -31,7 +31,7 @@ class PrevisaoCache(db.Model):
 
     Uma linha por localizacao (~1 km de precisao); payload em JSON com o
     mesmo formato devolvido por ``obter_previsao``. Serve o módulo
-    Meteorologia, o Assistente e o Resumo Diário quando a Open-Meteo
+    Meteorologia, o Assistente e o Resumo Diário quando a OpenWeather
     está em baixo — nunca mais velho que IDADE_MAXIMA_CACHE_HORAS.
     """
 

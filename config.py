@@ -8,6 +8,9 @@ load_dotenv(os.path.join(os.path.abspath(os.path.dirname(__file__)), '.env'))
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class Config:
+    # OpenWeather API
+    OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY')
+
     # Segurança
     SECRET_KEY = os.environ.get('SECRET_KEY')
     WTF_CSRF_ENABLED = True

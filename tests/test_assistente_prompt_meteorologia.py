@@ -9,7 +9,7 @@ utilizador confrontar ("onde obteve estes dados? ou voce inventou?").
 Os testes sao puras assercoes sobre strings (sem BD, sem HTTP): verificam
 que ambos os system prompts obrigam a chamada previa a ferramenta, proibe
 apresentar valores sem resultado da ferramenta, exigem citar fonte +
-data de actualizacao e explicam o horizonte de 7 dias rolantes.
+    data de actualizacao e explicam o horizonte gratuito de ate 5 dias.
 """
 
 from unittest import TestCase
@@ -50,15 +50,15 @@ class PromptMeteorologiaTests(TestCase):
     def test_exige_citar_fonte_e_data_de_actualizacao(self):
         for prompt in self.PROMPTS:
             with self.subTest(modo='leitura' if prompt is SYSTEM_PROMPT_LEITURA else 'escrita'):
-                self.assertIn('Open-Meteo', prompt)
+                self.assertIn('OpenWeather', prompt)
                 self.assertIn('meta.atualizada_em', prompt)
 
     def test_explica_horizonte_rolante_sem_limite_fixo(self):
         for prompt in self.PROMPTS:
             with self.subTest(modo='leitura' if prompt is SYSTEM_PROMPT_LEITURA else 'escrita'):
                 minusculas = prompt.lower()
-                self.assertIn('7 dias rolantes', minusculas)
-                self.assertIn('nunca inventes um limite fixo', minusculas)
+                self.assertIn('até 5 dias', minusculas)
+                self.assertIn('fora da previsão devolvida', minusculas)
 
     def test_pergunta_simples_nao_dispensa_ferramenta_do_tempo(self):
         self.assertIn('excepto perguntas sobre tempo', SYSTEM_PROMPT_LEITURA.lower())

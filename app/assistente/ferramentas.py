@@ -367,7 +367,7 @@ DEFINICOES_FERRAMENTAS_LEITURA = [
         'type': 'function',
         'function': {
             'name': 'get_meteorologia',
-            'description': 'OBRIGATÓRIO chamar antes de responder a perguntas sobre tempo, temperatura, chuva, vento ou previsão; nunca estimar valores. Devolve a previsão (atual + 7 dias) da localização em Meteorologia. Usar detalhado=True só para previsão horária.',
+            'description': 'OBRIGATÓRIO chamar antes de responder a perguntas sobre tempo, temperatura, chuva, vento ou previsão; nunca estimar valores. Devolve a previsão actual e até 5 dias da localização em Meteorologia. Usar detalhado=True só para previsão horária.',
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -1545,7 +1545,7 @@ def _num_arredondado(v, casas=1):
 
 
 def _previsao_compacta(previsao, local):
-    """Constrói o payload compacto (atual + 7 dias) enviado ao modelo."""
+    """Constrói o payload compacto (atual + até 5 dias) enviado ao modelo."""
     atual = previsao.get('atual') or {}
     diaria = previsao.get('diaria') or []
     return {
@@ -1638,7 +1638,7 @@ def get_meteorologia(user_id, detalhado=False):
     em Meteorologia -> Definir localização; sem localização guardada devolve um
     erro orientador (o modelo encaminha para o módulo, nunca inventa dados).
 
-    Quando a API Open-Meteo está em baixo mas existe previsão guardada (<= 24 h),
+    Quando a API OpenWeather está em baixo mas existe previsão guardada (<= 24 h),
     os dados vêm com meta.de_cache=True — o modelo deve avisar a frescura em vez
     de os apresentar como actuais.
     """

@@ -186,10 +186,9 @@ SYSTEM_PROMPT_LEITURA = (
     "utilizador guardou em Meteorologia; para outra localidade, informa que só tens "
     "acesso à localização guardada e encaminha para o módulo Meteorologia.\n"
     '- NUNCA inventes temperaturas, condições ou tendências: apresenta apenas os '
-    'valores devolvidos pela ferramenta, citando o local, a fonte (Open-Meteo) e a '
-    'data de actualização (meta.atualizada_em). A previsão cobre 7 dias rolantes a '
-    'contar de hoje — nunca inventes um limite fixo de datas nem valores para dias '
-    'fora da previsão devolvida.\n'
+    'valores devolvidos pela ferramenta, citando o local, a fonte (OpenWeather) e a '
+    'data de actualização (meta.atualizada_em). A previsão cobre até 5 dias; nunca '
+    'inventes datas nem valores para dias fora da previsão devolvida.\n'
     '- Se a pergunta for simples (cumprimento, explicação, instrução), responde '
     'diretamente sem chamar ferramentas — excepto perguntas sobre tempo, câmbios ou '
     'combustíveis, que obrigam sempre a chamar a ferramenta correspondente.\n'
@@ -235,10 +234,9 @@ SYSTEM_PROMPT_ESCRITA = (
     'estimes valores a partir do histórico ou do teu conhecimento. Esta regra '
     'sobrepõe-se à resposta directa para perguntas simples.\n'
     '- NUNCA inventes temperaturas, condições ou tendências: apresenta apenas os '
-    'valores devolvidos pela ferramenta, citando o local, a fonte (Open-Meteo) e a '
-    'data de actualização (meta.atualizada_em). A previsão cobre 7 dias rolantes a '
-    'contar de hoje — nunca inventes um limite fixo de datas nem valores para dias '
-    'fora da previsão devolvida.\n'
+    'valores devolvidos pela ferramenta, citando o local, a fonte (OpenWeather) e a '
+    'data de actualização (meta.atualizada_em). A previsão cobre até 5 dias; nunca '
+    'inventes datas nem valores para dias fora da previsão devolvida.\n'
     '- Sê conciso e directo nas respostas.\n'
     '- Mantém o tom formal e profissional.'
 )

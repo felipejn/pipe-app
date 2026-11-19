@@ -6,6 +6,23 @@ Todas as mudanças notáveis deste projecto estão documentadas aqui. A fonte de
 
 ---
 
+## [v1.8.42] — 2026-11-19
+Migrada a Meteorologia para OpenWeather com os endpoints gratuitos de condições actuais e previsão de cinco dias em intervalos de três horas.
+
+**Alterado**
+- Geocoding OpenWeather; payload meteorológico normalizado mantido para o módulo, Assistente e Resumo Diário. A previsão diária agrega máximas/mínimas estimadas a partir dos pontos de três horas, probabilidade máxima e precipitação acumulada; a interface e o Assistente indicam o limite de cinco dias.
+- Temperaturas actuais, sensação térmica, mínimas/máximas e vento são apresentados arredondados a números inteiros; mínima antes da máxima.
+- README actualizado com o requisito `OPENWEATHER_API_KEY` e os passos de deploy.
+
+**Validação**
+- Testes focados de Meteorologia, Assistente, prompts e Resumo Diário: 75 passaram e 8 subtestes passaram. Suite completa: 478 passaram, 1 ignorado e 33 subtestes passaram; 25 falhas conhecidas em `tests/test_assistente_combustiveis.py` por falta de preços nas fixtures.
+- `python -m compileall -q app config.py` e `git diff --check` sem erros. A API real não foi chamada; respostas OpenWeather foram simuladas.
+
+**Notas de deploy**
+- Sem alterações de BD ou dependências. No PythonAnywhere, configurar `OPENWEATHER_API_KEY` no ambiente da aplicação, fazer `git pull` e Reload.
+
+---
+
 ## [v1.8.41] — 2026-11-17
 Os cartões meteorológicos diários apresentam o volume previsto de precipitação acumulado.
 

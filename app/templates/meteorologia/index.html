@@ -37,19 +37,19 @@
   <div class="cartao" style="margin-bottom:1rem;">
     <p style="margin:0 0 .5rem 0;">
       <strong style="font-size:2.2rem;line-height:2.2rem;">
-        {{ '—' if a.temperatura is none else '%.1f'|format(a.temperatura) }} °C
+        {{ '—' if a.temperatura is none else '%.0f'|format(a.temperatura) }} °C
       </strong>
       <span style="font-size:1.1rem;"> {{ a.emoji }} {{ a.descricao_pt }}</span>
     </p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.6rem;">
-      <div><span class="texto-subtil">Sensação</span><br>{{ '—' if a.sensacao_termica is none else '%.1f'|format(a.sensacao_termica) }} °C</div>
+      <div><span class="texto-subtil">Sensação</span><br>{{ '—' if a.sensacao_termica is none else '%.0f'|format(a.sensacao_termica) }} °C</div>
       <div><span class="texto-subtil">Umidade</span><br>{{ '—' if a.humidade is none else a.humidade|int }} %</div>
       <div><span class="texto-subtil">Precipitação</span><br>{{ '—' if a.precipitacao is none else a.precipitacao }} mm</div>
       <div><span class="texto-subtil">Prob. precip.</span><br>{{ '—' if a.probabilidade_precipitacao is none else a.probabilidade_precipitacao|int }} %</div>
       <div><span class="texto-subtil">Vento</span><br>{{ '—' if a.vento_velocidade is none else a.vento_velocidade }} km/h {{ a.vento_direcao_cardinal }}</div>
       <div><span class="texto-subtil">UV</span><br>{{ '—' if a.uv is none else a.uv }}</div>
-      <div><span class="texto-subtil">Máx hoje</span><br>{{ '—' if a.temp_max_hoje is none else '%.1f'|format(a.temp_max_hoje) }} °C</div>
-      <div><span class="texto-subtil">Mín hoje</span><br>{{ '—' if a.temp_min_hoje is none else '%.1f'|format(a.temp_min_hoje) }} °C</div>
+      <div><span class="texto-subtil">Mín hoje</span><br>{{ '—' if a.temp_min_hoje is none else '%.0f'|format(a.temp_min_hoje) }} °C</div>
+      <div><span class="texto-subtil">Máx hoje</span><br>{{ '—' if a.temp_max_hoje is none else '%.0f'|format(a.temp_max_hoje) }} °C</div>
     </div>
   </div>
 
@@ -69,7 +69,7 @@
   </div>
 
   <div class="cartao" style="margin-bottom:1rem;">
-    <h3 style="margin-top:0;">Próximos 7 dias</h3>
+    <h3 style="margin-top:0;">Próximos dias (até 5)</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;">
       {% for d in previsao.diaria %}
       <div class="cartao" style="text-align:center;padding:.5rem;">

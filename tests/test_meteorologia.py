@@ -13,6 +13,7 @@ from app import create_app, db  # noqa: E402
 @pytest.fixture
 def app():
     app = create_app('testing')
+    app.config['OPENWEATHER_API_KEY'] = 'test-chave-testes'
     with app.app_context():
         uri = str(db.engine.url)
         assert 'memory' in uri, f'ABORTADO: BD real ({uri}).'
@@ -96,23 +97,20 @@ class _RespostaFalsa:
         return self._dados
 
 
-GEOCODING_VILA_VERDE = {
-    'results': [
-        {'id': 1, 'name': 'Vila Verde', 'latitude': 41.65,
-         'longitude': -8.43, 'country': 'Portugal',
-         'admin1': 'Distrito de Braga', 'admin2': 'Vila Verde',
-         'timezone': 'Europe/Lisbon'},
-        {'id': 2, 'name': 'Vila Verde', 'latitude': 39.0,
-         'longitude': -9.0, 'country': 'Portugal',
-         'admin1': 'Distrito de Lisboa', 'timezone': 'Europe/Lisbon'},
-    ]
-}
+GEOCODING_VILA_VERDE = [
+    {'name': 'Vila Verde', 'local_names': {'pt': 'Vila Verde'},
+     'lat': 41.65, 'lon': -8.43, 'country': 'PT', 'state': 'Braga'},
+    {'name': 'Vila Verde', 'lat': 39.0, 'lon': -9.0,
+     'country': 'PT', 'state': 'Lisboa'},
+]
 
 
 def _mock_get_vila_verde(monkeypatch):
     import app.meteorologia.services as servicos
     def falso_get(url, params=None, timeout=None, headers=None):
-        assert params['name'] == 'Vila Verde'
+        assert params['q'] == 'Vila Verde'
+        assert params['limit'] == 5
+        assert params['appid'] == 'test-chave-testes'
         return _RespostaFalsa(GEOCODING_VILA_VERDE)
     monkeypatch.setattr(servicos.requests, 'get', falso_get)
 
@@ -134,8 +132,9 @@ class TestPesquisar:
         assert len(resultados) == 2
         primeiro, segundo = resultados
         assert primeiro['nome'] == 'Vila Verde'
-        assert primeiro['regiao'] == 'Distrito de Braga'
-        assert primeiro['detalhe'] == 'Vila Verde'
+        assert primeiro['pais'] == 'Portugal'
+        assert primeiro['regiao'] == 'Braga'
+        assert primeiro['detalhe'] is None
         assert primeiro['latitude'] == 41.65
         assert segundo['detalhe'] is None
 
@@ -262,58 +261,55 @@ class _RespostaForecast:
         return self._dados
 
 
-def _horas_7dias():
-    from datetime import datetime as _dt, timedelta as _td
-    base = _dt(2026, 10, 7, 0, 0)
-    return [(base + _td(hours=i)).strftime('%Y-%m-%dT%H:00')
-            for i in range(168)]
-
-
-def _forecast_valido(hora_atual='2026-10-07T14:00'):
-    horas = _horas_7dias()
-    probs = [5] * 168
-    probs[14] = 42
+def _tempo_atual_valido():
+    from calendar import timegm
+    from datetime import datetime, timezone
     return {
-        'latitude': 41.65, 'longitude': -8.43,
-        'timezone': 'Europe/Lisbon',
-        'current': {
-            'time': hora_atual, 'temperature_2m': 21.5,
-            'relative_humidity_2m': 60,
-            'apparent_temperature': 22.3, 'precipitation': 0.0,
-            'weathercode': 2, 'wind_speed_10m': 12.5,
-            'wind_direction_10m': 90, 'uv_index': 3.5,
-        },
-        'hourly': {
-            'time': horas,
-            'temperature_2m': [10.0 + i * 0.1 for i in range(168)],
-            'weathercode': [2] * 168,
-            'precipitation_probability': probs,
-            'precipitation': [0.0] * 168,
-        },
-        'daily': {
-            'time': ['2026-10-07', '2026-10-08', '2026-10-09',
-                     '2026-10-10', '2026-10-11', '2026-10-12',
-                     '2026-10-13'],
-            'weathercode': [2, 3, 61, 0, 1, 80, 95],
-            'temperature_2m_max': [24.0, 23.5, 22.0, 21.0, 20.5,
-                                   19.0, 18.5],
-            'temperature_2m_min': [14.0, 13.5, 13.0, 12.5, 12.0,
-                                   11.5, 11.0],
-            'precipitation_probability_max': [10, 20, 30, 0, 5, 60, 80],
-            'precipitation_sum': [0, 1.2, 0, 3.4, 0, 2.1, 0],
-        },
+        'dt': timegm(datetime(2026, 10, 7, 13, tzinfo=timezone.utc).timetuple()),
+        'timezone': 3600,
+        'main': {'temp': 21.5, 'feels_like': 22.3, 'humidity': 60,
+                 'temp_max': 24.0, 'temp_min': 14.0},
+        'weather': [{'id': 802, 'description': 'scattered clouds'}],
+        'wind': {'speed': 3.47, 'deg': 90},
+        'rain': {'1h': 0.0},
     }
+
+
+def _forecast_valido():
+    from calendar import timegm
+    from datetime import datetime, timedelta, timezone
+    offset = 3600
+    base_local = datetime(2026, 10, 7)
+    lista = []
+    codigos = [802, 804, 500, 800, 211]
+    for i in range(40):
+        local = base_local + timedelta(hours=3 * i)
+        utc = local - timedelta(seconds=offset)
+        lista.append({
+            'dt': timegm(utc.replace(tzinfo=timezone.utc).timetuple()),
+            'dt_txt': local.strftime('%Y-%m-%d %H:%M:%S'),
+            'main': {'temp': 10.0 + i * 0.1},
+            'weather': [{'id': codigos[i // 8], 'description': 'condição'}],
+            'pop': 0.42 if i == 5 else 0.05,
+            'rain': {'3h': 1.2 if i == 8 else 0.0},
+            'wind': {'speed': 3.0, 'deg': 90},
+        })
+    return {'city': {'timezone': offset}, 'list': lista}
 
 
 def _mock_forecast(monkeypatch, dados=None, captar=None):
     import app.meteorologia.services as servicos
-    payload = dados if dados is not None else _forecast_valido()
+    forecast = dados if dados is not None else _forecast_valido()
+    atual = _tempo_atual_valido()
 
     def falso_get(url, params=None, timeout=None, headers=None):
         if captar is not None:
-            captar.update(params or {})
-        assert params.get('timezone') == 'auto'
-        return _RespostaForecast(payload)
+            captar.setdefault(url, []).append(params or {})
+        assert params.get('appid')
+        if url == servicos.WEATHER_URL:
+            return _RespostaForecast(atual)
+        assert url == servicos.FORECAST_5DAY_URL
+        return _RespostaForecast(forecast)
 
     monkeypatch.setattr(servicos.requests, 'get', falso_get)
 
@@ -332,18 +328,18 @@ class TestObterPrevisao:
         assert atual['humidade'] == 60
         assert atual['precipitacao'] == 0.0
         assert atual['probabilidade_precipitacao'] == 42
-        assert atual['codigo_wmo'] == 2
-        assert atual['vento_velocidade'] == 12.5
+        assert atual['codigo_wmo'] == 802
+        assert atual['vento_velocidade'] == 12
         assert atual['vento_direcao_graus'] == 90
-        assert atual['uv'] == 3.5
-        assert atual['temp_max_hoje'] == 24.0
-        assert atual['temp_min_hoje'] == 14.0
+        assert atual['uv'] is None
+        assert atual['temp_max_hoje'] == 10.7
+        assert atual['temp_min_hoje'] == 10.0
 
     def test_campos_derivados(self, monkeypatch):
         from app.meteorologia import services as servicos
         _mock_forecast(monkeypatch)
         atual = servicos.obter_previsao(41.65, -8.43)['atual']
-        assert atual['descricao_pt'] == 'Parcialmente nublado'
+        assert atual['descricao_pt'] == 'Nuvens dispersas'
         assert atual['emoji'] == '⛅'
         assert atual['vento_direcao_cardinal'] == 'Este'
 
@@ -352,19 +348,20 @@ class TestObterPrevisao:
         captar = {}
         _mock_forecast(monkeypatch, captar=captar)
         previsao = servicos.obter_previsao(41.65, -8.43)
-        assert previsao['timezone'] == 'Europe/Lisbon'
-        assert previsao['fonte'] == 'Open-Meteo'
-        assert captar.get('forecast_days') == 7
-        assert 'precipitation' in captar.get('hourly', '')
-        assert 'precipitation_sum' in captar.get('daily', '')
-        assert len(previsao['horaria']) == 24
-        assert previsao['horaria'][0]['hora'] == '2026-10-07T14:00'
+        assert previsao['timezone'] == 'UTC+01:00'
+        assert previsao['fonte'] == 'OpenWeather'
+        assert len(captar[servicos.WEATHER_URL]) == 1
+        assert len(captar[servicos.FORECAST_5DAY_URL]) == 1
+        assert captar[servicos.WEATHER_URL][0]['units'] == 'metric'
+        assert captar[servicos.FORECAST_5DAY_URL][0]['units'] == 'metric'
+        assert len(previsao['horaria']) <= 8
+        assert previsao['horaria'][0]['hora'] == '2026-10-07T15:00'
         assert previsao['horaria'][0]['prob_precipitacao'] == 42
         assert previsao['horaria'][0]['precipitacao'] == 0.0
-        assert len(previsao['diaria']) == 7
-        assert previsao['diaria'][0]['temp_max'] == 24.0
-        assert previsao['diaria'][0]['temp_min'] == 14.0
-        assert previsao['diaria'][2]['codigo_wmo'] == 61
+        assert len(previsao['diaria']) == 5
+        assert previsao['diaria'][0]['temp_max'] == 10.7
+        assert previsao['diaria'][0]['temp_min'] == 10.0
+        assert previsao['diaria'][2]['codigo_wmo'] == 500
         assert previsao['diaria'][1]['precipitacao'] == 1.2
 
     def test_lat_lon_invalidos_devolve_none(self):
@@ -393,6 +390,31 @@ class TestObterPrevisao:
         monkeypatch.setattr(servicos.requests, 'get', falhar)
         assert servicos.obter_previsao(41.65, -8.43) is None
 
+    def test_falha_no_forecast_nao_devolve_temperatura_parcial(self, monkeypatch):
+        import requests
+        import app.meteorologia.services as servicos
+        chamadas = []
+
+        def get(url, **kwargs):
+            chamadas.append(url)
+            if url == servicos.WEATHER_URL:
+                return _RespostaForecast(_tempo_atual_valido())
+            raise requests.Timeout('forecast indisponível')
+
+        monkeypatch.setattr(servicos.requests, 'get', get)
+        assert servicos.obter_previsao(41.65, -8.43) is None
+        assert chamadas == [servicos.WEATHER_URL, servicos.FORECAST_5DAY_URL]
+
+    def test_sem_chave_nao_faz_pedido(self, app, monkeypatch):
+        from flask import current_app
+        import app.meteorologia.services as servicos
+        monkeypatch.delenv('OPENWEATHER_API_KEY', raising=False)
+        monkeypatch.setitem(current_app.config, 'OPENWEATHER_API_KEY', '')
+        monkeypatch.setattr(
+            servicos.requests, 'get',
+            lambda *args, **kwargs: pytest.fail('não devia chamar a API'))
+        assert servicos.obter_previsao(41.65, -8.43) is None
+
     def test_sem_current_devolve_none(self, monkeypatch):
         from app.meteorologia import services as servicos
         _mock_forecast(monkeypatch, dados={'timezone': 'x'})
@@ -400,14 +422,11 @@ class TestObterPrevisao:
 
     def test_campos_em_falta_dao_none_sem_quebrar(self, monkeypatch):
         from app.meteorologia import services as servicos
-        dados = _forecast_valido()
-        del dados['current']['uv_index']
-        del dados['current']['apparent_temperature']
-        _mock_forecast(monkeypatch, dados=dados)
+        _mock_forecast(monkeypatch)
         previsao = servicos.obter_previsao(41.65, -8.43)
         assert previsao is not None
         assert previsao['atual']['uv'] is None
-        assert previsao['atual']['sensacao_termica'] is None
+        assert previsao['atual']['sensacao_termica'] == 22.3
 
 
 class TestWmoEVento:
@@ -432,6 +451,13 @@ class TestWmoEVento:
         assert direcao_cardinal(45) == 'Nordeste'
         assert direcao_cardinal(None) == '—'
         assert direcao_cardinal('x') == '—'
+
+    def test_codigos_openweather_conhecidos(self):
+        from app.meteorologia.services import descrever_openweather
+        assert descrever_openweather(800)[0] == 'Céu limpo'
+        assert descrever_openweather(802)[0] == 'Nuvens dispersas'
+        assert descrever_openweather(500)[0] == 'Chuva fraca'
+        assert descrever_openweather(211)[0] == 'Trovoada'
 
 
 class TestObterPrevisaoUtilizador:
@@ -493,7 +519,7 @@ class TestPaginaPrevisao:
     def test_com_local_mostra_previsao(
             self, authenticated_client, monkeypatch):
         dados = _forecast_valido()
-        dados['hourly']['precipitation'][14] = 0.4
+        dados['list'][5]['rain']['3h'] = 0.4
         _mock_forecast(monkeypatch, dados=dados)
         r = authenticated_client.post('/meteorologia/api/localizacao', json={
             'nome': 'Vila Verde', 'latitude': 41.65,
@@ -504,9 +530,14 @@ class TestPaginaPrevisao:
         assert resposta.status_code == 200
         corpo = resposta.data.decode('utf-8')
         assert 'Vila Verde' in corpo
-        assert '21,5' in corpo or '21.5' in corpo
+        assert '22 °C' in corpo
+        assert '21,5 °C' not in corpo and '21.5 °C' not in corpo
+        assert '22,3 °C' not in corpo and '22.3 °C' not in corpo
+        assert '11 °C' in corpo
+        assert '10 °C' in corpo
         assert '0,4 mm' in corpo or '0.4 mm' in corpo
         assert 'Mudar' in corpo
+        assert corpo.index('Mín hoje') < corpo.index('Máx hoje')
 
     def test_cache_antiga_sem_volume_horario_mostra_traco(
             self, authenticated_client, monkeypatch):
@@ -547,10 +578,7 @@ class TestPaginaPrevisao:
 
     def test_campos_em_falta_mostram_traco(
             self, authenticated_client, monkeypatch):
-        dados = _forecast_valido()
-        del dados['current']['uv_index']
-        del dados['current']['apparent_temperature']
-        _mock_forecast(monkeypatch, dados=dados)
+        _mock_forecast(monkeypatch)
         r = authenticated_client.post('/meteorologia/api/localizacao', json={
             'nome': 'Vila Verde', 'latitude': 41.65,
             'longitude': -8.43, 'pais': 'Portugal'})

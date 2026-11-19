@@ -216,27 +216,36 @@ def test_localidade_guardada_identifica_a_previsao_no_resumo(contexto):
     assert 'Meteorologia em Vila Verde:' in resultado['texto']
 
 
-def test_open_meteo_usa_weather_code_documentado_e_mantem_formato_normalizado():
+def test_openweather_normaliza_condicao_e_mantem_formato_do_resumo():
     from app.meteorologia import services as meteorologia
+    from calendar import timegm
+    from datetime import datetime, timezone
 
     class Resposta:
+        def __init__(self, dados):
+            self.dados = dados
+
         def raise_for_status(self):
             pass
 
         def json(self):
-            return {
-                'timezone': 'Europe/Lisbon',
-                'current': {'time': '2026-10-07T12:00', 'temperature_2m': 20,
-                            'weather_code': 2},
-                'hourly': {'time': [], 'weather_code': [],
-                           'temperature_2m': [], 'precipitation_probability': []},
-                'daily': {'time': ['2026-10-07'], 'weather_code': [61],
-                          'temperature_2m_max': [22], 'temperature_2m_min': [13],
-                          'precipitation_probability_max': [45]},
-            }
+            return self.dados
 
-    with patch.object(meteorologia.requests, 'get', return_value=Resposta()) as pedido:
+    atual = {
+        'dt': timegm(datetime(2026, 10, 7, 12, tzinfo=timezone.utc).timetuple()),
+        'timezone': 0,
+        'main': {'temp': 20, 'feels_like': 20, 'humidity': 60,
+                 'temp_max': 20, 'temp_min': 20},
+        'weather': [{'id': 500}],
+    }
+    forecast = {'city': {'timezone': 0}, 'list': [{
+        'dt': atual['dt'], 'dt_txt': '2026-10-07 12:00:00',
+        'main': {'temp': 13}, 'weather': [{'id': 500}],
+        'pop': 0.45, 'rain': {'3h': 0},
+    }]}
+    with patch.object(meteorologia.requests, 'get',
+                      side_effect=[Resposta(atual), Resposta(forecast)]) as pedido:
         previsao = meteorologia.obter_previsao(41.55, -8.42)
-    assert 'weather_code' in pedido.call_args.kwargs['params']['daily']
-    assert previsao['diaria'][0]['codigo_wmo'] == 61
+    assert pedido.call_count == 2
+    assert previsao['diaria'][0]['codigo_wmo'] == 500
     assert previsao['diaria'][0]['temp_min'] == 13

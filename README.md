@@ -71,7 +71,7 @@ PIPE started as a practical Flask exercise and grew into a portfolio piece: the 
 | 📝 **Notes** | Google-Keep-style colour cards (8 colours), checklists, labels, pin/archive, real-time search |
 | 🔑 **Passwords** | Cryptographic password/passphrase/PIN generator **and** an encrypted vault with Chrome autofill |
 | 📅 **Calendar** | Monthly + agenda views, colour-coded events, reminders the day before and on the day |
-| 🌤️ **Weather** | Open-Meteo forecast (hourly 24h + 7 days) for your saved location — no API key required |
+| 🌤️ **Weather** | OpenWeather current conditions + 3-hour forecast (up to 5 days) for your saved location — requires `OPENWEATHER_API_KEY` |
 | ⛽ **Fuel prices** | Portuguese station prices (API Aberta) for your chosen municipalities, refreshed by scheduled job, staleness/archiving rules |
 | ☀️ **Daily digest** | Deterministic + LLM-written summary of your day, sent to Telegram at 07:00 |
 | 🤖 **AI assistant** | Natural-language interface over every module (see [spotlight](#spotlight-ai-assistant-with-tool-use)) |
@@ -101,7 +101,7 @@ Modules are **opt-in per user**. The store (`/modulos/loja`) toggles modules at 
 
 ### Spotlight: weather with offline fallback
 
-Open-Meteo geocoding + forecast (no API key). When the API is down, the app serves the **last successful forecast up to 24 h old** from its own cache table, clearly flagged as cached — the assistant and daily digest share the same fallback.
+OpenWeather geocoding, current conditions and 5-day/3-hour forecast. Set `OPENWEATHER_API_KEY` to enable it. When the API is down, the app serves the **last successful forecast up to 24 h old** from its own cache table, clearly flagged as cached — the assistant and daily digest share the same fallback.
 
 ### Spotlight: privacy-preserving sharing
 
@@ -148,7 +148,7 @@ Tasks, notes and events can be shared with another user **by e-mail address only
 | Rate limiting | Flask-Limiter |
 | Cryptography | `cryptography` (AES-256-GCM), `bcrypt`, PBKDF2 (hashlib) |
 | AI | OpenRouter — chat completions + tool use, free-model fallback chain |
-| Integrations | Telegram Bot API · Zoho Mail REST (OAuth 2.0) · Wise FX · Open-Meteo · API Aberta · EuroMillions public API |
+| Integrations | Telegram Bot API · Zoho Mail REST (OAuth 2.0) · Wise FX · OpenWeather · API Aberta · EuroMillions public API |
 | Imaging | Pillow + pillow-heif |
 | Frontend | Vanilla HTML/CSS/JS — CSS custom-property design system (dark/light), PWA (manifest + service worker) |
 | Tests | pytest (in-memory SQLite fixtures) |
@@ -167,7 +167,7 @@ Flask blueprints (one per module: auth, tarefas, notas, calendario,
         ▼
 Services / business rules ──┬──► SQLite (Flask-SQLAlchemy + Flask-Migrate)
                             └──► External APIs (OpenRouter, Telegram, Zoho,
-                                 Wise, Open-Meteo, API Aberta)
+                                 Wise, OpenWeather, API Aberta)
 ```
 
 Every module is an independent blueprint: to add one, create the package, register the blueprint, add a manifest entry — the dashboard card appears automatically. Optional per-module dashboard providers plug into a registry loaded at startup.
@@ -208,6 +208,7 @@ pip install -r requirements.txt
 # Configuration
 cp .env.example .env
 # Edit .env and set SECRET_KEY (required — generate with: python -c "import secrets; print(secrets.token_hex(32))")
+# Set OPENWEATHER_API_KEY to enable the Weather module.
 # Everything else is optional locally — integrations degrade gracefully.
 
 # Database migrations + first admin user
@@ -231,6 +232,7 @@ The app is available at `http://127.0.0.1:5000`.
 | `ZOHO_CLIENT_ID` / `ZOHO_CLIENT_SECRET` / `ZOHO_REFRESH_TOKEN` / `ZOHO_ACCOUNT_ID` / `ZOHO_FROM_EMAIL` / `ZOHO_DC` | ❌ | Zoho Mail OAuth 2.0 (invites, 2FA e-mail, notifications) |
 | `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | ❌ | AI assistant (free-model fallback chain) |
 | `WISE_API_KEY` | ❌ | Exchange rates (falls back to ExchangeRate-API without it) |
+| `OPENWEATHER_API_KEY` | ❌ | Weather geocoding and current + 5-day forecast |
 | `APIABERTA_API_KEY` | ❌ | Fuel prices (anonymous tier works without it) |
 | `COFRE_CORS_ORIGINS` | ❌ | Chrome-extension origins allowed to call the vault API |
 | `PIPE_PUBLIC_URL` | ❌ | Base URL for links in scheduled-task e-mails |
@@ -242,8 +244,9 @@ The app is available at `http://127.0.0.1:5000`.
 Production runs on **PythonAnywhere** (free plan, nginx):
 
 1. `git pull` → `pip install -r requirements.txt` → **Reload**
-2. On schema changes: `python scripts/backup_bd.py` → `flask db upgrade` → verify with `flask db current` / `flask db check`
-3. One scheduled task runs `scripts/pipe_tasks.py` daily at **07:00**
+2. Configure `OPENWEATHER_API_KEY` in the PythonAnywhere web app environment before Reload; no database migration or dependency change is required for the OpenWeather switch.
+3. On schema changes: `python scripts/backup_bd.py` → `flask db upgrade` → verify with `flask db current` / `flask db check`
+4. One scheduled task runs `scripts/pipe_tasks.py` daily at **07:00**
 
 Full deploy procedures, migrations and known pitfalls are documented in the [CHANGELOG](CHANGELOG.md) and [project status](Estado_Atual.md).
 

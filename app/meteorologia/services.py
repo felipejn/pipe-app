@@ -5,18 +5,32 @@ simples, para futura reutilizacao pelo Assistente. A cache da ultima
 previsao e o unico ponto que toca o BD — e opcional (best-effort) e
 esta isolado das funcoes puras.
 """
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import os
 
 import json
 import logging
 
 import requests
 
-GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search'
-FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
+GEOCODING_URL = 'https://api.openweathermap.org/geo/1.0/direct'
+WEATHER_URL = 'https://api.openweathermap.org/data/2.5/weather'
+FORECAST_5DAY_URL = 'https://api.openweathermap.org/data/2.5/forecast'
 USER_AGENT = 'PIPE-Meteorologia/1.0'
 TIMEOUT_SEGUNDOS = 8
 TIMEZONE_PREDEFINIDO = 'Europe/Lisbon'
+PAISES_PT = {'PT': 'Portugal'}
+
+
+def _openweather_api_key():
+    try:
+        from flask import current_app, has_app_context
+        if has_app_context():
+            return current_app.config.get('OPENWEATHER_API_KEY') or os.environ.get(
+                'OPENWEATHER_API_KEY')
+    except ImportError:
+        pass
+    return os.environ.get('OPENWEATHER_API_KEY')
 
 # Cache da ultima previsao com sucesso (fallback quando a API falha).
 # Uma linha por coordenadas arredondadas (~1 km); payload em JSON no
@@ -35,7 +49,7 @@ TETO_TIMEZONE = 64
 
 
 def pesquisar_locais(q):
-    """Pesquisa locais na API Geocoding da Open-Meteo.
+    """Pesquisa locais na API Geocoding da OpenWeather.
 
     Devolve lista normalizada [{nome, latitude, longitude, pais, regiao,
     detalhe, timezone}], [] se pesquisa invalida/sem resultados,
@@ -44,11 +58,13 @@ def pesquisar_locais(q):
     texto = (q or '').strip()
     if len(texto) < 2 or len(texto) > 100:
         return []
+    chave = _openweather_api_key()
+    if not chave:
+        return None
     try:
         resposta = requests.get(
             GEOCODING_URL,
-            params={'name': texto, 'count': 5,
-                    'language': 'pt', 'format': 'json'},
+            params={'q': texto, 'limit': 5, 'appid': chave},
             timeout=TIMEOUT_SEGUNDOS,
             headers={'User-Agent': USER_AGENT},
         )
@@ -56,17 +72,18 @@ def pesquisar_locais(q):
         dados = resposta.json()
     except Exception:
         return None
-    resultados = dados.get('results', []) or []
+    resultados = dados if isinstance(dados, list) else []
     locais = []
     for item in resultados:
         try:
             locais.append({
-                'nome': item.get('name'),
-                'latitude': item.get('latitude'),
-                'longitude': item.get('longitude'),
-                'pais': item.get('country'),
-                'regiao': item.get('admin1'),
-                'detalhe': item.get('admin2'),
+                'nome': (item.get('local_names') or {}).get('pt')
+                        or item.get('name'),
+                'latitude': item.get('lat'),
+                'longitude': item.get('lon'),
+                'pais': PAISES_PT.get(item.get('country'), item.get('country')),
+                'regiao': item.get('state'),
+                'detalhe': None,
                 'timezone': item.get('timezone') or TIMEZONE_PREDEFINIDO,
             })
         except Exception:
@@ -195,19 +212,48 @@ def direcao_cardinal(graus):
 
 
 
-# ── Etapa B — Previsão ──
+# ── Etapa B — Previsão OpenWeather ──
 
-PARAMS_FORECAST = {
-    'current': ('temperature_2m,relative_humidity_2m,apparent_temperature,'
-                'precipitation,weather_code,wind_speed_10m,'
-                'wind_direction_10m,uv_index'),
-    'hourly': ('temperature_2m,weather_code,precipitation_probability,'
-               'precipitation'),
-    'daily': ('weather_code,temperature_2m_max,temperature_2m_min,'
-              'precipitation_probability_max,precipitation_sum'),
-    'timezone': 'auto',
-    'forecast_days': 7,
+MAPA_OPENWEATHER = {
+    200: ('Trovoada com chuva fraca', '⛈️'),
+    201: ('Trovoada com chuva', '⛈️'),
+    202: ('Trovoada com chuva forte', '⛈️'),
+    210: ('Trovoada fraca', '⛈️'), 211: ('Trovoada', '⛈️'),
+    212: ('Trovoada forte', '⛈️'), 221: ('Trovoada irregular', '⛈️'),
+    230: ('Trovoada com chuvisco fraco', '⛈️'),
+    231: ('Trovoada com chuvisco', '⛈️'),
+    232: ('Trovoada com chuvisco forte', '⛈️'),
+    300: ('Chuvisco fraco', '🌦️'), 301: ('Chuvisco', '🌦️'),
+    302: ('Chuvisco forte', '🌧️'), 310: ('Chuva fraca', '🌦️'),
+    311: ('Chuva', '🌧️'), 312: ('Chuva forte', '🌧️'),
+    313: ('Aguaceiros', '🌧️'), 314: ('Aguaceiros fortes', '🌧️'),
+    321: ('Aguaceiros', '🌧️'),
+    500: ('Chuva fraca', '🌦️'), 501: ('Chuva moderada', '🌧️'),
+    502: ('Chuva forte', '🌧️'), 503: ('Chuva muito forte', '🌧️'),
+    504: ('Chuva extrema', '🌧️'), 511: ('Chuva gelada', '🌧️'),
+    520: ('Aguaceiros fracos', '🌦️'), 521: ('Aguaceiros', '🌧️'),
+    522: ('Aguaceiros fortes', '🌧️'), 531: ('Aguaceiros irregulares', '🌧️'),
+    600: ('Neve fraca', '🌨️'), 601: ('Neve', '🌨️'),
+    602: ('Neve forte', '❄️'), 611: ('Granizo e neve', '🌨️'),
+    612: ('Aguaceiros de neve fracos', '🌨️'),
+    613: ('Aguaceiros de neve', '🌨️'), 615: ('Chuva e neve fracas', '🌨️'),
+    616: ('Chuva e neve', '🌨️'), 620: ('Aguaceiros de neve fracos', '🌨️'),
+    621: ('Aguaceiros de neve', '🌨️'), 622: ('Aguaceiros de neve fortes', '❄️'),
+    701: ('Nevoeiro', '🌫️'), 711: ('Fumo', '🌫️'), 721: ('Bruma', '🌫️'),
+    731: ('Redemoinhos de areia', '🌪️'), 741: ('Nevoeiro', '🌫️'),
+    751: ('Areia', '🌫️'), 761: ('Poeira', '🌫️'), 762: ('Cinzas vulcânicas', '🌫️'),
+    771: ('Rajadas de vento', '💨'), 781: ('Tornado', '🌪️'),
+    800: ('Céu limpo', '☀️'), 801: ('Poucas nuvens', '🌤️'),
+    802: ('Nuvens dispersas', '⛅'), 803: ('Nuvens fragmentadas', '☁️'),
+    804: ('Encoberto', '☁️'),
 }
+
+
+def descrever_openweather(codigo):
+    try:
+        return MAPA_OPENWEATHER.get(int(codigo), ('—', '❔'))
+    except (TypeError, ValueError):
+        return ('—', '❔')
 
 
 def _coordenadas_validas(lat, lon):
@@ -221,20 +267,6 @@ def _coordenadas_validas(lat, lon):
     return lat, lon
 
 
-def _indice_hora_atual(hora_atual, horas):
-    """Indice em hourly.time da hora de current.time (fallback: >=; None)."""
-    if not hora_atual or not horas:
-        return None
-    alvo = str(hora_atual)[:13]
-    for i, h in enumerate(horas):
-        if str(h)[:13] == alvo:
-            return i
-    for i, h in enumerate(horas):
-        if str(h) >= str(hora_atual):
-            return i
-    return None
-
-
 def _num(valor):
     try:
         if valor is None or isinstance(valor, bool):
@@ -244,22 +276,8 @@ def _num(valor):
         return None
 
 
-def _wmo_seguro(lista, i):
-    if i >= len(lista):
-        return None
-    try:
-        return int(lista[i]) if lista[i] is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _campo_compat(dados, nome_documentado, nome_antigo):
-    """Lê o nome actual da API ou o nome antigo usado por respostas existentes."""
-    return dados.get(nome_documentado, dados.get(nome_antigo))
-
-
 def obter_previsao(lat, lon):
-    """Previsao normalizada para (lat, lon) ou None se a API falhar.
+    """Previsão OpenWeather normalizada para coordenadas ou None se falhar.
 
     Com a API em baixo, serve a ultima previsao guardada (ate
     IDADE_MAXIMA_CACHE_HORAS) com de_cache=True; sem cache valida,
@@ -270,103 +288,152 @@ def obter_previsao(lat, lon):
     if coords is None:
         return None
     lat, lon = coords
+    chave = _openweather_api_key()
+    if not chave:
+        return _servir_cache_ou_none(lat, lon)
     try:
-        resposta = requests.get(
-            FORECAST_URL,
-            params={'latitude': lat, 'longitude': lon, **PARAMS_FORECAST},
-            timeout=TIMEOUT_SEGUNDOS,
-            headers={'User-Agent': USER_AGENT},
-        )
-        resposta.raise_for_status()
-        dados = resposta.json()
+        params = {'lat': lat, 'lon': lon, 'appid': chave,
+                  'units': 'metric', 'lang': 'pt'}
+        resposta_atual = requests.get(
+            WEATHER_URL, params=params, timeout=TIMEOUT_SEGUNDOS,
+            headers={'User-Agent': USER_AGENT})
+        resposta_atual.raise_for_status()
+        atual_api = resposta_atual.json()
+        resposta_forecast = requests.get(
+            FORECAST_5DAY_URL, params=params, timeout=TIMEOUT_SEGUNDOS,
+            headers={'User-Agent': USER_AGENT})
+        resposta_forecast.raise_for_status()
+        dados = resposta_forecast.json()
     except Exception:
         return _servir_cache_ou_none(lat, lon)
     try:
-        atual_api = dados.get('current') or {}
         if not isinstance(atual_api, dict) or not atual_api:
             return None
-        horaria_api = dados.get('hourly') or {}
-        diaria_api = dados.get('daily') or {}
-        horas = horaria_api.get('time') or []
-        probs = horaria_api.get('precipitation_probability') or []
-        precips = horaria_api.get('precipitation') or []
-        temps_h = horaria_api.get('temperature_2m') or []
-        wmos_h = _campo_compat(horaria_api, 'weather_code', 'weathercode') or []
-        idx = _indice_hora_atual(atual_api.get('time'), horas)
-        prob_atual = None
-        if idx is not None and idx < len(probs):
-            prob_atual = _num(probs[idx])
-        max_hoje = (diaria_api.get('temperature_2m_max') or [None])[0]
-        min_hoje = (diaria_api.get('temperature_2m_min') or [None])[0]
-        codigo = _campo_compat(atual_api, 'weather_code', 'weathercode')
-        try:
-            codigo_int = int(codigo) if codigo is not None else None
-        except (TypeError, ValueError):
-            codigo_int = None
-        descricao, emoji = descrever_wmo(codigo_int)
-        graus = _num(atual_api.get('wind_direction_10m'))
+        if not isinstance(dados, dict) or not isinstance(dados.get('list'), list):
+            return None
+        main = atual_api.get('main') or {}
+        vento_api = atual_api.get('wind') or {}
+        weather = (atual_api.get('weather') or [{}])[0]
+        offset = int(atual_api.get('timezone', dados.get('city', {}).get('timezone', 0)))
+        timezone_nome = _timezone_offset(offset)
+        agora_epoch = _num(atual_api.get('dt'))
+        if agora_epoch is None:
+            return None
+        agora_local = datetime.fromtimestamp(
+            agora_epoch + offset, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M')
+        codigo_int = int(weather['id']) if weather.get('id') is not None else None
+        descricao, emoji = descrever_openweather(codigo_int)
+        graus = _num(vento_api.get('deg'))
+        entradas = sorted(
+            (item for item in dados['list'] if isinstance(item, dict)
+             and _num(item.get('dt')) is not None),
+            key=lambda item: float(item['dt']))
+        proxima = next((item for item in entradas
+                        if float(item['dt']) >= agora_epoch), None)
+        pop_atual = _num(proxima.get('pop')) if proxima else None
+        if pop_atual is not None:
+            pop_atual *= 100
+        precip_atual = sum(_num((atual_api.get(k) or {}).get('1h')) or 0
+                           for k in ('rain', 'snow'))
         atual = {
-            'hora': atual_api.get('time'),
-            'temperatura': _num(atual_api.get('temperature_2m')),
-            'sensacao_termica': _num(atual_api.get('apparent_temperature')),
-            'humidade': _num(atual_api.get('relative_humidity_2m')),
-            'precipitacao': _num(atual_api.get('precipitation')),
-            'probabilidade_precipitacao': prob_atual,
+            'hora': agora_local,
+            'temperatura': _num(main.get('temp')),
+            'sensacao_termica': _num(main.get('feels_like')),
+            'humidade': _num(main.get('humidity')),
+            'precipitacao': precip_atual,
+            'probabilidade_precipitacao': pop_atual,
             'codigo_wmo': codigo_int,
-            'vento_velocidade': _num(atual_api.get('wind_speed_10m')),
+            'vento_velocidade': (round(_num(vento_api.get('speed')) * 3.6)
+                                 if _num(vento_api.get('speed')) is not None else None),
             'vento_direcao_graus': graus,
-            'uv': _num(atual_api.get('uv_index')),
-            'temp_max_hoje': _num(max_hoje),
-            'temp_min_hoje': _num(min_hoje),
+            'uv': _num(atual_api.get('uvi')),
+            'temp_max_hoje': _num(main.get('temp_max')),
+            'temp_min_hoje': _num(main.get('temp_min')),
             'descricao_pt': descricao,
             'emoji': emoji,
             'vento_direcao_cardinal': direcao_cardinal(graus),
         }
-        inicio = idx if idx is not None else 0
         horaria = []
-        for i in range(inicio, min(inicio + 24, len(horas))):
-            cod_h = _wmo_seguro(wmos_h, i)
+        limite_horas = agora_epoch + 24 * 60 * 60
+        for item in entradas:
+            dt = float(item['dt'])
+            if dt < agora_epoch or dt > limite_horas:
+                continue
+            main_item = item.get('main') or {}
+            condicao = (item.get('weather') or [{}])[0]
+            cod_h = int(condicao['id']) if condicao.get('id') is not None else None
+            chuva = sum(_num((item.get(k) or {}).get('3h')) or 0
+                        for k in ('rain', 'snow'))
+            pop = _num(item.get('pop'))
+            if pop is not None:
+                pop *= 100
             horaria.append({
-                'hora': horas[i],
-                'temperatura': _num(temps_h[i]) if i < len(temps_h) else None,
+                'hora': item.get('dt_txt', '').replace(' ', 'T')[:16],
+                'temperatura': _num(main_item.get('temp')),
                 'codigo_wmo': cod_h,
-                'descricao_pt': descrever_wmo(cod_h)[0],
-                'emoji': descrever_wmo(cod_h)[1],
-                'prob_precipitacao': _num(probs[i]) if i < len(probs) else None,
-                'precipitacao': _num(precips[i]) if i < len(precips) else None,
+                'descricao_pt': descrever_openweather(cod_h)[0],
+                'emoji': descrever_openweather(cod_h)[1],
+                'prob_precipitacao': pop,
+                'precipitacao': chuva,
             })
+        grupos = {}
+        for item in entradas:
+            data_local = str(item.get('dt_txt') or '')[:10]
+            if len(data_local) != 10:
+                continue
+            grupo = grupos.setdefault(data_local, [])
+            grupo.append(item)
         diaria = []
-        dias = diaria_api.get('time') or []
-        wmos_d = _campo_compat(diaria_api, 'weather_code', 'weathercode') or []
-        maxs = diaria_api.get('temperature_2m_max') or []
-        mins = diaria_api.get('temperature_2m_min') or []
-        probs_d = diaria_api.get('precipitation_probability_max') or []
-        precips_d = diaria_api.get('precipitation_sum') or []
-        for i in range(min(7, len(dias))):
-            cod_d = _wmo_seguro(wmos_d, i)
+        for data_local, itens in list(sorted(grupos.items()))[:5]:
+            temps = [_num((item.get('main') or {}).get('temp'))
+                     for item in itens]
+            temps = [t for t in temps if t is not None]
+            condicoes = [((item.get('weather') or [{}])[0].get('id'))
+                         for item in itens]
+            contagem = {}
+            for codigo in condicoes:
+                if codigo is not None:
+                    contagem[codigo] = contagem.get(codigo, 0) + 1
+            cod_d = max(contagem, key=contagem.get) if contagem else None
+            probs = [_num(item.get('pop')) for item in itens]
+            probs = [p for p in probs if p is not None]
+            precipitacao = sum(
+                sum(_num((item.get(k) or {}).get('3h')) or 0
+                    for k in ('rain', 'snow')) for item in itens)
             diaria.append({
-                'data': dias[i],
+                'data': data_local,
                 'codigo_wmo': cod_d,
-                'descricao_pt': descrever_wmo(cod_d)[0],
-                'emoji': descrever_wmo(cod_d)[1],
-                'temp_max': _num(maxs[i]) if i < len(maxs) else None,
-                'temp_min': _num(mins[i]) if i < len(mins) else None,
-                'prob_precipitacao': _num(probs_d[i]) if i < len(probs_d) else None,
-                'precipitacao': _num(precips_d[i]) if i < len(precips_d) else None,
+                'descricao_pt': descrever_openweather(cod_d)[0],
+                'emoji': descrever_openweather(cod_d)[1],
+                'temp_max': max(temps) if temps else None,
+                'temp_min': min(temps) if temps else None,
+                'prob_precipitacao': max(probs) * 100 if probs else None,
+                'precipitacao': precipitacao,
             })
+        resumo_hoje = next((dia for dia in diaria
+                            if dia['data'] == agora_local[:10]), None)
+        if resumo_hoje:
+            atual['temp_max_hoje'] = resumo_hoje['temp_max']
+            atual['temp_min_hoje'] = resumo_hoje['temp_min']
         payload = {
             'atual': atual,
             'horaria': horaria,
             'diaria': diaria,
-            'timezone': dados.get('timezone') or TIMEZONE_PREDEFINIDO,
+            'timezone': timezone_nome,
             'atualizada_em': datetime.utcnow().strftime('%Y-%m-%dT%H:%M'),
-            'fonte': 'Open-Meteo',
+            'fonte': 'OpenWeather',
         }
     except Exception:
         return _servir_cache_ou_none(lat, lon)
 
     _gravar_previsao_cache(lat, lon, payload)
     return payload
+
+
+def _timezone_offset(offset):
+    sinal = '+' if offset >= 0 else '-'
+    minutos = abs(int(offset)) // 60
+    return f'UTC{sinal}{minutos // 60:02d}:{minutos % 60:02d}'
 
 
 def _gravar_previsao_cache(lat, lon, payload):
